@@ -1,0 +1,53 @@
+# 构建阶段
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# 安装 pnpm
+RUN npm install -g pnpm
+
+# 复制 package.json 和 lock 文件
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/canvas-editor/package.json ./apps/canvas-editor/
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/ui-components/package.json ./packages/ui-components/
+COPY packages/common-util/package.json ./packages/common-util/
+
+# 安装依赖
+RUN pnpm install --frozen-lockfile
+
+# 复制源代码
+COPY tsconfig.json ./
+COPY apps/canvas-editor ./apps/canvas-editor
+COPY packages/shared-types ./packages/shared-types
+COPY packages/ui-components ./packages/ui-components
+COPY packages/common-util ./packages/common-util
+
+# 构建
+WORKDIR /app/apps/canvas-editor
+RUN pnpm run build
+
+# 生产阶段
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# 复制构建产物
+COPY --from=builder /app/apps/canvas-editor/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/canvas-editor/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/canvas-editor/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
+CMD ["node", "server.js"]

@@ -1,0 +1,39 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "checkJs": false,
+    "jsx": "react-jsx",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "removeComments": true,
+    "noEmit": false,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ai-lowcode/shared-types": ["packages/shared-types/src"],
+      "@ai-lowcode/ui-components": ["packages/ui-components/src"],
+      "@ai-lowcode/ai-sdk": ["packages/ai-sdk/src"],
+      "@ai-lowcode/code-generator": ["packages/code-generator/src"],
+      "@ai-lowcode/datasource-core": ["packages/datasource-core/src"],
+      "@ai-lowcode/common-util": ["packages/common-util/src"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build", ".next", "out"]
+}

@@ -1,0 +1,49 @@
+# 构建阶段
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# 安装 pnpm
+RUN npm install -g pnpm
+
+# 复制 package.json 和 lock 文件
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/nest-server/package.json ./apps/nest-server/
+COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/common-util/package.json ./packages/common-util/
+COPY packages/datasource-core/package.json ./packages/datasource-core/
+
+# 安装依赖
+RUN pnpm install --frozen-lockfile
+
+# 复制源代码
+COPY tsconfig.json ./
+COPY apps/nest-server ./apps/nest-server
+COPY packages/shared-types ./packages/shared-types
+COPY packages/common-util ./packages/common-util
+COPY packages/datasource-core ./packages/datasource-core
+
+# 构建
+WORKDIR /app/apps/nest-server
+RUN pnpm run build
+
+# 生产阶段
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nestjs
+
+# 复制构建产物
+COPY --from=builder /app/apps/nest-server/dist ./dist
+COPY --from=builder /app/apps/nest-server/node_modules ./node_modules
+COPY --from=builder /app/apps/nest-server/package.json ./
+
+USER nestjs
+
+EXPOSE 3000
+
+CMD ["node", "dist/main.js"]

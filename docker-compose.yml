@@ -1,0 +1,296 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # 基础服务层
+  # ============================================
+
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: ai-lowcode-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres123
+      POSTGRES_DB: ai_lowcode
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+      - ./database-ai-tables.sql:/docker-entrypoint-initdb.d/02-ai-tables.sql
+    networks:
+      - ai-lowcode-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: ai-lowcode-redis
+    command: redis-server --appendonly yes --requirepass redis123
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai-lowcode-network
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', 'redis123', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ============================================
+  # 向量数据库层 (Milvus)
+  # ============================================
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    container_name: ai-lowcode-etcd
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - etcd_data:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - ai-lowcode-network
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: ai-lowcode-minio
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio_data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    networks:
+      - ai-lowcode-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9000/minio/health/live']
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    restart: unless-stopped
+
+  milvus:
+    image: milvusdb/milvus:v2.3.3
+    container_name: ai-lowcode-milvus
+    command: ['milvus', 'run', 'standalone']
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvus_data:/var/lib/milvus
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:9091/healthz']
+      interval: 30s
+      start_period: 90s
+      timeout: 20s
+      retries: 3
+    ports:
+      - '19530:19530'
+      - '9091:9091'
+    depends_on:
+      etcd:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - ai-lowcode-network
+    restart: unless-stopped
+
+  # ============================================
+  # AI 服务层
+  # ============================================
+
+  # AI 辅助服务 (可选 - 需要配置 LLM API Key)
+  ai-assistant:
+    image: node:18-alpine
+    container_name: ai-lowcode-ai-assistant
+    working_dir: /app
+    volumes:
+      - ./packages/lang-ai-core:/app/lang-ai-core
+      - ./packages/code-generator:/app/code-generator
+    command: >
+      sh -c "
+        cd /app/lang-ai-core && 
+        npm install && 
+        echo 'AI Assistant service ready - configure LLM API key in .env to enable'"
+    environment:
+      - NODE_ENV=development
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    networks:
+      - ai-lowcode-network
+    restart: unless-stopped
+
+  # ============================================
+  # 应用服务层
+  # ============================================
+
+  # NestJS 后端服务
+  nest-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.nest-server
+    container_name: ai-lowcode-nest-server
+    environment:
+      - NODE_ENV=production
+      # 数据库配置
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=postgres123
+      - DB_DATABASE=ai_lowcode
+      # Redis 配置
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=redis123
+      # JWT 配置
+      - JWT_SECRET=ai-lowcode-jwt-secret-change-in-production
+      - JWT_EXPIRES_IN=7d
+      # 服务端口
+      - PORT=3000
+      # Milvus 配置
+      - MILVUS_HOST=milvus
+      - MILVUS_PORT=19530
+      # AI 配置 (需要填入实际的 API Key)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - DASHSCOPE_API_KEY=${DASHSCOPE_API_KEY:-}
+    ports:
+      - '3000:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+    networks:
+      - ai-lowcode-network
+    restart: unless-stopped
+
+  # Next.js 画布编辑器
+  canvas-editor:
+    build:
+      context: .
+      dockerfile: Dockerfile.canvas-editor
+    container_name: ai-lowcode-canvas-editor
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:3000
+      - NEXT_PUBLIC_MILVUS_URL=http://milvus:19530
+    ports:
+      - '3001:3000'
+    depends_on:
+      - nest-server
+    networks:
+      - ai-lowcode-network
+    restart: unless-stopped
+
+  # React 管理后台
+  admin-dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile.admin-dashboard
+    container_name: ai-lowcode-admin-dashboard
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=http://localhost:3000
+    ports:
+      - '3002:80'
+    depends_on:
+      - nest-server
+    networks:
+      - ai-lowcode-network
+    restart: unless-stopped
+
+  # ============================================
+  # 监控服务 (可选)
+  # ============================================
+
+  # pgAdmin PostgreSQL 管理界面
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ai-lowcode-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ailowcode.dev
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - '5050:80'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - ai-lowcode-network
+    restart: unless-stopped
+
+  # Redis Commander 可视化工具
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ai-lowcode-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+      HTTP_USER: admin
+      HTTP_PASSWORD: admin123
+    ports:
+      - '8081:8081'
+    depends_on:
+      - redis
+    networks:
+      - ai-lowcode-network
+    restart: unless-stopped
+
+  # Attu Milvus 可视化管理工具
+  attu:
+    image: zilliz/attu:v2.3
+    container_name: ai-lowcode-attu
+    environment:
+      MILVUS_URL: milvus:19530
+    ports:
+      - '3003:3000'
+    depends_on:
+      - milvus
+    networks:
+      - ai-lowcode-network
+    restart: unless-stopped
+
+# ============================================
+# 网络配置
+# ============================================
+volumes:
+  postgres_data:
+  redis_data:
+  etcd_data:
+  minio_data:
+  milvus_data:
+  pgadmin_data:
+
+networks:
+  ai-lowcode-network:
+    driver: bridge
+
+# ============================================
+# 健康检查脚本 (用于验证服务启动)
+# ============================================
