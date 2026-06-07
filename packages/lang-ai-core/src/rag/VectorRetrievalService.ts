@@ -3,7 +3,7 @@
  * 提供相似度召回功能
  */
 
-import { MilvusVectorStore } from './MilvusVectorStore'
+import { MilvusVectorStore } from '../vectorstore/MilvusVectorStore'
 import { RAGProcessor } from './RAGProcessor'
 import type { MilvusConfig, RAGConfig } from '@ai-lowcode/shared-types'
 

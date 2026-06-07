@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsNumber, IsEnum, IsArray } from 'class-validator'
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator'
 
 /**
  * 文档类型枚举

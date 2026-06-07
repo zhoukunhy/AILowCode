@@ -95,7 +95,7 @@ export class DataSourceController {
   @ApiOperation({ summary: '上传插件' })
   @ApiResponse({ status: 201, type: PluginEntity })
   async uploadPlugin(
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: any,
     @Body() dto: CreatePluginDto
   ) {
     return this.dataSourceService.uploadPlugin(file, dto)

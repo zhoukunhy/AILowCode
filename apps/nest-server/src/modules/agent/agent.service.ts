@@ -209,6 +209,7 @@ export class AgentService {
 
     // 构建配置
     const llmConfig: LLMConfig = {
+      provider: 'openai',
       apiKey: process.env.LLM_API_KEY || '',
       model: process.env.LLM_MODEL || 'gpt-4',
       baseUrl: process.env.LLM_BASE_URL,

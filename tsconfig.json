@@ -24,7 +24,7 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "incremental": true,
+    "incremental": false,
     "baseUrl": ".",
     "paths": {
       "@ai-lowcode/shared-types": ["packages/shared-types/src"],

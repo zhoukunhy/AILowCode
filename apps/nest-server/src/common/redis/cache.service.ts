@@ -189,9 +189,9 @@ export class CacheService {
     
     try {
       // 使用 SET NX 实现分布式锁
-      const result = await this.cacheManager.store.set(lockKey, lockValue, {
+      const result = await (this.cacheManager.store as any).set(lockKey, lockValue, {
         ttl: Math.ceil(ttl / 1000),
-        nx: true, // 只有当key不存在时才设置
+        nx: true,
       })
       
       return result === 'OK' || result === true
@@ -265,7 +265,8 @@ export class CacheService {
    */
   async getStats(): Promise<any> {
     try {
-      const stats = await this.cacheManager.store.getStats?.()
+      const store = this.cacheManager.store as any
+      const stats = store.getStats ? await store.getStats() : {}
       return {
         bloomFilters: this.bloomFilters.size,
         ...stats,

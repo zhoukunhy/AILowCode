@@ -19,8 +19,7 @@ import {
   CreateKnowledgeBaseDto, 
   UpdateKnowledgeBaseDto, 
   UploadDocumentDto, 
-  SearchKnowledgeDto,
-  DocumentChunkPreviewDto 
+  SearchKnowledgeDto
 } from './dto/knowledge.dto'
 
 /**
@@ -100,7 +99,7 @@ export class KnowledgeController {
   async uploadDocumentFile(
     @Body('knowledgeBaseId') knowledgeBaseId: string,
     @Body('type') type: string,
-    @UploadedFile() file: Express.Multer.File
+    @UploadedFile() file: any
   ) {
     if (!file) {
       throw new BadRequestException('文件不能为空')

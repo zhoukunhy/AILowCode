@@ -3,7 +3,7 @@
  * SQL_DDL / Nest_Crud / Http_Test
  */
 
-import type { z } from 'zod'
+import { z } from 'zod'
 
 // ==================== 工具输入/输出 Schema ====================
 

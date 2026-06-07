@@ -8,15 +8,15 @@ import {
   UpdateKnowledgeBaseDto, 
   UploadDocumentDto, 
   SearchKnowledgeDto,
-  DocumentChunkPreviewDto 
+  DocumentChunkPreviewDto
 } from './dto/knowledge.dto'
 import { 
   RAGPipelineService, 
   VectorRetrievalService,
-  MilvusVectorStore,
-  RAGProcessor
+  MilvusVectorStore
 } from '@ai-lowcode/lang-ai-core'
-import type { MilvusConfig, RAGConfig, RAGPipelineConfig } from '@ai-lowcode/shared-types'
+import type { RAGPipelineConfig } from '@ai-lowcode/lang-ai-core'
+import type { MilvusConfig } from '@ai-lowcode/shared-types'
 
 /**
  * 知识库服务
@@ -26,7 +26,6 @@ import type { MilvusConfig, RAGConfig, RAGPipelineConfig } from '@ai-lowcode/sha
 export class KnowledgeService {
   private readonly logger = new Logger(KnowledgeService.name)
   private milvusClients: Map<number, MilvusVectorStore> = new Map()
-  private ragProcessors: Map<string, RAGProcessor> = new Map()
   private ragPipelineServices: Map<number, RAGPipelineService> = new Map()
   private retrievalServices: Map<number, VectorRetrievalService> = new Map()
 
@@ -474,30 +473,6 @@ export class KnowledgeService {
       this.logger.error(`创建 Milvus 客户端失败: ${error instanceof Error ? error.message : String(error)}`)
       return null
     }
-  }
-
-  /**
-   * 获取 RAG 处理器
-   */
-  private async getRAGProcessor(knowledgeBase: KnowledgeBaseEntity): Promise<RAGProcessor> {
-    const cacheKey = `${knowledgeBase.id}-${knowledgeBase.embeddingModel}`
-    
-    if (this.ragProcessors.has(cacheKey)) {
-      return this.ragProcessors.get(cacheKey)!
-    }
-
-    const ragConfig: RAGConfig = {
-      embeddingApiKey: process.env.EMBEDDING_API_KEY || '',
-      embeddingModel: knowledgeBase.embeddingModel || 'text-embedding-3-small',
-      embeddingBaseUrl: process.env.EMBEDDING_BASE_URL,
-      chunkSize: 1000,
-      chunkOverlap: 200,
-    }
-
-    const ragProcessor = new RAGProcessor(ragConfig)
-    this.ragProcessors.set(cacheKey, ragProcessor)
-
-    return ragProcessor
   }
 
   /**

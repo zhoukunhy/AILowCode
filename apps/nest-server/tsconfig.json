@@ -10,6 +10,7 @@
     "allowSyntheticDefaultImports": true,
     "outDir": "./dist",
     "baseUrl": ".",
+    "composite": false,
     "paths": {
       "@/*": ["./src/*"],
       "@ai-lowcode/shared-types": ["../../packages/shared-types/src"],

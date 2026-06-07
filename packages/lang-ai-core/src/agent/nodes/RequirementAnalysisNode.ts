@@ -4,7 +4,7 @@
  */
 import { AgentState, RequirementAnalysis, ExtractedEntity, SubTask } from './types'
 import { StateUpdate } from './LangGraphState'
-import { LLMFactory } from '../llm/LLMFactory'
+import { LLMFactory } from '../../llm/LLMFactory'
 import type { LLMConfig } from '@ai-lowcode/shared-types'
 
 export interface RequirementAnalysisNodeConfig {

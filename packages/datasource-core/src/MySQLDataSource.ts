@@ -95,7 +95,7 @@ export class MySQLDataSource {
     const result = await this.query(
       "SHOW TABLES"
     )
-    return result.rows.map((row: any) => Object.values(row)[0])
+    return result.rows.map((row: any) => Object.values(row)[0]) as string[]
   }
 
   /**

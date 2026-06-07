@@ -257,7 +257,7 @@ export class ${input.entityName}Controller {
 
   ${swagger ? `@ApiOperation({ summary: '创建${input.entityName}' })` : ''}
   @Post()
-  ${swagger ? '@ApiResponse({ status: 201, description: '创建成功' })' : ''}
+  ${swagger ? `@ApiResponse({ status: 201, description: '创建成功' })` : ''}
   create(@Body() createDto: Create${input.entityName}Dto) {
     return this.service.create(createDto)
   }

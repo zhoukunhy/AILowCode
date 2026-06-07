@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsEnum, IsUrl } from 'class-validator'
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsEnum } from 'class-validator'
 
 /**
  * LLM 提供商枚举

@@ -41,8 +41,11 @@ export { DataSourceManager, createDataSourceManager } from './DataSourceManager'
 export { WasmSandbox, createWasmSandbox } from './WasmSandbox'
 export type { PluginInstance, PluginMetadata, ComponentMetadata, PropDefinition } from './WasmSandbox'
 
+// 导入类型
+import type { DatabaseConfig, QueryResult } from './types'
+
 // 旧版导出保持兼容
-export type { DatabaseType } from './types'
+export type { DataSourceType as DatabaseType } from './types'
 
 export class DataSource {
   private config: DatabaseConfig
@@ -97,20 +100,24 @@ export class DataSource {
 
 export class RedisClient {
   private config: DatabaseConfig
-  private client: any
+  private _client: any
 
   constructor(config: DatabaseConfig) {
     this.config = config
   }
 
+  get client(): any {
+    return this._client
+  }
+
   async connect(): Promise<void> {
     console.log(`连接Redis: ${this.config.host}:${this.config.port}`)
-    this.client = true
+    this._client = true
   }
 
   async disconnect(): Promise<void> {
     console.log('断开Redis连接')
-    this.client = null
+    this._client = null
   }
 
   async get(key: string): Promise<string | null> {

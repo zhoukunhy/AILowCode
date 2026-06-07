@@ -2,7 +2,7 @@
  * HTTP 数据源连接器
  * 支持 REST API 和 GraphQL
  */
-import { HttpConfig, QueryResult, PreviewResult, EndpointMetadata, ParameterMetadata } from './types'
+import { HttpConfig, QueryResult, PreviewResult, EndpointMetadata } from './types'
 
 export class HttpDataSource {
   private config: HttpConfig
@@ -59,7 +59,6 @@ export class HttpDataSource {
         'Content-Type': 'application/json',
         ...this.config.headers,
       },
-      timeout: this.config.timeout || 30000,
     }
 
     // 添加认证
@@ -130,7 +129,7 @@ export class HttpDataSource {
   /**
    * 模拟响应数据
    */
-  private mockResponse(path: string, method: string): any {
+  private mockResponse(path: string, _method: string): any {
     const mockData: Record<string, any> = {
       '/users': {
         data: [

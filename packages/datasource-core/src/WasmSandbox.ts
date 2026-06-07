@@ -2,9 +2,11 @@
  * Wasm 沙盒模块
  * 支持用户上传自定义组件插件，沙箱隔离运行
  */
+declare const WebAssembly: any
+
 export class WasmSandbox {
   private plugins: Map<string, PluginInstance> = new Map()
-  private moduleCache: Map<string, WebAssembly.Module> = new Map()
+  private moduleCache: Map<string, any> = new Map()
   private globalExports: Map<string, any> = new Map()
 
   /**
@@ -45,7 +47,7 @@ export class WasmSandbox {
   /**
    * 创建隔离的导入对象
    */
-  private createImportObject(memory: WebAssembly.Memory): WebAssembly.Imports {
+  private createImportObject(memory: any): any {
     return {
       env: {
         memory,
@@ -79,7 +81,7 @@ export class WasmSandbox {
   /**
    * 从内存读取字符串
    */
-  private readString(memory: WebAssembly.Memory, ptr: number, len: number): string {
+  private readString(memory: any, ptr: number, len: number): string {
     const buffer = new Uint8Array(memory.buffer, ptr, len)
     return new TextDecoder().decode(buffer)
   }
@@ -87,7 +89,7 @@ export class WasmSandbox {
   /**
    * 验证插件格式
    */
-  private validatePlugin(instance: WebAssembly.Instance, name: string): PluginInstance {
+  private validatePlugin(instance: any, name: string): PluginInstance {
     const exports = instance.exports as any
     
     // 检查必需的导出函数
@@ -213,7 +215,7 @@ export class WasmSandbox {
  */
 export interface PluginInstance {
   name: string
-  instance: WebAssembly.Instance
+  instance: any
   metadata: PluginMetadata
   exports: any
   status: 'loaded' | 'error' | 'unloaded'

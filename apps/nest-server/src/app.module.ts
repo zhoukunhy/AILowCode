@@ -12,6 +12,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module'
 import { AgentModule } from './modules/agent/agent.module'
 import { CodegenModule } from './modules/codegen/codegen.module'
 import { DataSourceModule } from './modules/data-source/data-source.module'
+import { RedisModule } from './common/redis/redis.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { RolesGuard } from './modules/auth/guards/roles.guard'
 
@@ -53,6 +54,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard'
     AgentModule,
     CodegenModule,
     DataSourceModule,
+    RedisModule,
   ],
   providers: [
     {

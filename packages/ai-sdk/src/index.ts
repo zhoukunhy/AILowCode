@@ -41,7 +41,10 @@ export class AIService {
         }),
       })
 
-      const data = await response.json()
+      const data = await response.json() as {
+        choices: [{ message: { content: string } }]
+        usage: { prompt_tokens: number; completion_tokens: number; total_tokens: number }
+      }
       
       return {
         content: data.choices[0].message.content,

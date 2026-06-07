@@ -6,7 +6,7 @@
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
 import { DocumentLoaderFactory } from './DocumentLoader'
 import { RAGProcessor } from './RAGProcessor'
-import { MilvusVectorStore } from './MilvusVectorStore'
+import { MilvusVectorStore } from '../vectorstore/MilvusVectorStore'
 import type { MilvusConfig, RAGConfig, RAGDocument } from '@ai-lowcode/shared-types'
 import type { Document } from '@langchain/core/documents'
 

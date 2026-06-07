@@ -3,18 +3,16 @@
   "version": "1.0.0",
   "description": "AI Language Model Core - LangChain integration with LLM factory, RAG, and Milvus vector store",
   "main": "dist/index.js",
-  "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format cjs,esm --dts",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "build": "node build.js",
+    "dev": "tsup src/index.ts --format cjs --watch",
     "clean": "rm -rf dist node_modules",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",

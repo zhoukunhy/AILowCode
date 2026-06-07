@@ -4,7 +4,7 @@
  */
 import { AgentState, SchemaGenerationResult, PageSchema, ComponentSchema } from './types'
 import { StateUpdate } from './LangGraphState'
-import { LLMFactory } from '../llm/LLMFactory'
+import { LLMFactory } from '../../llm/LLMFactory'
 import type { LLMConfig } from '@ai-lowcode/shared-types'
 
 export interface SchemaGenerationNodeConfig {

@@ -3,7 +3,9 @@
  * 实现 AI 调用限流，防止滥用
  */
 
-import Redis from 'ioredis'
+import { createClient } from 'redis'
+
+type Redis = ReturnType<typeof createClient>
 
 /**
  * 限流配置
@@ -131,7 +133,7 @@ export class TokenBucketRateLimiter {
     const now = Date.now()
 
     try {
-      const result = await this.redis.eval(
+      const result = await (this.redis as any).eval(
         this.luaScript,
         1,
         key,
@@ -175,7 +177,7 @@ export class TokenBucketRateLimiter {
     const now = Date.now()
 
     try {
-      const data = await this.redis.hmget(key, 'tokens', 'lastRefill')
+      const data = await (this.redis as any).hmGet(key, 'tokens', 'lastRefill')
       let tokens = parseFloat(data[0] || String(this.config.capacity))
       const lastRefill = parseFloat(data[1] || String(now))
 
@@ -206,7 +208,7 @@ export class TokenBucketRateLimiter {
     const pattern = `${this.keyPrefix}*`
     const keys = await this.redis.keys(pattern)
     if (keys.length > 0) {
-      await this.redis.del(...keys)
+      await (this.redis as any).del(...keys)
     }
   }
 
@@ -223,7 +225,6 @@ export class TokenBucketRateLimiter {
  */
 export class AIRateLimiter {
   private limiter: TokenBucketRateLimiter
-  private userLimiters: Map<string, TokenBucketRateLimiter> = new Map()
 
   constructor(redis: Redis) {
     this.limiter = new TokenBucketRateLimiter(redis, {

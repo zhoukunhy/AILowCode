@@ -4,7 +4,7 @@
  */
 import { AgentState, RAGRetrievalResult, RetrievedDocument } from './types'
 import { StateUpdate } from './LangGraphState'
-import { VectorRetrievalService } from '../rag/VectorRetrievalService'
+import { VectorRetrievalService } from '../../rag/VectorRetrievalService'
 import type { MilvusConfig, RAGConfig } from '@ai-lowcode/shared-types'
 
 export interface RAGRetrievalNodeConfig {

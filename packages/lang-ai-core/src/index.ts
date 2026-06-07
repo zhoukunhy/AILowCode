@@ -86,7 +86,6 @@ export {
 
 export {
   createErrorCollectionNode,
-  createRAGRetrievalNode,
   createRootCauseAnalysisNode,
   createFixSuggestionNode,
   createKnowledgeUpdateNode,
@@ -165,9 +164,12 @@ export type {
   PageVersionSnapshot,
   VersionMetadata,
   AIOptimizationSuggestion,
+} from './agent/openapi/OpenAPITypes'
+
+export type {
   OpenAPIAgentState,
   OpenAPIAgentConfig,
-} from './agent/openapi/OpenAPITypes'
+} from './agent/openapi/OpenAPIAgentExecutor'
 
 // 工具调用 Agent (AI3)
 export {

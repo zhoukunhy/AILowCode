@@ -5,10 +5,10 @@ import { Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { v4 as uuidv4 } from 'uuid'
-import * as JSZip from 'jszip'
+import JSZip from 'jszip'
 import { CodeGenerationLogEntity } from './entities/code-generation-log.entity'
 import { GenerateCodeDto, GenerateCodeResponseDto } from './dto/codegen.dto'
-import { CodeGenerator, createCodeGenerator } from '@ai-lowcode/code-generator'
+import { createCodeGenerator } from '@ai-lowcode/code-generator'
 import { CacheService } from '../../common/redis/cache.service'
 
 @Injectable()

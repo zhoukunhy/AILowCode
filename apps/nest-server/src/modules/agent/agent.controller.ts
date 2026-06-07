@@ -9,8 +9,7 @@ import {
   Delete, 
   Body, 
   Param, 
-  Query,
-  BadRequestException,
+  Query
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { AgentService } from './agent.service'

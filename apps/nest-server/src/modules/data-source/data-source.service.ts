@@ -13,10 +13,9 @@ import {
   CreateDataSourceDto, 
   UpdateDataSourceDto, 
   PreviewDataDto, 
-  CreatePluginDto,
-  DataSourceType 
+  CreatePluginDto
 } from './dto/data-source.dto'
-import { DataSourceManager, createDataSourceManager } from '@ai-lowcode/datasource-core'
+import { createDataSourceManager } from '@ai-lowcode/datasource-core'
 
 @Injectable()
 export class DataSourceService {
@@ -46,11 +45,11 @@ export class DataSourceService {
       // 验证配置
       const validation = await this.dataSourceManager.validateDataSource(
         dto.type,
-        dto.config
+        dto.config as any
       )
 
       if (!validation.success) {
-        throw new BadRequestException(`配置验证失败: ${validation.error}`)
+        throw new BadRequestException(`配置验证失败: ${(validation as any).error || '未知错误'}`)
       }
 
       const dataSource = this.dataSourceRepository.create({
@@ -64,7 +63,7 @@ export class DataSourceService {
       await this.dataSourceManager.registerDataSource(
         saved.id.toString(),
         dto.type,
-        dto.config
+        dto.config as any
       )
 
       this.logger.log(`数据源创建成功: ${saved.name}`)
@@ -109,11 +108,11 @@ export class DataSourceService {
       // 验证新配置
       const validation = await this.dataSourceManager.validateDataSource(
         dataSource.type as any,
-        dto.config
+        dto.config as any
       )
 
       if (!validation.success) {
-        throw new BadRequestException(`配置验证失败: ${validation.error}`)
+        throw new BadRequestException(`配置验证失败: ${(validation as any).error || '未知错误'}`)
       }
     }
 
@@ -148,7 +147,7 @@ export class DataSourceService {
     try {
       const validation = await this.dataSourceManager.validateDataSource(
         dataSource.type as any,
-        dataSource.config
+        dataSource.config as any
       )
 
       // 更新连接状态
@@ -173,7 +172,7 @@ export class DataSourceService {
         await this.dataSourceManager.registerDataSource(
           dataSource.id.toString(),
           dataSource.type as any,
-          dataSource.config
+          dataSource.config as any
         )
       }
 
@@ -184,7 +183,7 @@ export class DataSourceService {
         dataSourceId: dataSource.id.toString(),
         componentId: 'preview',
         fieldMapping: {},
-        queryConfig: dto.queryConfig,
+        queryConfig: dto.queryConfig as any,
       })
 
       // 预览数据
@@ -214,7 +213,7 @@ export class DataSourceService {
       await this.dataSourceManager.registerDataSource(
         dataSource.id.toString(),
         dataSource.type as any,
-        dataSource.config
+        dataSource.config as any
       )
     }
 
@@ -226,7 +225,7 @@ export class DataSourceService {
   /**
    * 上传插件
    */
-  async uploadPlugin(file: Express.Multer.File, dto: CreatePluginDto): Promise<PluginEntity> {
+  async uploadPlugin(file: any, dto: CreatePluginDto): Promise<PluginEntity> {
     try {
       // 生成唯一文件名
       const fileName = `${dto.name}-${dto.version}-${uuidv4()}.wasm`
@@ -289,7 +288,7 @@ export class DataSourceService {
       if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath)
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.warn(`删除插件文件失败: ${error.message}`)
     }
 
