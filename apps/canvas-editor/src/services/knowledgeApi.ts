@@ -207,3 +207,74 @@ export const getDocumentChunks = async (
   })
   return response.data
 }
+
+/**
+ * 清空知识库所有向量
+ */
+export const clearKnowledgeBaseVectors = async (knowledgeBaseId: number): Promise<void> => {
+  await api.post(`/knowledge/bases/${knowledgeBaseId}/clear-vectors`)
+}
+
+/**
+ * 获取知识库统计信息
+ */
+export interface KnowledgeBaseStats {
+  documentCount: number
+  chunkCount: number
+  pendingCount: number
+  completedCount: number
+  failedCount: number
+}
+
+export const getKnowledgeBaseStats = async (knowledgeBaseId: number): Promise<KnowledgeBaseStats> => {
+  const response = await api.get(`/knowledge/bases/${knowledgeBaseId}/stats`)
+  return response.data
+}
+
+/**
+ * 混合检索（向量+关键词）
+ */
+export const hybridSearchKnowledge = async (data: {
+  knowledgeBaseId: number
+  query: string
+  topK?: number
+  threshold?: number
+}): Promise<SearchResult[]> => {
+  const response = await api.post('/knowledge/hybrid-search', data)
+  return response.data
+}
+
+/**
+ * 重新向量化文档
+ */
+export const revectorizeDocument = async (documentId: number): Promise<KnowledgeDocument> => {
+  const response = await api.post(`/knowledge/documents/${documentId}/revectorize`)
+  return response.data
+}
+
+/**
+ * 获取向量化日志
+ */
+export interface VectorizationLog {
+  id: number
+  documentId: string
+  documentName: string
+  documentType: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  stage: string
+  startTime: string
+  endTime?: string
+  duration?: number
+  chunkCount: number
+  vectorCount: number
+  error?: string
+  metadata?: Record<string, any>
+  createdAt: string
+}
+
+export const getVectorizationLogs = async (documentId?: string): Promise<VectorizationLog[]> => {
+  const response = await api.get('/knowledge/logs', {
+    params: documentId ? { documentId } : {},
+  })
+  return response.data
+}

@@ -17,4 +17,4 @@ import { VectorStoreConfigEntity } from './entities/vector-store-config.entity'
   providers: [AIConfigService],
   exports: [AIConfigService],
 })
-export class AIConfigModule {}
+export class AiConfigModule {}

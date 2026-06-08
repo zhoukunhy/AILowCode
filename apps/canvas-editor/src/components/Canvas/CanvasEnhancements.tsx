@@ -296,8 +296,7 @@ export function useCanvasEnhancements() {
     keyboard.register('backspace', deleteSelected)
 
     // Ctrl+A 全选
-    keyboard.register('ctrl+a', (e: Event) => {
-      e.preventDefault()
+    keyboard.register('ctrl+a', () => {
       selectAll()
     })
 

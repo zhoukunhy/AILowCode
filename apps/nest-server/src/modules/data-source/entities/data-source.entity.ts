@@ -14,10 +14,10 @@ export class DataSourceEntity {
   @Column({ length: 20, comment: '数据源类型' })
   type!: string
 
-  @Column({ type: 'jsonb', comment: '数据源配置' })
+  @Column({ type: 'simple-json', comment: '数据源配置' })
   config!: Record<string, any>
 
-  @Column({ type: 'jsonb', nullable: true, comment: '连接状态' })
+  @Column({ type: 'simple-json', nullable: true, comment: '连接状态' })
   status?: Record<string, any>
 
   @Column({ length: 20, default: 'pending', comment: '状态' })
@@ -26,7 +26,7 @@ export class DataSourceEntity {
   @Column({ type: 'text', nullable: true, comment: '描述' })
   description?: string
 
-  @Column({ type: 'jsonb', nullable: true, comment: '元数据' })
+  @Column({ type: 'simple-json', nullable: true, comment: '元数据' })
   metadata?: Record<string, any>
 
   @CreateDateColumn({ comment: '创建时间' })

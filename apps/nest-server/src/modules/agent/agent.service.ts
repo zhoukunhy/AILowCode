@@ -13,12 +13,12 @@ import {
   GeneratePageResponseDto 
 } from './dto/agent.dto'
 import { PagePlanningAgent } from '@ai-lowcode/lang-ai-core'
-import type { MilvusConfig, RAGConfig, LLMConfig } from '@ai-lowcode/shared-types'
+import type { ChromaConfig, RAGConfig, LLMConfig } from '@ai-lowcode/shared-types'
 
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name)
-  private agents: Map<string, PagePlanningAgent> = new Map()
+  private agents: Map<string, InstanceType<typeof PagePlanningAgent>> = new Map()
 
   constructor(
     @InjectRepository(AgentSessionEntity)
@@ -121,7 +121,7 @@ export class AgentService {
           sessionId,
           success: false,
           error: result.error,
-          logs: session.executionLogs,
+          logs: session.executionLogs || [],
           duration: session.duration,
         }
       }
@@ -200,7 +200,7 @@ export class AgentService {
   /**
    * 获取或创建 Agent 实例
    */
-  private getOrCreateAgent(knowledgeBaseIds: number[]): PagePlanningAgent {
+  private getOrCreateAgent(knowledgeBaseIds: number[]): InstanceType<typeof PagePlanningAgent> {
     const key = knowledgeBaseIds.sort().join(',')
     
     if (this.agents.has(key)) {
@@ -216,11 +216,9 @@ export class AgentService {
       temperature: 0.7,
     }
 
-    const milvusConfig: MilvusConfig = {
-      address: process.env.MILVUS_ADDRESS || 'localhost:19530',
-      username: process.env.MILVUS_USERNAME || 'root',
-      password: process.env.MILVUS_PASSWORD || 'Milvus',
-      database: process.env.MILVUS_DATABASE || 'default',
+    const chromaConfig: ChromaConfig = {
+      url: process.env.CHROMA_URL || 'http://localhost:8000',
+      apiKey: process.env.CHROMA_API_KEY,
     }
 
     const ragConfig: RAGConfig = {
@@ -233,7 +231,7 @@ export class AgentService {
 
     const agent = new PagePlanningAgent({
       llmConfig,
-      milvusConfig,
+      chromaConfig,
       ragConfig,
       knowledgeBaseIds,
       defaultPageSize: { width: 1920, height: 1080 },

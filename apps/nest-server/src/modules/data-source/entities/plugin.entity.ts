@@ -23,7 +23,7 @@ export class PluginEntity {
   @Column({ length: 255, comment: '插件文件路径' })
   filePath!: string
 
-  @Column({ type: 'jsonb', comment: '插件元数据' })
+  @Column({ type: 'simple-json', comment: '插件元数据' })
   metadata!: Record<string, any>
 
   @Column({ length: 20, default: 'pending', comment: '状态' })

@@ -2,7 +2,7 @@
  * @ai-lowcode/lang-ai-core
  * AI Language Model Core Package
  *
- * 集成 LangChain、LangGraph、Milvus 向量库
+ * 集成 LangChain、LangGraph、Chroma 向量库
  * 提供 LLM 工厂、RAG 处理、向量存储等功能
  */
 
@@ -10,7 +10,7 @@
 export { LLMFactory } from './llm/LLMFactory'
 
 // 向量存储相关
-export { MilvusVectorStore } from './vectorstore/MilvusVectorStore'
+export { ChromaVectorStore } from './vectorstore/ChromaVectorStore'
 
 // RAG 相关
 export { RAGProcessor } from './rag/RAGProcessor'
@@ -30,7 +30,7 @@ export { createValidationNode } from './agent/nodes/ValidationNode'
 export type {
   LLMConfig,
   LLMProvider,
-  MilvusConfig,
+  ChromaConfig,
   RAGDocument,
   RAGConfig,
 } from '@ai-lowcode/shared-types'

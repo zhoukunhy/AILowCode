@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { AiAssistantFloatingButton } from '@/components/AiAssistantFloatingButton'
 
 // 菜单项类型
 interface MenuItem {
@@ -25,6 +26,7 @@ const menuItems: MenuItem[] = [
   { id: 'dashboard', label: '仪表盘', icon: '📊', path: '/dashboard' },
   { id: 'projects', label: '项目管理', icon: '📁', path: '/projects' },
   { id: 'editor', label: '画布编辑', icon: '🎨', path: '/editor' },
+  { id: 'ai-codegen', label: 'AI代码生成', icon: '💻', path: '/ai-codegen' },
   { id: 'knowledge', label: '知识库', icon: '📚', path: '/knowledge' },
   { id: 'users', label: '用户管理', icon: '👥', path: '/users' },
   { id: 'roles', label: '角色权限', icon: '🔐', path: '/roles' },
@@ -72,6 +74,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-200 transition-all duration-300 ${
           isCollapsed ? 'w-16' : 'w-64'
         } ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+        suppressHydrationWarning
       >
         {/* Logo */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
@@ -149,7 +152,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* 主内容区 */}
-      <div className={`flex-1 transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`}>
+      <div className={`flex-1 transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`} suppressHydrationWarning>
         {/* 顶部栏 */}
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-4">
@@ -233,10 +236,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* 页面内容 */}
-        <main className="h-[calc(100vh-64px)] overflow-hidden">
+        <main className="h-[calc(100vh-64px)] overflow-auto" suppressHydrationWarning>
           {children}
         </main>
       </div>
+
+      {/* AI 助手悬浮按钮 */}
+      <AiAssistantFloatingButton />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 {
   "name": "@ai-lowcode/lang-ai-core",
   "version": "1.0.0",
-  "description": "AI Language Model Core - LangChain integration with LLM factory, RAG, and Milvus vector store",
+  "description": "AI Language Model Core - LangChain integration with LLM factory, RAG, and Chroma vector store",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -26,7 +26,7 @@
     "@langchain/core": "^0.3.0",
     "@langchain/langgraph": "^0.2.0",
     "@langchain/openai": "^0.3.0",
-    "@zilliz/milvus2-sdk-node": "^2.4.0",
+    "chromadb": "^1.8.0",
     "express": "^4.18.0",
     "langchain": "^0.3.0",
     "zod": "^3.23.0"
@@ -47,7 +47,7 @@
   "keywords": [
     "langchain",
     "langgraph",
-    "milvus",
+    "chroma",
     "rag",
     "llm",
     "ai",

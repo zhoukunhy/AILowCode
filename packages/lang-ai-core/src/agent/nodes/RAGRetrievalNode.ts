@@ -5,10 +5,10 @@
 import { AgentState, RAGRetrievalResult, RetrievedDocument } from './types'
 import { StateUpdate } from './LangGraphState'
 import { VectorRetrievalService } from '../../rag/VectorRetrievalService'
-import type { MilvusConfig, RAGConfig } from '@ai-lowcode/shared-types'
+import type { ChromaConfig, RAGConfig } from '@ai-lowcode/shared-types'
 
 export interface RAGRetrievalNodeConfig {
-  milvusConfig: MilvusConfig
+  chromaConfig: ChromaConfig
   ragConfig: RAGConfig
   knowledgeBaseIds: number[]
   topK?: number
@@ -39,7 +39,7 @@ export function createRAGRetrievalNode(config: RAGRetrievalNodeConfig) {
         // 遍历所有知识库进行检索
         for (const kbId of config.knowledgeBaseIds) {
           const retrievalService = new VectorRetrievalService(
-            config.milvusConfig,
+            config.chromaConfig,
             config.ragConfig,
             `knowledge_base_${kbId}`
           )

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { Repository, In } from 'typeorm'
 import { KnowledgeBaseEntity, KnowledgeDocumentEntity, DocumentChunkEntity } from './entities/knowledge.entity'
 import { VectorizationLogEntity } from './entities/vectorization-log.entity'
 import { 
@@ -13,10 +13,10 @@ import {
 import { 
   RAGPipelineService, 
   VectorRetrievalService,
-  MilvusVectorStore
+  ChromaVectorStore
 } from '@ai-lowcode/lang-ai-core'
 import type { RAGPipelineConfig } from '@ai-lowcode/lang-ai-core'
-import type { MilvusConfig } from '@ai-lowcode/shared-types'
+import type { ChromaConfig } from '@ai-lowcode/shared-types'
 
 /**
  * 知识库服务
@@ -25,9 +25,9 @@ import type { MilvusConfig } from '@ai-lowcode/shared-types'
 @Injectable()
 export class KnowledgeService {
   private readonly logger = new Logger(KnowledgeService.name)
-  private milvusClients: Map<number, MilvusVectorStore> = new Map()
-  private ragPipelineServices: Map<number, RAGPipelineService> = new Map()
-  private retrievalServices: Map<number, VectorRetrievalService> = new Map()
+  private chromaClients: Map<number, InstanceType<typeof ChromaVectorStore>> = new Map()
+  private ragPipelineServices: Map<number, InstanceType<typeof RAGPipelineService>> = new Map()
+  private retrievalServices: Map<number, InstanceType<typeof VectorRetrievalService>> = new Map()
 
   constructor(
     @InjectRepository(KnowledgeBaseEntity)
@@ -50,8 +50,8 @@ export class KnowledgeService {
       const knowledgeBase = this.knowledgeBaseRepository.create(createDto)
       const saved = await this.knowledgeBaseRepository.save(knowledgeBase)
 
-      // 初始化 Milvus 集合
-      await this.initMilvusCollection(saved.id, saved.dimension)
+      // 初始化 Chroma 集合
+      await this.initChromaCollection(saved.id, saved.dimension)
 
       this.logger.log(`知识库创建成功: ${saved.name} (ID: ${saved.id})`)
       return saved
@@ -120,21 +120,21 @@ export class KnowledgeService {
     try {
       const knowledgeBase = await this.getKnowledgeBaseById(id)
       
-      // 删除 Milvus 集合
-      const milvusClient = await this.getMilvusClient(id)
-      if (milvusClient) {
+      // 删除 Chroma 集合
+      const chromaClient = await this.getChromaClient(id)
+      if (chromaClient) {
         try {
-          await milvusClient.dropCollection(`knowledge_base_${id}`)
-          this.logger.log(`Milvus 集合删除成功: knowledge_base_${id}`)
+          await chromaClient.dropCollection(`knowledge_base_${id}`)
+          this.logger.log(`Chroma 集合删除成功: knowledge_base_${id}`)
         } catch (error) {
-          this.logger.warn(`删除 Milvus 集合失败: ${error instanceof Error ? error.message : String(error)}`)
+          this.logger.warn(`删除 Chroma 集合失败: ${error instanceof Error ? error.message : String(error)}`)
         }
       }
 
       // 清理服务缓存
       this.ragPipelineServices.delete(id)
       this.retrievalServices.delete(id)
-      this.milvusClients.delete(id)
+      this.chromaClients.delete(id)
 
       await this.knowledgeBaseRepository.softRemove(knowledgeBase)
       this.logger.log(`知识库删除成功: ${knowledgeBase.name} (ID: ${knowledgeBase.id})`)
@@ -220,15 +220,15 @@ export class KnowledgeService {
     try {
       const document = await this.getDocumentById(id)
       
-      // 删除 Milvus 中的向量
-      const milvusClient = await this.getMilvusClient(document.knowledgeBaseId)
-      if (milvusClient) {
+      // 删除 Chroma 中的向量
+      const chromaClient = await this.getChromaClient(document.knowledgeBaseId)
+      if (chromaClient) {
         try {
           const chunks = await this.chunkRepository.find({ where: { documentId: id } })
           if (chunks.length > 0) {
             const vectorIds = chunks.filter(c => c.vectorId).map(c => c.vectorId as string)
             if (vectorIds.length > 0) {
-              await milvusClient.deleteDocuments(`knowledge_base_${document.knowledgeBaseId}`, vectorIds)
+              await chromaClient.deleteDocuments(`knowledge_base_${document.knowledgeBaseId}`, vectorIds)
               this.logger.log(`删除向量: ${vectorIds.length} 个`)
             }
           }
@@ -370,9 +370,9 @@ export class KnowledgeService {
 
       this.logger.log(`检索成功: 查询="${searchDto.query}", 结果=${context.results.length}`)
 
-      return context.results.map((result) => ({
+      return context.results.map((result: { id: string; content: string | null; metadata: Record<string, unknown>; score: number }) => ({
         id: result.id,
-        content: result.content,
+        content: result.content || '',
         metadata: result.metadata,
         score: result.score,
       }))
@@ -427,50 +427,190 @@ export class KnowledgeService {
     }
   }
 
+  /**
+   * 批量清空知识库向量
+   */
+  async clearKnowledgeBaseVectors(knowledgeBaseId: number): Promise<void> {
+    try {
+      const knowledgeBase = await this.getKnowledgeBaseById(knowledgeBaseId)
+
+      // 删除所有分块记录
+      const documents = await this.documentRepository.find({ where: { knowledgeBaseId } })
+      const documentIds = documents.map(doc => doc.id)
+      
+      if (documentIds.length > 0) {
+        await this.chunkRepository.delete({ documentId: In(documentIds) })
+      }
+
+      for (const doc of documents) {
+        doc.vectorStatus = 'pending'
+        doc.chunkCount = 0
+        doc.errorMessage = undefined
+        await this.documentRepository.save(doc)
+      }
+
+      this.logger.log(`知识库向量清空成功: ${knowledgeBase.name} (ID: ${knowledgeBaseId})`)
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error
+      this.logger.error(`清空知识库向量失败: ${error instanceof Error ? error.message : String(error)}`)
+      throw new BadRequestException('清空知识库向量失败')
+    }
+  }
+
+  /**
+   * 获取知识库统计信息
+   */
+  async getKnowledgeBaseStats(knowledgeBaseId: number): Promise<{
+    documentCount: number
+    chunkCount: number
+    pendingCount: number
+    completedCount: number
+    failedCount: number
+  }> {
+    try {
+      await this.getKnowledgeBaseById(knowledgeBaseId)
+
+      const documents = await this.documentRepository.find({ 
+        where: { knowledgeBaseId, deletedAt: undefined as any },
+        select: ['id']
+      })
+      const documentIds = documents.map(doc => doc.id)
+
+      const [documentCount, chunkCount] = await Promise.all([
+        documents.length,
+        documentIds.length > 0 
+          ? this.chunkRepository.count({ where: { documentId: In(documentIds) } })
+          : Promise.resolve(0),
+      ])
+
+      const pendingCount = await this.documentRepository.count({
+        where: { knowledgeBaseId, vectorStatus: 'pending', deletedAt: undefined as any },
+      })
+
+      const completedCount = await this.documentRepository.count({
+        where: { knowledgeBaseId, vectorStatus: 'completed', deletedAt: undefined as any },
+      })
+
+      const failedCount = await this.documentRepository.count({
+        where: { knowledgeBaseId, vectorStatus: 'failed', deletedAt: undefined as any },
+      })
+
+      return {
+        documentCount,
+        chunkCount: chunkCount as any,
+        pendingCount,
+        completedCount,
+        failedCount,
+      }
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error
+      this.logger.error(`获取知识库统计信息失败: ${error instanceof Error ? error.message : String(error)}`)
+      throw new BadRequestException('获取知识库统计信息失败')
+    }
+  }
+
+  /**
+   * 混合检索（向量 + 关键词）
+   */
+  async hybridSearchKnowledge(searchDto: SearchKnowledgeDto): Promise<any[]> {
+    try {
+      const knowledgeBase = await this.getKnowledgeBaseById(searchDto.knowledgeBaseId)
+
+      const retrievalService = await this.getRetrievalService(knowledgeBase)
+
+      const context = await retrievalService.hybridRetrieve(
+        searchDto.query,
+        searchDto.topK || 5,
+        searchDto.threshold || 0.7
+      )
+
+      this.logger.log(`混合检索成功: 查询="${searchDto.query}", 结果=${context.results.length}`)
+
+      return context.results.map((result: { id: string; content: string | null; metadata: Record<string, unknown>; score: number }) => ({
+        id: result.id,
+        content: result.content || '',
+        metadata: result.metadata,
+        score: result.score,
+      }))
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error
+      this.logger.error(`混合检索失败: ${error instanceof Error ? error.message : String(error)}`)
+      throw new BadRequestException('混合检索失败')
+    }
+  }
+
+  /**
+   * 重新向量化文档
+   */
+  async revectorizeDocument(documentId: number): Promise<KnowledgeDocumentEntity> {
+    try {
+      const document = await this.getDocumentById(documentId)
+      const knowledgeBase = await this.getKnowledgeBaseById(document.knowledgeBaseId)
+
+      // 重置文档状态
+      document.vectorStatus = 'pending'
+      document.chunkCount = 0
+      document.errorMessage = undefined
+      await this.documentRepository.save(document)
+
+      // 删除旧的分块记录
+      await this.chunkRepository.delete({ documentId })
+
+      // 异步重新向量化
+      this.processDocumentVectorization(document.id, knowledgeBase).catch(error => {
+        this.logger.error(`文档重新向量化失败: ${document.name}`, error)
+      })
+
+      return document
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error
+      this.logger.error(`重新向量化文档失败: ${error instanceof Error ? error.message : String(error)}`)
+      throw new BadRequestException('重新向量化文档失败')
+    }
+  }
+
   // ==================== 辅助方法 ====================
 
   /**
-   * 初始化 Milvus 集合
+   * 初始化 Chroma 集合
    */
-  private async initMilvusCollection(knowledgeBaseId: number, dimension: number): Promise<void> {
+  private async initChromaCollection(knowledgeBaseId: number, dimension: number): Promise<void> {
     try {
-      const milvusClient = await this.getMilvusClient(knowledgeBaseId)
-      if (milvusClient) {
-        await milvusClient.createKnowledgeCollection(
+      const chromaClient = await this.getChromaClient(knowledgeBaseId)
+      if (chromaClient) {
+        await chromaClient.createKnowledgeCollection(
           `knowledge_base_${knowledgeBaseId}`,
           dimension
         )
-        this.logger.log(`Milvus 集合创建成功: knowledge_base_${knowledgeBaseId}`)
+        this.logger.log(`Chroma 集合创建成功: knowledge_base_${knowledgeBaseId}`)
       }
     } catch (error) {
-      this.logger.error(`创建 Milvus 集合失败: ${error instanceof Error ? error.message : String(error)}`)
+      this.logger.error(`创建 Chroma 集合失败: ${error instanceof Error ? error.message : String(error)}`)
       throw error
     }
   }
 
   /**
-   * 获取 Milvus 客户端
+   * 获取 Chroma 客户端
    */
-  private async getMilvusClient(knowledgeBaseId: number): Promise<MilvusVectorStore | null> {
-    if (this.milvusClients.has(knowledgeBaseId)) {
-      return this.milvusClients.get(knowledgeBaseId)!
+  private async getChromaClient(knowledgeBaseId: number): Promise<InstanceType<typeof ChromaVectorStore> | null> {
+    if (this.chromaClients.has(knowledgeBaseId)) {
+      return this.chromaClients.get(knowledgeBaseId)!
     }
 
     // 从环境变量获取配置
-    const milvusConfig: MilvusConfig = {
-      address: process.env.MILVUS_ADDRESS || 'localhost:19530',
-      username: process.env.MILVUS_USERNAME || 'root',
-      password: process.env.MILVUS_PASSWORD || 'Milvus',
-      database: process.env.MILVUS_DATABASE || 'default',
+    const chromaConfig: ChromaConfig = {
+      url: process.env.CHROMA_URL || 'http://localhost:8000',
+      apiKey: process.env.CHROMA_API_KEY,
     }
 
     try {
-      const milvusClient = new MilvusVectorStore(milvusConfig)
-      await milvusClient.connect()
-      this.milvusClients.set(knowledgeBaseId, milvusClient)
-      return milvusClient
+      const chromaClient = new ChromaVectorStore(chromaConfig)
+      await chromaClient.connect()
+      this.chromaClients.set(knowledgeBaseId, chromaClient)
+      return chromaClient
     } catch (error) {
-      this.logger.error(`创建 Milvus 客户端失败: ${error instanceof Error ? error.message : String(error)}`)
+      this.logger.error(`创建 Chroma 客户端失败: ${error instanceof Error ? error.message : String(error)}`)
       return null
     }
   }
@@ -478,17 +618,15 @@ export class KnowledgeService {
   /**
    * 获取 RAG 链路服务
    */
-  private async getRAGPipelineService(knowledgeBase: KnowledgeBaseEntity): Promise<RAGPipelineService> {
+  private async getRAGPipelineService(knowledgeBase: KnowledgeBaseEntity): Promise<InstanceType<typeof RAGPipelineService>> {
     if (this.ragPipelineServices.has(knowledgeBase.id)) {
       return this.ragPipelineServices.get(knowledgeBase.id)!
     }
 
     const config: RAGPipelineConfig = {
-      milvusConfig: {
-        address: process.env.MILVUS_ADDRESS || 'localhost:19530',
-        username: process.env.MILVUS_USERNAME || 'root',
-        password: process.env.MILVUS_PASSWORD || 'Milvus',
-        database: process.env.MILVUS_DATABASE || 'default',
+      chromaConfig: {
+        url: process.env.CHROMA_URL || 'http://localhost:8000',
+        apiKey: process.env.CHROMA_API_KEY,
       },
       ragConfig: {
         embeddingApiKey: process.env.EMBEDDING_API_KEY || '',
@@ -510,17 +648,15 @@ export class KnowledgeService {
   /**
    * 获取检索服务
    */
-  private async getRetrievalService(knowledgeBase: KnowledgeBaseEntity): Promise<VectorRetrievalService> {
+  private async getRetrievalService(knowledgeBase: KnowledgeBaseEntity): Promise<InstanceType<typeof VectorRetrievalService>> {
     if (this.retrievalServices.has(knowledgeBase.id)) {
       return this.retrievalServices.get(knowledgeBase.id)!
     }
 
     const retrievalService = new VectorRetrievalService(
       {
-        address: process.env.MILVUS_ADDRESS || 'localhost:19530',
-        username: process.env.MILVUS_USERNAME || 'root',
-        password: process.env.MILVUS_PASSWORD || 'Milvus',
-        database: process.env.MILVUS_DATABASE || 'default',
+        url: process.env.CHROMA_URL || 'http://localhost:8000',
+        apiKey: process.env.CHROMA_API_KEY,
       },
       {
         embeddingApiKey: process.env.EMBEDDING_API_KEY || '',

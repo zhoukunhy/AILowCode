@@ -1,20 +1,20 @@
 /**
  * RAG 完整链路服务
- * 文档加载 → 文本分割 → Embedding 向量化 → 写入 Milvus
+ * 文档加载 → 文本分割 → Embedding 向量化 → 写入 Chroma
  */
 
 import { RecursiveCharacterTextSplitter } from 'langchain/text_splitter'
 import { DocumentLoaderFactory } from './DocumentLoader'
 import { RAGProcessor } from './RAGProcessor'
-import { MilvusVectorStore } from '../vectorstore/MilvusVectorStore'
-import type { MilvusConfig, RAGConfig, RAGDocument } from '@ai-lowcode/shared-types'
+import { ChromaVectorStore } from '../vectorstore/ChromaVectorStore'
+import type { ChromaConfig, RAGConfig, RAGDocument } from '@ai-lowcode/shared-types'
 import type { Document } from '@langchain/core/documents'
 
 /**
  * RAG 链路配置
  */
 export interface RAGPipelineConfig {
-  milvusConfig: MilvusConfig
+  chromaConfig: ChromaConfig
   ragConfig: RAGConfig
   collectionName: string
 }
@@ -41,14 +41,14 @@ export interface VectorizationLog {
  * RAG 链路服务
  */
 export class RAGPipelineService {
-  private milvusClient: MilvusVectorStore
+  private chromaClient: ChromaVectorStore
   private ragProcessor: RAGProcessor
   private config: RAGPipelineConfig
   private logs: Map<string, VectorizationLog> = new Map()
 
   constructor(config: RAGPipelineConfig) {
     this.config = config
-    this.milvusClient = new MilvusVectorStore(config.milvusConfig)
+    this.chromaClient = new ChromaVectorStore(config.chromaConfig)
     this.ragProcessor = new RAGProcessor(config.ragConfig)
   }
 
@@ -57,7 +57,7 @@ export class RAGPipelineService {
    */
   async initialize(): Promise<void> {
     try {
-      await this.milvusClient.connect()
+      await this.chromaClient.connect()
       console.log('RAG Pipeline Service initialized')
     } catch (error) {
       throw new Error(`初始化失败: ${error instanceof Error ? error.message : String(error)}`)
@@ -132,13 +132,13 @@ export class RAGPipelineService {
       log.vectorCount = ragDocuments.length
       console.log(`[RAG] 向量化成功: ${documentName}, 生成 ${ragDocuments.length} 个向量`)
 
-      // 阶段 4: 写入 Milvus
+      // 阶段 4: 写入 Chroma
       log.stage = 'storing'
       this.updateLog(documentId, log)
 
       await this.storeVectors(ragDocuments)
 
-      console.log(`[RAG] 向量存储成功: ${documentName}, 已存储到 Milvus`)
+      console.log(`[RAG] 向量存储成功: ${documentName}, 已存储到 Chroma`)
 
       // 完成处理
       log.status = 'completed'
@@ -239,11 +239,11 @@ export class RAGPipelineService {
   }
 
   /**
-   * 存储向量到 Milvus
+   * 存储向量到 Chroma
    */
   private async storeVectors(ragDocuments: RAGDocument[]): Promise<void> {
     try {
-      await this.milvusClient.insertDocuments(
+      await this.chromaClient.insertDocuments(
         this.config.collectionName,
         ragDocuments
       )
@@ -315,7 +315,7 @@ export class RAGPipelineService {
    * 关闭连接
    */
   async close(): Promise<void> {
-    await this.milvusClient.close()
+    await this.chromaClient.close()
     console.log('RAG Pipeline Service closed')
   }
 }

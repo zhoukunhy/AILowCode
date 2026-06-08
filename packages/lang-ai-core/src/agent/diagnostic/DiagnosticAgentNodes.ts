@@ -4,7 +4,7 @@
 
 import { LLMFactory } from '../../llm/LLMFactory'
 import { VectorRetrievalService } from '../../rag/VectorRetrievalService'
-import { MilvusVectorStore } from '../../vectorstore/MilvusVectorStore'
+import { ChromaVectorStore } from '../../vectorstore/ChromaVectorStore'
 import type { 
   ErrorInfo, 
   ErrorType, 
@@ -76,11 +76,12 @@ export function createErrorCollectionNode() {
  * 创建 RAG 检索节点
  */
 export function createRAGRetrievalNode(config: DiagnosticAgentConfig) {
-  const vectorStore = new MilvusVectorStore(config.ragConfig as any)
-  const retrievalService = new VectorRetrievalService({
-    milvusConfig: config.ragConfig as any,
-    collectionName: config.knowledgeBaseConfig.errorCollectionName,
-  })
+  const vectorStore = new ChromaVectorStore(config.ragConfig as any)
+  const retrievalService = new VectorRetrievalService(
+    config.ragConfig as any,
+    config.ragConfig,
+    config.knowledgeBaseConfig.errorCollectionName
+  )
 
   return async (state: DiagnosticAgentState): Promise<Partial<DiagnosticAgentState>> => {
     const startTime = Date.now()
@@ -105,8 +106,9 @@ export function createRAGRetrievalNode(config: DiagnosticAgentConfig) {
       // 检索相似错误
       let similarErrors: SimilarError[] = []
       try {
-        const retrievalResult = await retrievalService.search(query, config.ragConfig.topK || 5)
-        similarErrors = retrievalResult.documents.map((doc, index) => ({
+        await retrievalService.initialize()
+        const retrievalResult = await retrievalService.retrieve(query, config.ragConfig.topK || 5)
+        similarErrors = retrievalResult.results.map((doc, index) => ({
           id: doc.id || `error-${index}`,
           errorType: (doc.metadata?.errorType as ErrorType) || 'unknown',
           errorMessage: doc.metadata?.errorMessage || doc.content.slice(0, 200),
@@ -126,11 +128,11 @@ export function createRAGRetrievalNode(config: DiagnosticAgentConfig) {
       // 检索知识库文章
       let knowledgeArticles: KnowledgeArticle[] = []
       try {
-        const articleRetrieval = await retrievalService.search(
+        const articleRetrieval = await retrievalService.retrieve(
           `${query} documentation solution guide`,
           3
         )
-        knowledgeArticles = articleRetrieval.documents.map((doc, index) => ({
+        knowledgeArticles = articleRetrieval.results.map((doc, index) => ({
           id: doc.id || `article-${index}`,
           title: doc.metadata?.title || 'Unknown Article',
           content: doc.content,
@@ -451,7 +453,7 @@ export function createKnowledgeUpdateNode(config: DiagnosticAgentConfig) {
       }
 
       // 这里应该调用向量存储来更新知识库
-      // 实际实现中需要将知识条目写入 Milvus
+      // 实际实现中需要将知识条目写入 Chroma
       console.log('[KnowledgeUpdate] 知识库条目:', knowledgeEntry)
 
       const output: Partial<DiagnosticAgentState> = {

@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core'
 import { JwtModule } from '@nestjs/jwt'
 import { AuthModule } from './modules/auth/auth.module'
 import { UserModule } from './modules/user/user.module'
+import { RoleModule } from './modules/role/role.module'
 import { ProjectModule } from './modules/project/project.module'
 import { TemplateModule } from './modules/template/template.module'
 import { PageModule } from './modules/page/page.module'
@@ -12,6 +13,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module'
 import { AgentModule } from './modules/agent/agent.module'
 import { CodegenModule } from './modules/codegen/codegen.module'
 import { DataSourceModule } from './modules/data-source/data-source.module'
+import { AiConfigModule } from './modules/ai-config/ai-config.module'
 import { RedisModule } from './common/redis/redis.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { RolesGuard } from './modules/auth/guards/roles.guard'
@@ -25,12 +27,8 @@ import { RolesGuard } from './modules/auth/guards/roles.guard'
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get('DB_HOST', 'localhost'),
-        port: configService.get('DB_PORT', 5432),
-        username: configService.get('DB_USERNAME', 'postgres'),
-        password: configService.get('DB_PASSWORD', 'postgres'),
-        database: configService.get('DB_DATABASE', 'ai_lowcode'),
+        type: 'sqlite',
+        database: configService.get('DB_DATABASE', 'ai_lowcode.sqlite'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: configService.get('NODE_ENV') !== 'production',
         logging: configService.get('NODE_ENV') !== 'production',
@@ -47,6 +45,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard'
     }),
     AuthModule,
     UserModule,
+    RoleModule,
     ProjectModule,
     TemplateModule,
     PageModule,
@@ -54,6 +53,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard'
     AgentModule,
     CodegenModule,
     DataSourceModule,
+    AiConfigModule,
     RedisModule,
   ],
   providers: [

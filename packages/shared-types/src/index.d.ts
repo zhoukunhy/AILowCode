@@ -121,12 +121,10 @@ export interface LLMConfig {
     maxTokens?: number;
     topP?: number;
 }
-export interface MilvusConfig {
-    address: string;
-    username?: string;
-    password?: string;
-    ssl?: boolean;
-    database?: string;
+export interface ChromaConfig {
+    url: string;
+    apiKey?: string;
+    collectionName?: string;
 }
 export interface RAGDocument {
     id: string;
@@ -211,7 +209,7 @@ export interface ToolCallLog {
 }
 export interface AIConfig {
     llm: LLMConfig;
-    milvus: MilvusConfig;
+    chroma: ChromaConfig;
     rag: RAGConfig;
 }
 //# sourceMappingURL=index.d.ts.map

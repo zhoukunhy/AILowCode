@@ -2,7 +2,7 @@
  * 代码生成引擎主入口
  * 集成 RAG 检索和 LangChain 优化功能
  */
-import type { PageSchema, LLMConfig, MilvusConfig } from '@ai-lowcode/lang-ai-core'
+import type { PageSchema, LLMConfig, ChromaConfig } from '@ai-lowcode/lang-ai-core'
 import { GeneratedFile, GeneratedProject, GenerateOptions } from './types'
 import { FrontendGenerator } from './FrontendGenerator'
 import { BackendGenerator } from './BackendGenerator'

@@ -19,6 +19,7 @@ import {
   Divider,
   Tooltip,
   Popconfirm,
+  Radio,
 } from 'antd'
 import {
   PlusOutlined,
@@ -33,6 +34,9 @@ import {
   FileMarkdownOutlined,
   ApiOutlined,
   FileSearchOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import {
@@ -44,8 +48,20 @@ import {
   deleteDocument,
   searchKnowledge,
   getDocumentChunks,
+  clearKnowledgeBaseVectors,
+  getKnowledgeBaseStats,
+  hybridSearchKnowledge,
+  revectorizeDocument,
+  getVectorizationLogs,
 } from '../../services/knowledgeApi'
-import type { KnowledgeBase, KnowledgeDocument, SearchResult, DocumentChunk } from '../../services/knowledgeApi'
+import type { 
+  KnowledgeBase, 
+  KnowledgeDocument, 
+  SearchResult, 
+  DocumentChunk,
+  KnowledgeBaseStats,
+  VectorizationLog
+} from '../../services/knowledgeApi'
 
 const { TextArea } = Input
 const { Option } = Select
@@ -64,6 +80,7 @@ export default function KnowledgePanel() {
   const [createModalVisible, setCreateModalVisible] = useState(false)
   const [searchModalVisible, setSearchModalVisible] = useState(false)
   const [previewModalVisible, setPreviewModalVisible] = useState(false)
+  const [logsModalVisible, setLogsModalVisible] = useState(false)
   const [fileList, setFileList] = useState<UploadFile[]>([])
   const [docType, setDocType] = useState<'md' | 'api' | 'requirement'>('md')
   const [searchQuery, setSearchQuery] = useState('')
@@ -74,6 +91,9 @@ export default function KnowledgePanel() {
   const [selectedDocument, setSelectedDocument] = useState<KnowledgeDocument | null>(null)
   const [newKBName, setNewKBName] = useState('')
   const [newKBDescription, setNewKBDescription] = useState('')
+  const [stats, setStats] = useState<KnowledgeBaseStats | null>(null)
+  const [logs, setLogs] = useState<VectorizationLog[]>([])
+  const [searchType, setSearchType] = useState<'vector' | 'hybrid'>('vector')
 
   // 加载知识库列表
   useEffect(() => {
@@ -84,6 +104,7 @@ export default function KnowledgePanel() {
   useEffect(() => {
     if (selectedKnowledgeBase) {
       loadDocuments(selectedKnowledgeBase.id)
+      loadStats(selectedKnowledgeBase.id)
     }
   }, [selectedKnowledgeBase])
 
@@ -111,6 +132,15 @@ export default function KnowledgePanel() {
       message.error('加载文档失败：' + (error.response?.data?.message || error.message))
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadStats = async (knowledgeBaseId: number) => {
+    try {
+      const statsData = await getKnowledgeBaseStats(knowledgeBaseId)
+      setStats(statsData)
+    } catch (error: any) {
+      console.error('加载统计信息失败:', error)
     }
   }
 
@@ -209,18 +239,72 @@ export default function KnowledgePanel() {
 
     setLoading(true)
     try {
-      const results = await searchKnowledge({
-        knowledgeBaseId: selectedKnowledgeBase.id,
-        query: searchQuery,
-        topK: 10,
-        threshold: 0.5,
-      })
+      const results = searchType === 'hybrid'
+        ? await hybridSearchKnowledge({
+            knowledgeBaseId: selectedKnowledgeBase.id,
+            query: searchQuery,
+            topK: 10,
+            threshold: 0.5,
+          })
+        : await searchKnowledge({
+            knowledgeBaseId: selectedKnowledgeBase.id,
+            query: searchQuery,
+            topK: 10,
+            threshold: 0.5,
+          })
       setSearchResults(results)
       if (results.length === 0) {
         message.info('未找到相关内容')
       }
     } catch (error: any) {
       message.error('检索失败：' + (error.response?.data?.message || error.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleClearVectors = async () => {
+    if (!selectedKnowledgeBase) {
+      message.error('请先选择知识库')
+      return
+    }
+
+    setLoading(true)
+    try {
+      await clearKnowledgeBaseVectors(selectedKnowledgeBase.id)
+      message.success('清空向量成功')
+      await loadDocuments(selectedKnowledgeBase.id)
+      await loadStats(selectedKnowledgeBase.id)
+    } catch (error: any) {
+      message.error('清空失败：' + (error.response?.data?.message || error.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleRevectorize = async (documentId: number) => {
+    setLoading(true)
+    try {
+      await revectorizeDocument(documentId)
+      message.success('重新向量化任务已启动')
+      if (selectedKnowledgeBase) {
+        await loadDocuments(selectedKnowledgeBase.id)
+      }
+    } catch (error: any) {
+      message.error('重新向量化失败：' + (error.response?.data?.message || error.message))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleLoadLogs = async () => {
+    setLoading(true)
+    try {
+      const logsData = await getVectorizationLogs()
+      setLogs(logsData)
+      setLogsModalVisible(true)
+    } catch (error: any) {
+      message.error('加载日志失败：' + (error.response?.data?.message || error.message))
     } finally {
       setLoading(false)
     }
@@ -298,43 +382,106 @@ export default function KnowledgePanel() {
           </Select>
 
           {selectedKnowledgeBase && (
-            <Space>
-              <Button
-                icon={<UploadOutlined />}
-                size="small"
-                onClick={() => setUploadModalVisible(true)}
-              >
-                上传文档
-              </Button>
-              <Button
-                icon={<SearchOutlined />}
-                size="small"
-                onClick={() => setSearchModalVisible(true)}
-              >
-                检索知识库
-              </Button>
-              <Button
-                icon={<ReloadOutlined />}
-                size="small"
-                onClick={() => loadDocuments(selectedKnowledgeBase.id)}
-              >
-                刷新
-              </Button>
-              <Popconfirm
-                title="确定要删除此知识库吗？"
-                onConfirm={() => handleDeleteKnowledgeBase(selectedKnowledgeBase.id)}
-                okText="确定"
-                cancelText="取消"
-              >
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
+                <Card size="small" hoverable>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <FileTextOutlined style={{ fontSize: 24, marginRight: 8, color: '#1890ff' }} />
+                    <div>
+                      <div style={{ fontSize: 12, color: '#8c8c8c' }}>文档数量</div>
+                      <div style={{ fontSize: 20, fontWeight: 'bold' }}>{stats?.documentCount || 0}</div>
+                    </div>
+                  </div>
+                </Card>
+                <Card size="small" hoverable>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <BarChartOutlined style={{ fontSize: 24, marginRight: 8, color: '#52c41a' }} />
+                    <div>
+                      <div style={{ fontSize: 12, color: '#8c8c8c' }}>分块总数</div>
+                      <div style={{ fontSize: 20, fontWeight: 'bold' }}>{stats?.chunkCount || 0}</div>
+                    </div>
+                  </div>
+                </Card>
+                <Card size="small" hoverable>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <CheckCircleOutlined style={{ fontSize: 24, marginRight: 8, color: '#52c41a' }} />
+                    <div>
+                      <div style={{ fontSize: 12, color: '#8c8c8c' }}>已完成</div>
+                      <div style={{ fontSize: 20, fontWeight: 'bold' }}>{stats?.completedCount || 0}</div>
+                    </div>
+                  </div>
+                </Card>
+                <Card size="small" hoverable>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <ClockCircleOutlined style={{ fontSize: 24, marginRight: 8, color: '#faad14' }} />
+                    <div>
+                      <div style={{ fontSize: 12, color: '#8c8c8c' }}>待处理</div>
+                      <div style={{ fontSize: 20, fontWeight: 'bold' }}>{stats?.pendingCount || 0}</div>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              <Space>
                 <Button
-                  danger
-                  icon={<DeleteOutlined />}
+                  icon={<UploadOutlined />}
                   size="small"
+                  onClick={() => setUploadModalVisible(true)}
                 >
-                  删除知识库
+                  上传文档
                 </Button>
-              </Popconfirm>
-            </Space>
+                <Button
+                  icon={<SearchOutlined />}
+                  size="small"
+                  onClick={() => setSearchModalVisible(true)}
+                >
+                  检索知识库
+                </Button>
+                <Button
+                  icon={<ReloadOutlined />}
+                  size="small"
+                  onClick={() => loadDocuments(selectedKnowledgeBase.id)}
+                >
+                  刷新
+                </Button>
+                <Button
+                  icon={<FileTextOutlined />}
+                  size="small"
+                  onClick={handleLoadLogs}
+                >
+                  查看日志
+                </Button>
+                <Popconfirm
+                  title="确定要清空此知识库的所有向量吗？"
+                  description="此操作将删除所有文档的向量数据，文档内容不会被删除，可以重新向量化。"
+                  onConfirm={handleClearVectors}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    size="small"
+                  >
+                    清空向量
+                  </Button>
+                </Popconfirm>
+                <Popconfirm
+                  title="确定要删除此知识库吗？"
+                  onConfirm={() => handleDeleteKnowledgeBase(selectedKnowledgeBase.id)}
+                  okText="确定"
+                  cancelText="取消"
+                >
+                  <Button
+                    danger
+                    icon={<DeleteOutlined />}
+                    size="small"
+                  >
+                    删除知识库
+                  </Button>
+                </Popconfirm>
+              </Space>
+            </>
           )}
         </Space>
       </div>
@@ -352,14 +499,23 @@ export default function KnowledgePanel() {
               renderItem={(doc) => (
                 <List.Item
                   actions={[
-                    <Tooltip title="查看分块">
+                    <Tooltip key={`preview-${doc.id}`} title="查看分块">
                       <Button
                         type="link"
                         icon={<EyeOutlined />}
                         onClick={() => handlePreviewChunks(doc)}
                       />
                     </Tooltip>,
+                    <Tooltip key={`revectorize-${doc.id}`} title="重新向量化">
+                      <Button
+                        type="link"
+                        icon={<ReloadOutlined />}
+                        onClick={() => handleRevectorize(doc.id)}
+                        disabled={doc.vectorStatus === 'processing'}
+                      />
+                    </Tooltip>,
                     <Popconfirm
+                      key={`delete-${doc.id}`}
                       title="确定要删除此文档吗？"
                       onConfirm={() => handleDeleteDocument(doc.id)}
                       okText="确定"
@@ -496,6 +652,13 @@ export default function KnowledgePanel() {
       >
         <Space direction="vertical" style={{ width: '100%' }}>
           <div>
+            <Text>检索类型</Text>
+            <Radio.Group value={searchType} onChange={(e) => setSearchType(e.target.value)}>
+              <Radio value="vector">向量检索（语义相似）</Radio>
+              <Radio value="hybrid">混合检索（向量+关键词）</Radio>
+            </Radio.Group>
+          </div>
+          <div>
             <Text>查询内容</Text>
             <TextArea
               rows={3}
@@ -569,6 +732,56 @@ export default function KnowledgePanel() {
             onChange={(page) => handlePreviewChunks(selectedDocument!, page)}
             style={{ marginTop: 16, textAlign: 'center' }}
           />
+        )}
+      </Modal>
+
+      {/* 向量化日志模态框 */}
+      <Modal
+        title="向量化日志"
+        open={logsModalVisible}
+        onCancel={() => setLogsModalVisible(false)}
+        footer={null}
+        width={800}
+      >
+        <List
+          dataSource={logs}
+          renderItem={(log) => (
+            <List.Item>
+              <List.Item.Meta
+                title={
+                  <Space>
+                    <Text>{log.documentName}</Text>
+                    {getStatusTag(log.status)}
+                  </Space>
+                }
+                description={
+                  <Space direction="vertical" size={0}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      类型: {log.documentType} | 阶段: {log.stage} | 分块: {log.chunkCount} | 向量: {log.vectorCount}
+                    </Text>
+                    {log.startTime && (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        开始时间: {new Date(log.startTime).toLocaleString()}
+                      </Text>
+                    )}
+                    {log.duration && (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        耗时: {log.duration}ms
+                      </Text>
+                    )}
+                    {log.error && (
+                      <Text type="danger" style={{ fontSize: 12 }}>
+                        错误: {log.error}
+                      </Text>
+                    )}
+                  </Space>
+                }
+              />
+            </List.Item>
+          )}
+        />
+        {logs.length === 0 && (
+          <Empty description="暂无向量化日志" />
         )}
       </Modal>
     </div>

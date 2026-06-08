@@ -13,7 +13,7 @@ import {
   BadRequestException,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger'
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiParam } from '@nestjs/swagger'
 import { KnowledgeService } from './knowledge.service'
 import { 
   CreateKnowledgeBaseDto, 
@@ -160,5 +160,44 @@ export class KnowledgeController {
       page: page || 1,
       pageSize: pageSize || 10,
     })
+  }
+
+  @Post('bases/:id/clear-vectors')
+  @ApiOperation({ summary: '清空知识库所有向量' })
+  @ApiParam({ name: 'id', description: '知识库ID' })
+  @ApiResponse({ status: 200, description: '清空成功' })
+  async clearKnowledgeBaseVectors(@Param('id', ParseIntPipe) id: number) {
+    await this.knowledgeService.clearKnowledgeBaseVectors(id)
+    return { message: '清空成功' }
+  }
+
+  @Get('bases/:id/stats')
+  @ApiOperation({ summary: '获取知识库统计信息' })
+  @ApiParam({ name: 'id', description: '知识库ID' })
+  @ApiResponse({ status: 200, description: '查询成功' })
+  async getKnowledgeBaseStats(@Param('id', ParseIntPipe) id: number) {
+    return this.knowledgeService.getKnowledgeBaseStats(id)
+  }
+
+  @Post('hybrid-search')
+  @ApiOperation({ summary: '混合检索（向量+关键词）' })
+  @ApiResponse({ status: 200, description: '检索成功' })
+  async hybridSearchKnowledge(@Body() searchDto: SearchKnowledgeDto) {
+    return this.knowledgeService.hybridSearchKnowledge(searchDto)
+  }
+
+  @Post('documents/:id/revectorize')
+  @ApiOperation({ summary: '重新向量化文档' })
+  @ApiParam({ name: 'id', description: '文档ID' })
+  @ApiResponse({ status: 200, description: '重新向量化任务已启动' })
+  async revectorizeDocument(@Param('id', ParseIntPipe) id: number) {
+    return this.knowledgeService.revectorizeDocument(id)
+  }
+
+  @Get('logs')
+  @ApiOperation({ summary: '获取向量化日志' })
+  @ApiResponse({ status: 200, description: '查询成功' })
+  async getVectorizationLogs(@Query('documentId') documentId?: string) {
+    return this.knowledgeService.getVectorizationLogs(documentId)
   }
 }

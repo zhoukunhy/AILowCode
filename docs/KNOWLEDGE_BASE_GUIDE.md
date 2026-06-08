@@ -2,7 +2,7 @@
 
 ## 📚 功能概述
 
-Canvas Editor 知识库功能已完整实现，支持用户上传 Markdown、API 文档、需求文档，自动进行 RAG 切片向量化存入 Milvus，并提供知识库检索和预览功能。
+Canvas Editor 知识库功能已完整实现，支持用户上传 Markdown、API 文档、需求文档，自动进行 RAG 切片向量化存入 Chroma，并提供知识库检索和预览功能。
 
 ---
 
@@ -46,8 +46,8 @@ Canvas Editor 知识库功能已完整实现，支持用户上传 Markdown、API
 ### 1. 启动后端服务
 
 ```bash
-# 确保 Milvus 已启动
-docker-compose up -d etcd minio milvus
+# 确保 Chroma 已启动
+docker-compose up -d chroma
 
 # 启动 NestJS 服务
 cd apps/nest-server
@@ -264,7 +264,7 @@ NestJS 接收文件
     ↓
 生成嵌入向量
     ↓
-存储向量到 Milvus
+存储向量到 Chroma
     ↓
 更新文档状态
 ```
@@ -308,11 +308,8 @@ NestJS 接收文件
 在 `.env` 文件中配置以下变量：
 
 ```bash
-# Milvus 配置
-MILVUS_ADDRESS=localhost:19530
-MILVUS_USERNAME=root
-MILVUS_PASSWORD=Milvus
-MILVUS_DATABASE=default
+# Chroma 配置
+CHROMA_URL=http://localhost:8000
 
 # Embedding 配置
 EMBEDDING_API_KEY=your-openai-api-key
@@ -320,9 +317,9 @@ EMBEDDING_MODEL=text-embedding-3-small
 EMBEDDING_BASE_URL=https://api.openai.com/v1
 ```
 
-### Milvus 集合命名
+### Chroma 集合命名
 
-每个知识库会创建一个独立的 Milvus 集合，命名格式：
+每个知识库会创建一个独立的 Chroma 集合，命名格式：
 ```
 knowledge_base_{knowledgeBaseId}
 ```
@@ -364,14 +361,14 @@ knowledge_base_{knowledgeBaseId}
 ### 文档处理优化
 
 - **异步处理** - 文档上传后异步进行向量化
-- **批量插入** - 分块后批量插入 Milvus
+- **批量插入** - 分块后批量插入 Chroma
 - **状态跟踪** - 实时更新处理状态
 
 ### 检索优化
 
 - **相似度过滤** - 只返回相似度高于阈值的结果
 - **TopK 限制** - 限制返回结果数量
-- **向量索引** - Milvus 使用 IVF_FLAT 索引
+- **向量索引** - Chroma 自动管理索引
 
 ---
 
@@ -393,12 +390,12 @@ knowledge_base_{knowledgeBaseId}
 
 **可能原因：**
 - Embedding API 密钥无效
-- Milvus 连接失败
+- Chroma 连接失败
 - 文档内容为空
 
 **解决方案：**
 - 检查 EMBEDDING_API_KEY 配置
-- 确保 Milvus 服务正常运行
+- 确保 Chroma 服务正常运行
 - 检查文档内容是否有效
 
 ### 问题 3：检索无结果
@@ -449,7 +446,7 @@ knowledge_base_{knowledgeBaseId}
 ✅ 前端知识库管理界面
 ✅ 文档上传和处理
 ✅ RAG 切片和向量化
-✅ Milvus 向量存储
+✅ Chroma 向量存储
 ✅ 知识库检索功能
 ✅ 文档分块预览
 

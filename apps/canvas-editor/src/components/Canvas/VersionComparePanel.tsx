@@ -1,15 +1,115 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
-import { useCanvasStore, PageConfig } from '@/store/canvasStore'
-import { createVersionCompareService } from '@ai-lowcode/lang-ai-core'
-import type {
-  VersionComparison,
-  VersionDifference,
-  VersionSuggestion,
-  VersionAnalysis,
-  PageVersionSnapshot,
-} from '@ai-lowcode/lang-ai-core'
+import { useCanvasStore } from '@/store/canvasStore'
+
+// 本地模拟类型定义
+interface VersionComparison {
+  analysis: {
+    totalChanges: number
+    additions: number
+    removals: number
+    modifications: number
+    breakingChanges: boolean
+    codeQualityImprovement: boolean
+    performanceImprovement: boolean
+    criticalChanges: number
+  }
+  differences: VersionDifference[]
+  suggestions: VersionSuggestion[]
+}
+
+interface VersionDifference {
+  id: string
+  type: 'addition' | 'removal' | 'modification'
+  componentId: string
+  componentName: string
+  property?: string
+  oldValue?: any
+  newValue?: any
+  description: string
+  path?: string
+  severity?: 'low' | 'medium' | 'high'
+}
+
+interface VersionSuggestion {
+  id: string
+  type: 'optimization' | 'warning' | 'error'
+  message: string
+  severity: 'low' | 'medium' | 'high'
+  action?: 'accept' | 'review' | 'validate' | 'update' | 'manual'
+  description?: string
+  automated?: boolean
+}
+
+interface PageVersionSnapshot {
+  id: string
+  pageId: string
+  version: string
+  timestamp: Date
+  pageSchema: any
+  metadata: Record<string, any>
+}
+
+// 模拟版本对比服务
+const createVersionCompareService = () => ({
+  compare: async (_from: PageVersionSnapshot, _to: PageVersionSnapshot): Promise<VersionComparison> => {
+    // 模拟对比结果
+    return {
+      analysis: {
+        totalChanges: Math.floor(Math.random() * 10) + 1,
+        additions: Math.floor(Math.random() * 5),
+        removals: Math.floor(Math.random() * 3),
+        modifications: Math.floor(Math.random() * 4),
+        breakingChanges: Math.random() > 0.7,
+        codeQualityImprovement: Math.random() > 0.5,
+        performanceImprovement: Math.random() > 0.5,
+        criticalChanges: Math.floor(Math.random() * 2),
+      },
+      differences: [
+        {
+          id: '1',
+          type: 'addition' as const,
+          componentId: 'comp-1',
+          componentName: '新增按钮组件',
+          description: '添加了一个新的提交按钮',
+        },
+        {
+          id: '2',
+          type: 'modification' as const,
+          componentId: 'comp-2',
+          componentName: '表格组件',
+          property: 'columns',
+          description: '修改了列配置',
+        },
+        {
+          id: '3',
+          type: 'removal' as const,
+          componentId: 'comp-3',
+          componentName: '旧的搜索框',
+          description: '移除了过时的搜索组件',
+        },
+      ],
+      suggestions: [
+        {
+          id: 's1',
+          type: 'optimization' as const,
+          message: '建议将按钮样式提取为全局样式变量',
+          severity: 'low' as const,
+        },
+        {
+          id: 's2',
+          type: 'warning' as const,
+          message: '表格列过多可能影响移动端显示',
+          severity: 'medium' as const,
+        },
+      ],
+    }
+  },
+  getChangeSummary: (comparison: VersionComparison) => {
+    return `检测到 ${comparison.analysis.totalChanges} 个变更`
+  },
+})
 
 interface VersionHistory {
   id: string
@@ -34,7 +134,7 @@ export function VersionComparePanel({ versions, onSelectVersion, onRollback }: V
   const [loading, setLoading] = useState(false)
   const { currentPage, components } = useCanvasStore()
 
-  const versionService = createVersionCompareService({ aiEnabled: true })
+  const versionService = createVersionCompareService()
 
   // 选择版本对比
   const handleCompare = useCallback(async () => {
@@ -83,12 +183,6 @@ export function VersionComparePanel({ versions, onSelectVersion, onRollback }: V
     setSelectedVersions(newSelected)
     setComparison(null)
   }
-
-  // 获取变更摘要
-  const getChangeSummary = useCallback(() => {
-    if (!comparison) return ''
-    return versionService.getChangeSummary(comparison)
-  }, [comparison, versionService])
 
   return (
     <div className="flex flex-col h-full bg-white">
@@ -274,8 +368,8 @@ function DifferenceItem({ difference }: { difference: VersionDifference }) {
         <div className="flex-1">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">{difference.path}</span>
-            <span className={`text-xs font-medium ${severityColors[difference.severity]}`}>
-              {difference.severity.toUpperCase()}
+            <span className={`text-xs font-medium ${severityColors[difference.severity || 'low']}`}>
+              {(difference.severity || 'low').toUpperCase()}
             </span>
           </div>
           <p className="text-sm text-gray-500 mt-1">{difference.description}</p>
@@ -310,8 +404,8 @@ function SuggestionItem({ suggestion }: { suggestion: VersionSuggestion }) {
   return (
     <div className="p-3 bg-gray-50 rounded-lg">
       <div className="flex items-start gap-2">
-        <span className={`px-2 py-1 rounded text-xs font-medium ${actionColors[suggestion.action]}`}>
-          {suggestion.action.toUpperCase()}
+        <span className={`px-2 py-1 rounded text-xs font-medium ${actionColors[suggestion.action || 'review']}`}>
+          {(suggestion.action || 'review').toUpperCase()}
         </span>
         <div className="flex-1">
           <p className="text-sm text-gray-700">{suggestion.description}</p>

@@ -87,35 +87,20 @@ export class UpdateAIConfigDto {
  * 创建向量库配置 DTO
  */
 export class CreateVectorStoreConfigDto {
-  @ApiProperty({ description: '配置名称', example: 'Milvus生产环境' })
+  @ApiProperty({ description: '配置名称', example: 'Chroma生产环境' })
   @IsString()
   @IsNotEmpty()
   name!: string
 
-  @ApiProperty({ description: 'Milvus地址', example: 'localhost:19530' })
+  @ApiProperty({ description: 'Chroma地址', example: 'http://localhost:8000' })
   @IsString()
   @IsNotEmpty()
-  address!: string
+  url!: string
 
-  @ApiPropertyOptional({ description: '用户名', example: 'root' })
+  @ApiPropertyOptional({ description: 'API密钥', example: 'your-api-key' })
   @IsString()
   @IsOptional()
-  username?: string
-
-  @ApiPropertyOptional({ description: '密码', example: 'Milvus' })
-  @IsString()
-  @IsOptional()
-  password?: string
-
-  @ApiPropertyOptional({ description: '数据库名称', default: 'default' })
-  @IsString()
-  @IsOptional()
-  database?: string
-
-  @ApiPropertyOptional({ description: '是否启用SSL', default: false })
-  @IsBoolean()
-  @IsOptional()
-  ssl?: boolean
+  apiKey?: string
 
   @ApiPropertyOptional({ description: '其他配置' })
   @IsOptional()
@@ -136,30 +121,15 @@ export class UpdateVectorStoreConfigDto {
   @IsOptional()
   name?: string
 
-  @ApiPropertyOptional({ description: 'Milvus地址' })
+  @ApiPropertyOptional({ description: 'Chroma地址' })
   @IsString()
   @IsOptional()
-  address?: string
+  url?: string
 
-  @ApiPropertyOptional({ description: '用户名' })
+  @ApiPropertyOptional({ description: 'API密钥' })
   @IsString()
   @IsOptional()
-  username?: string
-
-  @ApiPropertyOptional({ description: '密码' })
-  @IsString()
-  @IsOptional()
-  password?: string
-
-  @ApiPropertyOptional({ description: '数据库名称' })
-  @IsString()
-  @IsOptional()
-  database?: string
-
-  @ApiPropertyOptional({ description: '是否启用SSL' })
-  @IsBoolean()
-  @IsOptional()
-  ssl?: boolean
+  apiKey?: string
 
   @ApiPropertyOptional({ description: '其他配置' })
   @IsOptional()

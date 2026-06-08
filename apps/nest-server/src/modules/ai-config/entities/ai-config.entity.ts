@@ -24,7 +24,7 @@ export class AIConfigEntity {
   @Column({ length: 255, nullable: true, comment: 'API基础URL' })
   baseUrl?: string
 
-  @Column({ type: 'jsonb', nullable: true, comment: '其他配置（JSON格式）' })
+  @Column({ type: 'simple-json', nullable: true, comment: '其他配置（JSON格式）' })
   config?: Record<string, any>
 
   @Column({ default: true, comment: '是否启用' })

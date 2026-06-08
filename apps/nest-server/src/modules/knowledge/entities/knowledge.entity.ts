@@ -26,7 +26,7 @@ export class KnowledgeBaseEntity {
   @Column({ default: true, comment: '是否启用' })
   isActive!: boolean
 
-  @Column({ type: 'jsonb', nullable: true, comment: '元数据' })
+  @Column({ type: 'simple-json', nullable: true, comment: '元数据' })
   metadata?: Record<string, any>
 
   @CreateDateColumn({ comment: '创建时间' })
@@ -73,7 +73,7 @@ export class KnowledgeDocumentEntity {
   @Column({ default: 0, comment: '分块数量' })
   chunkCount!: number
 
-  @Column({ type: 'jsonb', nullable: true, comment: '元数据' })
+  @Column({ type: 'simple-json', nullable: true, comment: '元数据' })
   metadata?: Record<string, any>
 
   @Column({ nullable: true, comment: '错误信息' })
@@ -110,10 +110,10 @@ export class DocumentChunkEntity {
   @Column({ type: 'text', comment: '分块内容' })
   content!: string
 
-  @Column({ type: 'jsonb', nullable: true, comment: '元数据' })
+  @Column({ type: 'simple-json', nullable: true, comment: '元数据' })
   metadata?: Record<string, any>
 
-  @Column({ type: 'text', nullable: true, comment: 'Milvus向量ID' })
+  @Column({ type: 'text', nullable: true, comment: 'Chroma向量ID' })
   vectorId?: string
 
   @ManyToOne(() => KnowledgeDocumentEntity)

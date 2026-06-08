@@ -10,9 +10,9 @@ describe('VectorRetrievalService', () => {
   describe('构造函数', () => {
     it('应该正确初始化检索服务', () => {
       const service = new VectorRetrievalService({
-        milvusConfig: {
-          address: 'localhost:19530',
-          token: 'test-token',
+        chromaConfig: {
+          url: 'http://localhost:8000',
+          apiKey: 'test-api-key',
         },
         collectionName: 'test-collection',
       })
@@ -24,23 +24,22 @@ describe('VectorRetrievalService', () => {
   describe('search 方法', () => {
     it('应该处理空查询', async () => {
       const service = new VectorRetrievalService({
-        milvusConfig: {
-          address: 'localhost:19530',
-          token: 'test-token',
+        chromaConfig: {
+          url: 'http://localhost:8000',
+          apiKey: 'test-api-key',
         },
         collectionName: 'test-collection',
       })
 
-      // 测试空查询的边界情况
       const query = ''
       expect(typeof query).toBe('string')
     })
 
     it('应该处理正常查询', async () => {
       const service = new VectorRetrievalService({
-        milvusConfig: {
-          address: 'localhost:19530',
-          token: 'test-token',
+        chromaConfig: {
+          url: 'http://localhost:8000',
+          apiKey: 'test-api-key',
         },
         collectionName: 'test-collection',
       })
@@ -54,7 +53,7 @@ describe('VectorRetrievalService', () => {
 
 describe('RAGProcessor', () => {
   const mockRAGConfig: RAGConfig = {
-    provider: 'milvus',
+    provider: 'chroma',
     collectionName: 'test-collection',
     embeddingModel: 'text-embedding-ada-002',
   }
@@ -117,7 +116,6 @@ describe('RetrievalResult 类型', () => {
 
 describe('RAG 流程集成测试', () => {
   it('应该完整执行 RAG 流程', () => {
-    // 测试 RAG 流程的各个阶段
     const stages = [
       'document_loading',
       'text_chunking',
@@ -135,13 +133,13 @@ describe('RAG 流程集成测试', () => {
   })
 
   it('应该正确配置向量数据库', () => {
-    const milvusConfig = {
-      address: 'localhost:19530',
-      token: 'test-token',
+    const chromaConfig = {
+      url: 'http://localhost:8000',
+      apiKey: 'test-api-key',
       collectionName: 'test-collection',
     }
 
-    expect(milvusConfig.address).toContain('19530')
-    expect(typeof milvusConfig.collectionName).toBe('string')
+    expect(chromaConfig.url).toContain('8000')
+    expect(typeof chromaConfig.collectionName).toBe('string')
   })
 })

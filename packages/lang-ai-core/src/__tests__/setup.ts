@@ -17,6 +17,5 @@ global.console = {
 
 // 全局测试环境变量
 process.env.NODE_ENV = 'test'
-process.env.MILVUS_HOST = 'localhost'
-process.env.MILVUS_PORT = '19530'
+process.env.CHROMA_URL = 'http://localhost:8000'
 process.env.OPENAI_API_KEY = 'test-api-key'

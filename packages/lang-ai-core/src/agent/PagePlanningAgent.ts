@@ -8,11 +8,11 @@ import { createRequirementAnalysisNode } from './nodes/RequirementAnalysisNode'
 import { createRAGRetrievalNode } from './nodes/RAGRetrievalNode'
 import { createSchemaGenerationNode } from './nodes/SchemaGenerationNode'
 import { createValidationNode } from './nodes/ValidationNode'
-import type { MilvusConfig, RAGConfig, LLMConfig } from '@ai-lowcode/shared-types'
+import type { ChromaConfig, RAGConfig, LLMConfig } from '@ai-lowcode/shared-types'
 
 export interface PagePlanningConfig {
   llmConfig: LLMConfig
-  milvusConfig: MilvusConfig
+  chromaConfig: ChromaConfig
   ragConfig: RAGConfig
   knowledgeBaseIds: number[]
   defaultPageSize?: { width: number; height: number }
@@ -42,7 +42,7 @@ export class PagePlanningAgent {
         llmConfig: this.config.llmConfig,
       }),
       createRAGRetrievalNode({
-        milvusConfig: this.config.milvusConfig,
+        chromaConfig: this.config.chromaConfig,
         ragConfig: this.config.ragConfig,
         knowledgeBaseIds: this.config.knowledgeBaseIds,
         topK: 5,

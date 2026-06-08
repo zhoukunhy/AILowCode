@@ -14,7 +14,7 @@ export class Template {
   @Column()
   category!: string
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   schema!: Record<string, any>
 
   @Column({ default: 0 })

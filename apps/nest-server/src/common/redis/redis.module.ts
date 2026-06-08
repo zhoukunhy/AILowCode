@@ -15,16 +15,24 @@ import { TokenBucketRateLimiter, AIRateLimiter } from './rate-limiter.service'
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async (configService: ConfigService) => {
-        const store = await redisStore({
-          socket: {
-            host: configService.get('REDIS_HOST', 'localhost'),
-            port: configService.get('REDIS_PORT', 6379),
-          },
-          password: configService.get('REDIS_PASSWORD', ''),
-          ttl: 7 * 24 * 60 * 60 * 1000, // 7天 token 过期时间
-        })
-        return {
-          store,
+        try {
+          const store = await redisStore({
+            socket: {
+              host: configService.get('REDIS_HOST', 'localhost'),
+              port: configService.get('REDIS_PORT', 6379),
+            },
+            password: configService.get('REDIS_PASSWORD', ''),
+            ttl: 7 * 24 * 60 * 60 * 1000, // 7天 token 过期时间
+          })
+          return {
+            store,
+          }
+        } catch (error) {
+          // Redis连接失败，使用内存缓存作为备选方案
+          console.log('Redis连接失败，使用内存缓存')
+          return {
+            ttl: 7 * 24 * 60 * 60 * 1000,
+          }
         }
       },
       inject: [ConfigService],

@@ -104,8 +104,29 @@ export class PageController {
   @ApiResponse({ status: 200, description: '保存成功' })
   saveCanvasJson(
     @Param('id', ParseIntPipe) id: number,
-    @Body('canvasJson') canvasJson: any
+    @Body('canvasJson') canvasJson: any,
+    @Body('userId') userId?: number
   ) {
-    return this.pageService.saveCanvasJson(id, canvasJson)
+    return this.pageService.saveCanvasJson(id, canvasJson, userId)
+  }
+
+  @Get(':id/export')
+  @ApiOperation({ summary: '导出页面画布 JSON' })
+  @ApiParam({ name: 'projectId', description: '项目ID' })
+  @ApiParam({ name: 'id', description: '页面ID' })
+  @ApiResponse({ status: 200, description: '导出成功' })
+  exportCanvasJson(@Param('id', ParseIntPipe) id: number) {
+    return this.pageService.exportCanvasJson(id)
+  }
+
+  @Post('import')
+  @ApiOperation({ summary: '导入页面画布 JSON' })
+  @ApiParam({ name: 'projectId', description: '项目ID' })
+  @ApiResponse({ status: 201, description: '导入成功' })
+  importCanvasJson(
+    @Param('projectId', ParseIntPipe) projectId: number,
+    @Body() importData: { name: string; canvasJson: any; pageConfig?: any }
+  ) {
+    return this.pageService.importCanvasJson(projectId, importData)
   }
 }

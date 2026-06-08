@@ -29,10 +29,10 @@ export class CodeGenerationLogEntity {
   @Column({ type: 'integer', nullable: true, comment: '执行时长（毫秒）' })
   duration?: number
 
-  @Column({ type: 'timestamp', nullable: true, comment: '开始时间' })
+  @Column({ type: 'datetime', nullable: true, comment: '开始时间' })
   startTime?: Date
 
-  @Column({ type: 'timestamp', nullable: true, comment: '结束时间' })
+  @Column({ type: 'datetime', nullable: true, comment: '结束时间' })
   endTime?: Date
 
   @CreateDateColumn({ comment: '创建时间' })

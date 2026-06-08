@@ -69,4 +69,27 @@ export class ProjectController {
   async remove(@Param('id', ParseIntPipe) id: string) {
     return this.projectService.remove(+id)
   }
+
+  @Post(':id/archive')
+  @ApiOperation({ summary: '归档项目' })
+  @ApiParam({ name: 'id', description: '项目ID' })
+  @ApiResponse({ status: 200, description: '归档成功' })
+  async archive(@Param('id', ParseIntPipe) id: string) {
+    return this.projectService.archive(+id)
+  }
+
+  @Post(':id/unarchive')
+  @ApiOperation({ summary: '取消归档项目' })
+  @ApiParam({ name: 'id', description: '项目ID' })
+  @ApiResponse({ status: 200, description: '取消归档成功' })
+  async unarchive(@Param('id', ParseIntPipe) id: string) {
+    return this.projectService.unarchive(+id)
+  }
+
+  @Get('archived')
+  @ApiOperation({ summary: '获取已归档的项目' })
+  @ApiResponse({ status: 200, description: '查询成功' })
+  async findArchived(@Request() req: any) {
+    return this.projectService.findArchived(req.user.userId)
+  }
 }

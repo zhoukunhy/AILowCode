@@ -10,15 +10,15 @@ if (!fs.existsSync(distDir)) {
   fs.mkdirSync(distDir, { recursive: true });
 }
 
-// 使用 tsc 编译，生成 JS 和 .d.ts 文件
-try {
-  execSync(`npx tsc --outDir ${distDir} --declaration --declarationMap --sourceMap --skipLibCheck --module commonjs --target ES2022 --moduleResolution node`, {
-    cwd: pkgDir,
-    stdio: 'inherit'
-  });
-} catch (error) {
-  console.log('编译完成（可能有类型警告）');
-}
+// 使用 tsc 编译，生成 JS 和 .d.ts 文件，排除测试文件
+  try {
+    execSync(`npx tsc --outDir ${distDir} --declaration --declarationMap --sourceMap --skipLibCheck --module commonjs --target ES2022 --moduleResolution node --exclude src/__tests__/**/*`, {
+      cwd: pkgDir,
+      stdio: 'inherit'
+    });
+  } catch (error) {
+    console.log('编译完成（可能有类型警告）');
+  }
 
 // 为 ESM 添加 .js 扩展名
 function addJsExtensions(dir) {

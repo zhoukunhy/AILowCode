@@ -5,15 +5,14 @@ import { useCanvasStore } from '@/store/canvasStore'
 import { PropertyForm } from './PropertyForm'
 
 export function PropertyPanel() {
-  const {
-    selectedId,
-    components,
-    componentList,
-    currentPage,
-    updateCurrentPage,
-    updateComponent,
-    updateComponentProps,
-  } = useCanvasStore()
+  // 使用选择器获取状态，确保正确响应变化
+  const selectedId = useCanvasStore((state) => state.selectedId)
+  const components = useCanvasStore((state) => state.components)
+  const componentList = useCanvasStore((state) => state.componentList)
+  const currentPage = useCanvasStore((state) => state.currentPage)
+  const updateCurrentPage = useCanvasStore((state) => state.updateCurrentPage)
+  const updateComponent = useCanvasStore((state) => state.updateComponent)
+  const updateComponentProps = useCanvasStore((state) => state.updateComponentProps)
 
   const selectedComponent = components.find(c => c.id === selectedId)
   const componentMeta = componentList.find(m => m.type === selectedComponent?.type)

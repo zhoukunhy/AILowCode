@@ -45,7 +45,7 @@ export class Page {
   @Column({ name: 'background_color', default: '#ffffff' })
   backgroundColor!: string
 
-  @Column({ name: 'canvas_json', type: 'jsonb', default: [] })
+  @Column({ name: 'canvas_json', type: 'simple-json', nullable: true, default: null })
   canvasJson!: any
 
   @Column({ name: 'sort_order', default: 0 })

@@ -12,7 +12,7 @@ export class Project {
   @Column({ type: 'text', nullable: true })
   description?: string
 
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: 'simple-json', nullable: true })
   schema?: Record<string, any>
 
   @Column({ default: 'draft' })

@@ -142,7 +142,6 @@ export default function RolesPage() {
   const [roles, setRoles] = useState<Role[]>(mockRoles)
   const [selectedRole, setSelectedRole] = useState<Role | null>(null)
   const [showRoleModal, setShowRoleModal] = useState(false)
-  const [showPermissionModal, setShowPermissionModal] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<string[]>(permissionCategories)
 
   // 切换分类展开/收起

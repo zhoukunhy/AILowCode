@@ -3,8 +3,8 @@
  * 用于检索项目编码规范、历史优质代码片段作为参考上下文
  */
 
-import { VectorRetrievalService, MilvusVectorStore } from '@ai-lowcode/lang-ai-core'
-import type { MilvusConfig, RAGConfig } from '@ai-lowcode/shared-types'
+import { VectorRetrievalService, ChromaVectorStore } from '@ai-lowcode/lang-ai-core'
+import type { ChromaConfig, RAGConfig } from '@ai-lowcode/shared-types'
 
 /**
  * 编码规范文档
@@ -67,7 +67,7 @@ export interface RAGContext {
  * RAG 上下文检索配置
  */
 export interface RAGContextConfig {
-  milvusConfig: MilvusConfig
+  chromaConfig: ChromaConfig
   collectionName: string
   maxResults: number
   minScore: number
@@ -77,7 +77,7 @@ export interface RAGContextConfig {
  * RAG 上下文检索服务
  */
 export class RAGContextRetriever {
-  private vectorStore: MilvusVectorStore
+  private vectorStore: ChromaVectorStore
   private retrievalService: VectorRetrievalService
   private config: RAGContextConfig
   private initialized: boolean = false
@@ -90,11 +90,12 @@ export class RAGContextRetriever {
 
   constructor(config: RAGContextConfig) {
     this.config = config
-    this.vectorStore = new MilvusVectorStore(config.milvusConfig)
-    this.retrievalService = new VectorRetrievalService({
-      milvusConfig: config.milvusConfig,
-      collectionName: config.collectionName,
-    })
+    this.vectorStore = new ChromaVectorStore(config.chromaConfig)
+    this.retrievalService = new VectorRetrievalService(
+      config.chromaConfig,
+      {},
+      config.collectionName
+    )
     
     this.initializeCodingStandards()
   }
@@ -276,12 +277,13 @@ export class UserService {
    */
   private async retrieveCodeSnippets(query: string, type: 'frontend' | 'backend'): Promise<CodeSnippet[]> {
     try {
-      const results = await this.retrievalService.search(
+      await this.retrievalService.initialize()
+      const results = await this.retrievalService.retrieve(
         `${query} ${type === 'frontend' ? 'React component' : 'NestJS service'}`,
         this.config.maxResults
       )
 
-      return results.documents.map((doc, index) => ({
+      return results.results.map((doc, index) => ({
         id: doc.id || `snippet-${index}`,
         name: doc.metadata?.name || 'Unknown',
         type: doc.metadata?.type || 'component',
@@ -303,12 +305,12 @@ export class UserService {
    */
   private async retrieveRelevantDocs(query: string): Promise<string[]> {
     try {
-      const results = await this.retrievalService.search(
+      const results = await this.retrievalService.retrieve(
         `documentation ${query}`,
         3
       )
 
-      return results.documents.map(doc => doc.content)
+      return results.results.map(doc => doc.content)
     } catch (error) {
       console.error('[RAGContext] 文档检索失败:', error)
       return []

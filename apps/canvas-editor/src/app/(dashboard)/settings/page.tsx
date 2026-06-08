@@ -39,7 +39,7 @@ export default function SettingsPage() {
     maxTokens: 4000,
     temperature: 0.7,
     enableRAG: true,
-    vectorDb: 'milvus',
+    vectorDb: 'chroma',
     embeddingModel: 'text-embedding-ada-002',
   })
 
@@ -293,9 +293,9 @@ export default function SettingsPage() {
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     >
+                      <option value="chroma">Chroma</option>
                       <option value="milvus">Milvus</option>
                       <option value="pinecone">Pinecone</option>
-                      <option value="chroma">Chroma</option>
                     </select>
                   </div>
                 </div>

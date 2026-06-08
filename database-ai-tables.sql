@@ -116,11 +116,8 @@ COMMENT ON COLUMN ai_configs.is_active IS '是否启用';
 CREATE TABLE IF NOT EXISTS vector_store_configs (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL COMMENT '配置名称',
-    address VARCHAR(255) NOT NULL COMMENT 'Milvus地址',
-    username VARCHAR(100) COMMENT '用户名',
-    password TEXT COMMENT '密码（加密存储）',
-    database VARCHAR(100) DEFAULT 'default' COMMENT '数据库名称',
-    ssl BOOLEAN DEFAULT false COMMENT '是否启用SSL',
+    url VARCHAR(255) NOT NULL COMMENT 'Chroma URL',
+    api_key TEXT COMMENT 'API密钥（加密存储）',
     config JSONB COMMENT '其他配置（JSON格式）',
     is_active BOOLEAN DEFAULT true COMMENT '是否启用',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -133,11 +130,8 @@ CREATE INDEX idx_vector_store_configs_is_active ON vector_store_configs(is_activ
 COMMENT ON TABLE vector_store_configs IS '向量库配置表';
 COMMENT ON COLUMN vector_store_configs.id IS '配置ID';
 COMMENT ON COLUMN vector_store_configs.name IS '配置名称';
-COMMENT ON COLUMN vector_store_configs.address IS 'Milvus地址';
-COMMENT ON COLUMN vector_store_configs.username IS '用户名';
-COMMENT ON COLUMN vector_store_configs.password IS '密码（加密存储）';
-COMMENT ON COLUMN vector_store_configs.database IS '数据库名称';
-COMMENT ON COLUMN vector_store_configs.ssl IS '是否启用SSL';
+COMMENT ON COLUMN vector_store_configs.url IS 'Chroma URL';
+COMMENT ON COLUMN vector_store_configs.api_key IS 'API密钥（加密存储）';
 COMMENT ON COLUMN vector_store_configs.config IS '其他配置（JSON格式）';
 COMMENT ON COLUMN vector_store_configs.is_active IS '是否启用';
 

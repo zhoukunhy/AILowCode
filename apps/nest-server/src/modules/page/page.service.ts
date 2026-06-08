@@ -1,12 +1,15 @@
 import {
   Injectable,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Page } from './entities/page.entity'
 import { CreatePageDto, UpdatePageDto, QueryPageDto } from './dto/page.dto'
 import { Project } from '../project/entities/project.entity'
+import { PageVersionService } from './page-version.service'
 
 /**
  * 页面服务
@@ -18,7 +21,9 @@ export class PageService {
     @InjectRepository(Page)
     private pageRepository: Repository<Page>,
     @InjectRepository(Project)
-    private projectRepository: Repository<Project>
+    private projectRepository: Repository<Project>,
+    @Inject(forwardRef(() => PageVersionService))
+    private versionService: PageVersionService
   ) {}
 
   /**
@@ -122,10 +127,92 @@ export class PageService {
 
   /**
    * 批量保存页面画布数据（用于自动保存）
+   * 保存时自动创建版本快照
    */
-  async saveCanvasJson(id: number, canvasJson: any): Promise<Page> {
+  async saveCanvasJson(
+    id: number,
+    canvasJson: any,
+    userId?: number
+  ): Promise<{ page: Page; version: any }> {
     const page = await this.findOne(id)
     page.canvasJson = canvasJson
+    const savedPage = await this.pageRepository.save(page)
+
+    // 自动创建版本快照
+    const version = await this.versionService.createSnapshot(
+      id,
+      canvasJson,
+      userId,
+      '手动保存'
+    )
+
+    return { page: savedPage, version }
+  }
+
+  /**
+   * 导出页面画布 JSON
+   * 用于跨项目复用页面配置
+   */
+  async exportCanvasJson(id: number): Promise<{
+    page: Partial<Page>
+    canvasJson: any
+    exportedAt: string
+  }> {
+    const page = await this.findOne(id)
+
+    return {
+      page: {
+        name: page.name,
+        width: page.width,
+        height: page.height,
+        gridSize: page.gridSize,
+        snapToGrid: page.snapToGrid,
+        showGrid: page.showGrid,
+        showRulers: page.showRulers,
+        backgroundColor: page.backgroundColor,
+        isHome: page.isHome,
+      },
+      canvasJson: page.canvasJson,
+      exportedAt: new Date().toISOString(),
+    }
+  }
+
+  /**
+   * 导入页面画布 JSON
+   * 从其他页面配置创建新页面
+   */
+  async importCanvasJson(
+    projectId: number,
+    importData: {
+      name: string
+      canvasJson: any
+      pageConfig?: Partial<Page>
+    }
+  ): Promise<Page> {
+    // 检查项目是否存在
+    const project = await this.projectRepository.findOne({
+      where: { id: projectId },
+    })
+    if (!project) {
+      throw new NotFoundException('项目不存在')
+    }
+
+    const pageConfig = importData.pageConfig || {}
+
+    const page = this.pageRepository.create({
+      name: importData.name,
+      projectId,
+      canvasJson: importData.canvasJson,
+      width: pageConfig.width || 1920,
+      height: pageConfig.height || 1080,
+      gridSize: pageConfig.gridSize || 20,
+      snapToGrid: pageConfig.snapToGrid ?? true,
+      showGrid: pageConfig.showGrid ?? true,
+      showRulers: pageConfig.showRulers ?? false,
+      backgroundColor: pageConfig.backgroundColor || '#ffffff',
+      isHome: false,
+    })
+
     return this.pageRepository.save(page)
   }
 }

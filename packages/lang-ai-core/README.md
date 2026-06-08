@@ -5,7 +5,7 @@ AI Language Model Core Package - 基于 LangChain 的 AI 核心功能包
 ## 📦 功能特性
 
 - ✅ **LLM 工厂模式** - 统一封装 DeepSeek、通义千问、OpenAI
-- ✅ **Milvus 向量库集成** - 完整的向量存储和检索功能
+- ✅ **Chroma 向量库集成** - 完整的向量存储和检索功能
 - ✅ **RAG 文档处理** - 文档分块、嵌入生成、相似度计算
 - ✅ **TypeScript 类型支持** - 完整的类型定义
 - ✅ **Monorepo 集成** - 与 shared-types 无缝集成
@@ -18,10 +18,10 @@ AI Language Model Core Package - 基于 LangChain 的 AI 核心功能包
 pnpm install
 ```
 
-### 启动 Milvus 向量库
+### 启动 Chroma 向量库
 
 ```bash
-docker-compose up -d etcd minio milvus
+docker-compose up -d chroma
 ```
 
 ### 配置环境变量
@@ -55,20 +55,18 @@ const response = await llm.invoke('你好，请介绍一下自己')
 console.log(response.content)
 ```
 
-### 2. Milvus 向量库使用
+### 2. Chroma 向量库使用
 
 ```typescript
-import { MilvusVectorStore } from '@ai-lowcode/lang-ai-core'
-import type { MilvusConfig } from '@ai-lowcode/shared-types'
+import { ChromaVectorStore } from '@ai-lowcode/lang-ai-core'
+import type { ChromaConfig } from '@ai-lowcode/shared-types'
 
-// 连接 Milvus
-const milvusConfig: MilvusConfig = {
-  address: 'localhost:19530',
-  username: 'root',
-  password: 'Milvus',
+// 连接 Chroma
+const chromaConfig: ChromaConfig = {
+  url: 'http://localhost:8000',
 }
 
-const vectorStore = new MilvusVectorStore(milvusConfig)
+const vectorStore = new ChromaVectorStore(chromaConfig)
 await vectorStore.connect()
 
 // 创建知识库集合
@@ -141,7 +139,7 @@ console.log(ragDocuments)
 - 配置启用/禁用
 
 ### 5. vector_store_configs - 向量库配置表
-- 存储 Milvus 连接配置
+- 存储 Chroma 连接配置
 - 支持多向量库实例
 - 配置启用/禁用
 
@@ -204,21 +202,15 @@ export class YourService {
 
 ## 🐳 Docker Compose
 
-项目已配置完整的 Milvus 服务栈：
+项目已配置完整的 Chroma 服务栈：
 
 ```yaml
 services:
-  etcd:
-    # etcd 元数据存储
-  
-  minio:
-    # MinIO 对象存储
-  
-  milvus:
-    # Milvus 向量数据库
+  chroma:
+    # Chroma 向量数据库
+    image: chromadb/chroma:latest
     ports:
-      - '19530:19530'  # gRPC 端口
-      - '9091:9091'    # 健康检查端口
+      - '8000:8000'
 ```
 
 启动命令：
@@ -227,14 +219,14 @@ services:
 # 启动所有服务
 docker-compose up -d
 
-# 仅启动 Milvus 相关服务
-docker-compose up -d etcd minio milvus
+# 仅启动 Chroma 服务
+docker-compose up -d chroma
 
 # 查看服务状态
 docker-compose ps
 
 # 查看日志
-docker-compose logs -f milvus
+docker-compose logs -f chroma
 ```
 
 ## 🔐 安全注意事项
@@ -252,7 +244,7 @@ docker-compose logs -f milvus
 import type {
   LLMProvider,
   LLMConfig,
-  MilvusConfig,
+  ChromaConfig,
   RAGDocument,
   RAGConfig,
   AgentInput,

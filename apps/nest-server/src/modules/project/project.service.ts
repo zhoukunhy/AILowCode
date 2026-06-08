@@ -85,4 +85,44 @@ export class ProjectService {
     await this.projectRepository.remove(project)
     return { message: '删除成功' }
   }
+
+  /**
+   * 归档项目
+   * @param id 项目ID
+   * @returns 归档后的项目
+   */
+  async archive(id: number): Promise<Project> {
+    const project = await this.projectRepository.findOne({ where: { id } })
+    if (!project) {
+      throw new NotFoundException('项目不存在')
+    }
+    project.status = 'archived'
+    return this.projectRepository.save(project)
+  }
+
+  /**
+   * 取消归档项目
+   * @param id 项目ID
+   * @returns 恢复后的项目
+   */
+  async unarchive(id: number): Promise<Project> {
+    const project = await this.projectRepository.findOne({ where: { id } })
+    if (!project) {
+      throw new NotFoundException('项目不存在')
+    }
+    project.status = 'draft'
+    return this.projectRepository.save(project)
+  }
+
+  /**
+   * 获取用户已归档的项目
+   * @param userId 用户ID
+   * @returns 归档项目列表
+   */
+  async findArchived(userId: number): Promise<Project[]> {
+    return this.projectRepository.find({
+      where: { userId, status: 'archived' },
+      order: { updatedAt: 'DESC' },
+    })
+  }
 }

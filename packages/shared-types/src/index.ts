@@ -151,14 +151,12 @@ export interface LLMConfig {
 }
 
 /**
- * Milvus 向量库配置
+ * Chroma 向量库配置
  */
-export interface MilvusConfig {
-  address: string
-  username?: string
-  password?: string
-  ssl?: boolean
-  database?: string
+export interface ChromaConfig {
+  url: string
+  apiKey?: string
+  collectionName?: string
 }
 
 /**
@@ -291,7 +289,7 @@ export interface ToolCallLog {
  */
 export interface AIConfig {
   llm: LLMConfig
-  milvus: MilvusConfig
+  chroma: ChromaConfig
   rag: RAGConfig
 }
 

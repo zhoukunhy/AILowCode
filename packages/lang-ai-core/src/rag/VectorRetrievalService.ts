@@ -3,9 +3,9 @@
  * 提供相似度召回功能
  */
 
-import { MilvusVectorStore } from '../vectorstore/MilvusVectorStore'
+import { ChromaVectorStore } from '../vectorstore/ChromaVectorStore'
 import { RAGProcessor } from './RAGProcessor'
-import type { MilvusConfig, RAGConfig } from '@ai-lowcode/shared-types'
+import type { ChromaConfig, RAGConfig } from '@ai-lowcode/shared-types'
 
 /**
  * 检索结果
@@ -32,16 +32,16 @@ export interface RetrievalContext {
  * 向量检索服务
  */
 export class VectorRetrievalService {
-  private milvusClient: MilvusVectorStore
+  private chromaClient: ChromaVectorStore
   private ragProcessor: RAGProcessor
   private collectionName: string
 
   constructor(
-    milvusConfig: MilvusConfig,
+    chromaConfig: ChromaConfig,
     ragConfig: RAGConfig,
     collectionName: string
   ) {
-    this.milvusClient = new MilvusVectorStore(milvusConfig)
+    this.chromaClient = new ChromaVectorStore(chromaConfig)
     this.ragProcessor = new RAGProcessor(ragConfig)
     this.collectionName = collectionName
   }
@@ -50,7 +50,7 @@ export class VectorRetrievalService {
    * 初始化服务
    */
   async initialize(): Promise<void> {
-    await this.milvusClient.connect()
+    await this.chromaClient.connect()
   }
 
   /**
@@ -70,7 +70,7 @@ export class VectorRetrievalService {
       const queryVector = await this.ragProcessor.generateEmbedding(query)
 
       // 向量搜索
-      const searchResults = await this.milvusClient.search(
+      const searchResults = await this.chromaClient.search(
         this.collectionName,
         queryVector,
         topK
@@ -78,12 +78,12 @@ export class VectorRetrievalService {
 
       // 过滤低相似度结果
       const filteredResults = searchResults
-        .filter((result: any) => result.score >= threshold)
+        .filter((result: any) => (1 - result.distance) >= threshold)
         .map((result: any) => ({
           id: result.id,
           content: result.content,
           metadata: result.metadata || {},
-          score: result.score,
+          score: 1 - result.distance,
         }))
 
       return {
@@ -219,7 +219,7 @@ export class VectorRetrievalService {
    * 关闭连接
    */
   async close(): Promise<void> {
-    await this.milvusClient.close()
+    await this.chromaClient.close()
   }
 }
 

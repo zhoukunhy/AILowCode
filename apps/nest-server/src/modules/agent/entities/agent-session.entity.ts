@@ -39,7 +39,7 @@ export class AgentSessionEntity {
   @Column({ length: 20, default: 'pending', comment: '状态：pending, running, completed, failed' })
   status!: string
 
-  @Column({ type: 'jsonb', nullable: true, comment: '执行日志（JSON 数组）' })
+  @Column({ type: 'simple-json', nullable: true, comment: '执行日志（JSON 数组）' })
   executionLogs?: AgentLogEntry[]
 
   @Column({ type: 'text', nullable: true, comment: '错误信息' })
@@ -48,13 +48,13 @@ export class AgentSessionEntity {
   @Column({ type: 'integer', nullable: true, comment: '执行时长（毫秒）' })
   duration?: number
 
-  @Column({ type: 'timestamp', nullable: true, comment: '开始时间' })
+  @Column({ type: 'datetime', nullable: true, comment: '开始时间' })
   startTime?: Date
 
-  @Column({ type: 'timestamp', nullable: true, comment: '结束时间' })
+  @Column({ type: 'datetime', nullable: true, comment: '结束时间' })
   endTime?: Date
 
-  @Column({ type: 'jsonb', nullable: true, comment: '元数据' })
+  @Column({ type: 'simple-json', nullable: true, comment: '元数据' })
   metadata?: Record<string, any>
 
   @CreateDateColumn({ comment: '创建时间' })

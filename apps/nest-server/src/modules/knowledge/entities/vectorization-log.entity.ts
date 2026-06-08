@@ -27,10 +27,10 @@ export class VectorizationLogEntity {
   @Column({ length: 100, comment: '处理阶段' })
   stage!: string
 
-  @Column({ type: 'timestamp', comment: '开始时间' })
+  @Column({ type: 'datetime', comment: '开始时间' })
   startTime!: Date
 
-  @Column({ type: 'timestamp', nullable: true, comment: '结束时间' })
+  @Column({ type: 'datetime', nullable: true, comment: '结束时间' })
   endTime?: Date
 
   @Column({ type: 'integer', nullable: true, comment: '持续时间（毫秒）' })
@@ -45,7 +45,7 @@ export class VectorizationLogEntity {
   @Column({ type: 'text', nullable: true, comment: '错误信息' })
   error?: string
 
-  @Column({ type: 'jsonb', nullable: true, comment: '元数据' })
+  @Column({ type: 'simple-json', nullable: true, comment: '元数据' })
   metadata?: Record<string, any>
 
   @CreateDateColumn({ comment: '创建时间' })
