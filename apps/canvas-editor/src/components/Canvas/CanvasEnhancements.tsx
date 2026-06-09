@@ -221,7 +221,11 @@ export class KeyboardManager {
  * 创建画布 hook 增强
  */
 export function useCanvasEnhancements() {
-  const store = useCanvasStore()
+  const components = useCanvasStore((state) => state.components)
+  const selectComponent = useCanvasStore((state) => state.selectComponent)
+  const removeComponent = useCanvasStore((state) => state.removeComponent)
+  const updateComponent = useCanvasStore((state) => state.updateComponent)
+  
   const multiSelect = new MultiSelectManager()
   const zoom = new ZoomManager()
 
@@ -231,35 +235,35 @@ export function useCanvasEnhancements() {
       multiSelect.toggle(id)
       const selected = multiSelect.getSelected()
       if (selected.length === 1) {
-        store.selectComponent(selected[0])
+        selectComponent(selected[0])
       }
     } else {
       multiSelect.clear()
       multiSelect.add(id)
-      store.selectComponent(id)
+      selectComponent(id)
     }
   }
 
   const selectAll = () => {
-    const ids = store.components.map(c => c.id)
+    const ids = components.map(c => c.id)
     multiSelect.selectAll(ids)
-    store.selectComponent(ids[0] || null)
+    selectComponent(ids[0] || null)
   }
 
   const clearSelection = () => {
     multiSelect.clear()
-    store.selectComponent(null)
+    selectComponent(null)
   }
 
   const deleteSelected = () => {
     const selected = multiSelect.getSelected()
-    selected.forEach(id => store.removeComponent(id))
+    selected.forEach(id => removeComponent(id))
     clearSelection()
   }
 
   // 组合选中组件
   const groupSelected = () => {
-    const selected = multiSelect.getSelectedComponents(store.components)
+    const selected = multiSelect.getSelectedComponents(components)
     if (selected.length < 2) return
 
     // 计算边界
@@ -277,7 +281,7 @@ export function useCanvasEnhancements() {
 
     // 更新选中组件的位置（相对于组合）
     selected.forEach(comp => {
-      store.updateComponent(comp.id, {
+      updateComponent(comp.id, {
         x: comp.x - minX,
         y: comp.y - minY,
       })

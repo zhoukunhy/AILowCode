@@ -10,6 +10,7 @@ import type {
   DiagnosticAgentConfig,
   ErrorKnowledgeEntry,
   ErrorRetrievalResult,
+  DiagnosticAgentState,
 } from './DiagnosticAgentTypes'
 
 /**
@@ -46,6 +47,20 @@ export class DiagnosticService {
    */
   async diagnoseBatch(errors: ErrorInfo[]): Promise<DiagnosisResult[]> {
     return await this.executor.executeBatch(errors)
+  }
+
+  /**
+   * 获取诊断状态
+   */
+  async getDiagnosticStatus(sessionId: string): Promise<DiagnosticAgentState | null> {
+    return await this.executor.getDiagnosticStatus(sessionId)
+  }
+
+  /**
+   * 取消诊断任务
+   */
+  async cancelDiagnostic(sessionId: string): Promise<void> {
+    await this.executor.cancelDiagnostic(sessionId)
   }
 
   /**

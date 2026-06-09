@@ -132,7 +132,8 @@ export function VersionComparePanel({ versions, onSelectVersion, onRollback }: V
   const [selectedVersions, setSelectedVersions] = useState<[VersionHistory | null, VersionHistory | null]>([null, null])
   const [comparison, setComparison] = useState<VersionComparison | null>(null)
   const [loading, setLoading] = useState(false)
-  const { currentPage, components } = useCanvasStore()
+  const currentPage = useCanvasStore((state) => state.currentPage)
+  const components = useCanvasStore((state) => state.components)
 
   const versionService = createVersionCompareService()
 

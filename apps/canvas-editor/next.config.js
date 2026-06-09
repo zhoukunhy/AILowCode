@@ -39,14 +39,18 @@ const nextConfig = {
   // webpack 配置优化
   webpack: (config, { isServer }) => {
     // 禁用所有与 canvas 相关的模块，因为它们无法在 Node.js 环境中运行
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        canvas: false,
-        fs: false,
-        path: false,
-      }
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      canvas: false,
+      fs: false,
+      path: false,
     }
+    
+    // 忽略 konva 中对 canvas 的导入
+    config.module.rules.push({
+      test: /node_modules\/konva\/.*\.js$/,
+      use: 'null-loader',
+    })
     
     return config
   },

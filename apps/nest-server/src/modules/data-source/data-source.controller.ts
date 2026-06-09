@@ -23,7 +23,8 @@ import {
   CreateDataSourceDto, 
   UpdateDataSourceDto, 
   PreviewDataDto, 
-  CreatePluginDto 
+  CreatePluginDto,
+  TestConnectionDto,
 } from './dto/data-source.dto'
 import { DataSourceEntity } from './entities/data-source.entity'
 import { PluginEntity } from './entities/plugin.entity'
@@ -74,6 +75,12 @@ export class DataSourceController {
   @ApiOperation({ summary: '测试数据源连接' })
   async testConnection(@Param('id') id: number) {
     return this.dataSourceService.testConnection(id)
+  }
+
+  @Post('test')
+  @ApiOperation({ summary: '测试连接（直接配置）' })
+  async testConnectionDirect(@Body() dto: TestConnectionDto) {
+    return this.dataSourceService.testConnectionDirect(dto.type, dto.config)
   }
 
   @Post('preview')

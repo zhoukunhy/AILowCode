@@ -3,6 +3,8 @@
 import React from 'react'
 import { useCanvasStore } from '@/store/canvasStore'
 import { PropertyForm } from './PropertyForm'
+import { DataSourceBinding } from './DataSourceBinding'
+import { DataPreviewPanel } from '../DataPreviewPanel'
 
 export function PropertyPanel() {
   // 使用选择器获取状态，确保正确响应变化
@@ -242,6 +244,12 @@ export function PropertyPanel() {
             />
           </div>
         )}
+        
+        {/* 数据源绑定 */}
+        <DataSourceBinding />
+        
+        {/* 数据预览 */}
+        <DataPreviewPanel />
       </div>
     </div>
   )

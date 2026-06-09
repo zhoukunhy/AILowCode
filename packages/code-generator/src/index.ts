@@ -2,13 +2,13 @@
  * 代码生成引擎主入口
  * 集成 RAG 检索和 LangChain 优化功能
  */
-import type { PageSchema, LLMConfig, ChromaConfig } from '@ai-lowcode/lang-ai-core'
+import type { PageSchema, LLMConfig } from '@ai-lowcode/lang-ai-core'
 import { GeneratedFile, GeneratedProject, GenerateOptions } from './types'
 import { FrontendGenerator } from './FrontendGenerator'
 import { BackendGenerator } from './BackendGenerator'
 import { RAGContextRetriever, RAGContext, RAGContextConfig } from './RAGContextRetriever'
-import { LangChainCodeOptimizer, OptimizationOptions, OptimizationResult, CodeOptimizerConfig } from './LangChainCodeOptimizer'
-import { AIRefactorService, RefactorOptions, RefactorResult, AIRefactorConfig } from './AIRefactorService'
+import { LangChainCodeOptimizer, OptimizationResult } from './LangChainCodeOptimizer'
+import { AIRefactorService } from './AIRefactorService'
 
 /**
  * 增强的生成选项
@@ -427,5 +427,3 @@ export type {
   CodeIssue,
   AIRefactorConfig,
 } from './AIRefactorService'
-
-export type { EnhancedGenerateOptions, EnhancedGenerateResult }

@@ -129,6 +129,7 @@ export default function KnowledgePage() {
   const [selectedDocs, setSelectedDocs] = useState<string[]>([])
   const [searchKeyword, setSearchKeyword] = useState('')
   const [filterType, setFilterType] = useState('全部')
+  const [previewDoc, setPreviewDoc] = useState<Document | null>(null)
 
   // 过滤文档
   const filteredDocuments = documents.filter((doc) => {
@@ -347,7 +348,10 @@ export default function KnowledgePage() {
                   <td className="py-4 px-6 text-gray-500 text-sm">{doc.updatedAt}</td>
                   <td className="py-4 px-6">
                     <div className="flex items-center gap-2">
-                      <button className="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                      <button 
+                        onClick={() => setPreviewDoc(doc)}
+                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                      >
                         预览
                       </button>
                       {doc.status === '索引失败' && (
@@ -432,6 +436,84 @@ export default function KnowledgePage() {
               </button>
               <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                 开始上传
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 预览弹窗 */}
+      {previewDoc && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-3xl max-h-[80vh] overflow-hidden">
+            {/* 弹窗头部 */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getTypeIcon(previewDoc.type).color}`}>
+                  {getTypeIcon(previewDoc.type).icon}
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-800">{previewDoc.title}</h3>
+                  <p className="text-sm text-gray-500">
+                    {previewDoc.type.toUpperCase()} | {previewDoc.size} | {previewDoc.chunks} 个碎片
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewDoc(null)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 预览内容 */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <div className="prose prose-sm max-w-none">
+                <h4 className="text-lg font-semibold text-gray-800 mb-4">文档内容预览</h4>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <pre className="whitespace-pre-wrap text-sm text-gray-600 font-mono">
+{`# ${previewDoc.title}
+
+## 文档信息
+
+- **类型**: ${previewDoc.type.toUpperCase()}
+- **大小**: ${previewDoc.size}
+- **碎片数**: ${previewDoc.chunks}
+- **状态**: ${previewDoc.status}
+- **创建时间**: ${previewDoc.createdAt}
+- **更新时间**: ${previewDoc.updatedAt}
+
+## 内容摘要
+
+这是文档\`${previewDoc.title}\`的预览内容。
+
+### 章节一
+
+文档内容将在这里显示...
+
+### 章节二
+
+更多内容...
+
+---
+
+> 注：这是模拟预览内容，实际内容将从向量数据库中检索显示。`}
+                  </pre>
+                </div>
+              </div>
+            </div>
+
+            {/* 弹窗底部 */}
+            <div className="flex justify-end gap-3 p-4 border-t border-gray-100">
+              <button
+                onClick={() => setPreviewDoc(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                关闭
+              </button>
+              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                查看详情
               </button>
             </div>
           </div>

@@ -3,7 +3,7 @@
  */
 
 /**
- * 异常信息
+ * 错误信息
  */
 export interface ErrorInfo {
   id: string
@@ -35,6 +35,18 @@ export type ErrorSource =
   | 'database'
   | 'frontend'
   | 'backend'
+
+export type ErrorCategory =
+  | 'validation_error'
+  | 'configuration_error'
+  | 'dependency_missing'
+  | 'syntax_error'
+  | 'runtime_exception'
+  | 'network_error'
+  | 'authentication_error'
+  | 'authorization_error'
+  | 'database_error'
+  | 'unknown_error'
 
 export interface ErrorContext {
   componentId?: string
@@ -130,13 +142,51 @@ export interface AlternativeSolution {
 }
 
 /**
+ * 自动修复结果
+ */
+export interface AutoFixResult {
+  success: boolean
+  appliedChanges: AppliedChange[]
+  error?: string
+  appliedAt: Date
+}
+
+export interface AppliedChange {
+  file: string
+  changeType: 'add' | 'modify' | 'delete'
+  before?: string
+  after?: string
+  diff?: string
+}
+
+/**
+ * 修复验证结果
+ */
+export interface FixValidationResult {
+  success: boolean
+  validationType: 'syntax' | 'unit_test' | 'integration_test' | 'manual_review'
+  validationResults: ValidationResult[]
+  message?: string
+}
+
+export interface ValidationResult {
+  type: string
+  passed: boolean
+  message?: string
+  details?: Record<string, any>
+}
+
+/**
  * 诊断结果
  */
 export interface DiagnosisResult {
   errorInfo: ErrorInfo
+  errorCategory?: ErrorCategory
   retrievalResult: ErrorRetrievalResult
   rootCauseAnalysis: RootCauseAnalysis
   fixSuggestion: FixSuggestion
+  autoFixResult?: AutoFixResult
+  fixValidationResult?: FixValidationResult
   diagnosticMetadata: DiagnosticMetadata
 }
 
@@ -149,6 +199,9 @@ export interface DiagnosticMetadata {
   ragRetrievalTime: number
   analysisTime: number
   modelLatency: number
+  autoFixAttempted?: boolean
+  autoFixSuccess?: boolean
+  retryCount?: number
 }
 
 /**
@@ -156,22 +209,30 @@ export interface DiagnosticMetadata {
  */
 export interface DiagnosticAgentState {
   sessionId: string
+  diagnosticId: string
   errorInfo?: ErrorInfo
+  errorCategory?: ErrorCategory
   retrievalResult?: ErrorRetrievalResult
   rootCauseAnalysis?: RootCauseAnalysis
   fixSuggestion?: FixSuggestion
+  autoFixResult?: AutoFixResult
+  fixValidationResult?: FixValidationResult
   finalResult?: DiagnosisResult
   logs: DiagnosticExecutionLog[]
   currentNode: DiagnosticNodeName
   status: 'idle' | 'running' | 'completed' | 'failed'
   error?: string
+  retryCount?: number
 }
 
 export type DiagnosticNodeName = 
   | 'error_collection'
+  | 'error_classifier'
   | 'rag_retrieval'
   | 'root_cause_analysis'
   | 'fix_suggestion'
+  | 'auto_fix'
+  | 'fix_validation'
   | 'knowledge_update'
   | 'end'
 
@@ -195,6 +256,8 @@ export interface DiagnosticAgentConfig {
   ragConfig: RAGConfig
   knowledgeBaseConfig: KnowledgeBaseConfig
   collectionName: string
+  enableAutoFix?: boolean
+  maxRetryCount?: number
 }
 
 export interface LLMConfig {

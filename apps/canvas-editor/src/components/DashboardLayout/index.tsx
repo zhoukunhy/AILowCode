@@ -26,6 +26,7 @@ const menuItems: MenuItem[] = [
   { id: 'dashboard', label: '仪表盘', icon: '📊', path: '/dashboard' },
   { id: 'projects', label: '项目管理', icon: '📁', path: '/projects' },
   { id: 'editor', label: '画布编辑', icon: '🎨', path: '/editor' },
+  { id: 'workflow', label: '流程编排', icon: '🔄', path: '/workflow' },
   { id: 'ai-codegen', label: 'AI代码生成', icon: '💻', path: '/ai-codegen' },
   { id: 'knowledge', label: '知识库', icon: '📚', path: '/knowledge' },
   { id: 'users', label: '用户管理', icon: '👥', path: '/users' },

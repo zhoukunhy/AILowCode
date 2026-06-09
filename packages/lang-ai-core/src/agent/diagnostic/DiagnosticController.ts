@@ -10,6 +10,7 @@ import type {
   DiagnosisResult, 
   DiagnosticServiceConfig,
   ErrorKnowledgeEntry,
+  DiagnosticAgentState,
 } from './DiagnosticAgentTypes'
 
 /**
@@ -35,7 +36,6 @@ export function createDiagnosticRouter(config: DiagnosticServiceConfig): Router 
         return
       }
 
-      // 生成错误 ID
       errorInfo.id = errorInfo.id || `error-${Date.now()}`
       errorInfo.timestamp = errorInfo.timestamp ? new Date(errorInfo.timestamp) : new Date()
 
@@ -87,6 +87,60 @@ export function createDiagnosticRouter(config: DiagnosticServiceConfig): Router 
       })
     } catch (error: any) {
       console.error('[DiagnosticAPI] 批量诊断失败:', error)
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      })
+    }
+  })
+
+  /**
+   * GET /diagnose/status/:sessionId
+   * 获取诊断状态
+   */
+  router.get('/diagnose/status/:sessionId', async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params
+      
+      const state = await service.getDiagnosticStatus(sessionId)
+
+      if (!state) {
+        res.status(404).json({
+          success: false,
+          error: '诊断任务不存在',
+        })
+        return
+      }
+
+      res.json({
+        success: true,
+        data: state,
+      })
+    } catch (error: any) {
+      console.error('[DiagnosticAPI] 获取诊断状态失败:', error)
+      res.status(500).json({
+        success: false,
+        error: error.message,
+      })
+    }
+  })
+
+  /**
+   * POST /diagnose/cancel/:sessionId
+   * 取消诊断任务
+   */
+  router.post('/diagnose/cancel/:sessionId', async (req: Request, res: Response) => {
+    try {
+      const { sessionId } = req.params
+      
+      await service.cancelDiagnostic(sessionId)
+
+      res.json({
+        success: true,
+        message: '诊断任务已取消',
+      })
+    } catch (error: any) {
+      console.error('[DiagnosticAPI] 取消诊断任务失败:', error)
       res.status(500).json({
         success: false,
         error: error.message,

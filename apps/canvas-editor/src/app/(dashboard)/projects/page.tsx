@@ -217,7 +217,7 @@ export default function ProjectsPage() {
             <div
               key={project.id}
               className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-              onClick={() => router.push(`/editor/${project.id}`)}
+              onClick={() => router.push(`/projects/${project.id}`)}
             >
               {/* 缩略图 */}
               <div className="h-40 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
@@ -303,7 +303,7 @@ export default function ProjectsPage() {
                 <tr
                   key={project.id}
                   className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
-                  onClick={() => router.push(`/editor/${project.id}`)}
+                  onClick={() => router.push(`/projects/${project.id}`)}
                 >
                   <td className="py-4 px-6">
                     <div className="flex items-center">

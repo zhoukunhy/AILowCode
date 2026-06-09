@@ -8,6 +8,7 @@ import { redisStore } from 'cache-manager-redis-yet'
 import { CacheModule } from '@nestjs/cache-manager'
 import { CacheService } from './cache.service'
 import { TokenBucketRateLimiter, AIRateLimiter } from './rate-limiter.service'
+import { RateLimitController } from './rate-limiter.controller'
 
 @Global()
 @Module({
@@ -38,6 +39,7 @@ import { TokenBucketRateLimiter, AIRateLimiter } from './rate-limiter.service'
       inject: [ConfigService],
     }),
   ],
+  controllers: [RateLimitController],
   providers: [
     CacheService,
     TokenBucketRateLimiter,

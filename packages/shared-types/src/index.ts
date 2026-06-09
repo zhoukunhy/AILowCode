@@ -293,3 +293,66 @@ export interface AIConfig {
   rag: RAGConfig
 }
 
+// ==================== 流程编排类型定义 ====================
+
+export type ProcessStatus = 'draft' | 'active' | 'inactive'
+
+export type NodeType = 'start' | 'approve' | 'condition' | 'fork' | 'join' | 'end' | 'action'
+
+export interface ProcessNode {
+  id: string
+  type: NodeType
+  name: string
+  description?: string
+  x: number
+  y: number
+  width: number
+  height: number
+  config?: Record<string, any>
+  zIndex: number
+  processDefinitionId: string
+}
+
+export interface ProcessCondition {
+  type: 'expression' | 'script' | 'data'
+  value: string
+  operator?: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+  compareValue?: any
+}
+
+export interface ProcessTransition {
+  id: string
+  sourceNodeId: string
+  targetNodeId: string
+  label?: string
+  condition?: ProcessCondition
+  points?: { x: number; y: number }[]
+  zIndex: number
+}
+
+export interface ProcessDefinition {
+  id: string
+  name: string
+  description?: string
+  status: ProcessStatus
+  startNodeId?: string
+  metadata?: Record<string, any>
+  creatorId: string
+  createdAt: Date
+  updatedAt: Date
+  nodes?: ProcessNode[]
+  transitions?: ProcessTransition[]
+}
+
+export interface SaveProcessDto {
+  id?: string
+  name: string
+  description?: string
+  status?: ProcessStatus
+  startNodeId?: string
+  metadata?: Record<string, any>
+  creatorId: string
+  nodes: ProcessNode[]
+  transitions: ProcessTransition[]
+}
+

@@ -86,8 +86,12 @@ export {
 
 export {
   createErrorCollectionNode,
+  createErrorClassifierNode,
+  createRAGRetrievalNode as createDiagnosticRAGRetrievalNode,
   createRootCauseAnalysisNode,
   createFixSuggestionNode,
+  createAutoFixNode,
+  createFixValidationNode,
   createKnowledgeUpdateNode,
 } from './agent/diagnostic/DiagnosticAgentNodes'
 
@@ -103,6 +107,7 @@ export type {
   ErrorType,
   ErrorSource,
   ErrorContext,
+  ErrorCategory,
   ErrorRetrievalResult,
   SimilarError,
   KnowledgeArticle,
@@ -111,6 +116,10 @@ export type {
   FixSuggestion,
   FixStep,
   AlternativeSolution,
+  AutoFixResult,
+  AppliedChange,
+  FixValidationResult,
+  ValidationResult,
   DiagnosisResult,
   DiagnosticMetadata,
   DiagnosticAgentState,

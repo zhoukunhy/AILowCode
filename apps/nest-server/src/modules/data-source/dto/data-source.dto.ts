@@ -115,3 +115,18 @@ export class QueryResultDto {
   @ApiPropertyOptional({ description: '字段信息' })
   fields?: any[]
 }
+
+/**
+ * 测试连接 DTO
+ */
+export class TestConnectionDto {
+  @ApiProperty({ description: '数据源类型', enum: DataSourceType })
+  @IsEnum(DataSourceType)
+  @IsNotEmpty()
+  type!: DataSourceType
+
+  @ApiProperty({ description: '数据源配置', type: Object })
+  @IsObject()
+  @IsNotEmpty()
+  config!: Record<string, any>
+}

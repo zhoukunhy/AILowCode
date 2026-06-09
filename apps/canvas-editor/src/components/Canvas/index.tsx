@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useCallback, useMemo, useEffect, useState } from 'react'
-import { Stage, Layer } from 'react-konva'
+import { Stage, Layer, Rect } from 'react-konva'
 import { useCanvasStore } from '@/store/canvasStore'
 import { CanvasGrid } from './CanvasGrid'
 import { ComponentRenderer } from './ComponentRenderer'
@@ -15,15 +15,19 @@ export function Canvas() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
   const [visibleRect, setVisibleRect] = useState({ x: 0, y: 0, width: 0, height: 0 })
+  const [isDragSelecting, setIsDragSelecting] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const [dragEnd, setDragEnd] = useState({ x: 0, y: 0 })
   
-  const {
-    currentPage,
-    components,
-    selectedId,
-    addComponent,
-    selectComponent,
-    updateComponent,
-  } = useCanvasStore()
+  const currentPage = useCanvasStore((state) => state.currentPage)
+  const components = useCanvasStore((state) => state.components)
+  const selectedIds = useCanvasStore((state) => state.selectedIds)
+  const zoom = useCanvasStore((state) => state.zoom)
+  const addComponent = useCanvasStore((state) => state.addComponent)
+  const selectComponent = useCanvasStore((state) => state.selectComponent)
+  const selectComponents = useCanvasStore((state) => state.selectComponents)
+  const updateComponent = useCanvasStore((state) => state.updateComponent)
+  const removeComponent = useCanvasStore((state) => state.removeComponent)
 
   // 监听容器尺寸变化
   useEffect(() => {
@@ -75,6 +79,31 @@ export function Canvas() {
     
     return () => container.removeEventListener('scroll', handleScroll)
   }, [])
+
+  // 键盘事件处理
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 删除选中的组件
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
+        e.preventDefault()
+        selectedIds.forEach(id => removeComponent(id))
+      }
+
+      // Ctrl/Cmd + A 全选
+      if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+        e.preventDefault()
+        selectComponents(components.map(c => c.id))
+      }
+
+      // Escape 取消选中
+      if (e.key === 'Escape') {
+        selectComponent(null)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedIds, components, removeComponent, selectComponents, selectComponent])
 
   // 判断组件是否在可见区域内（带有边距）
   const isComponentVisible = useCallback((component: any, margin: number = 100) => {
@@ -156,12 +185,70 @@ export function Canvas() {
     e.dataTransfer.dropEffect = 'copy'
   }, [])
 
-  // 处理画布点击 - 取消选中
-  const handleStageClick = useCallback((e: any) => {
-    if (e.target === e.target.getStage()) {
-      selectComponent(null)
+  // 处理画布鼠标按下 - 开始框选
+  const handleStageMouseDown = useCallback((e: any) => {
+    if (e.target !== e.target.getStage()) return
+    
+    const stage = stageRef.current
+    if (!stage) return
+    
+    const pos = stage.getPointerPosition()
+    if (!pos) return
+    
+    // 检查是否是右键或修饰键
+    if (e.evt.button !== 0) return
+    
+    setIsDragSelecting(true)
+    setDragStart(pos)
+    setDragEnd(pos)
+  }, [])
+
+  // 处理画布鼠标移动 - 框选
+  const handleStageMouseMove = useCallback((_e: any) => {
+    if (!isDragSelecting) return
+    
+    const stage = stageRef.current
+    if (!stage) return
+    
+    const pos = stage.getPointerPosition()
+    if (!pos) return
+    
+    setDragEnd(pos)
+  }, [isDragSelecting])
+
+  // 处理画布鼠标释放 - 完成框选
+  const handleStageMouseUp = useCallback((e: any) => {
+    if (!isDragSelecting) {
+      // 点击画布空白处取消选中
+      if (e.target === e.target.getStage()) {
+        selectComponent(null)
+      }
+      return
     }
-  }, [selectComponent])
+
+    setIsDragSelecting(false)
+    
+    // 计算选区范围
+    const startX = Math.min(dragStart.x, dragEnd.x)
+    const startY = Math.min(dragStart.y, dragEnd.y)
+    const endX = Math.max(dragStart.x, dragEnd.x)
+    const endY = Math.max(dragStart.y, dragEnd.y)
+    
+    // 只有当选区足够大时才进行选择
+    if (endX - startX > 5 && endY - startY > 5) {
+      // 找出所有在选区内的组件
+      const selectedComponents = components.filter((component) => {
+        return (
+          component.x < endX &&
+          component.x + component.width > startX &&
+          component.y < endY &&
+          component.y + component.height > startY
+        )
+      })
+      
+      selectComponents(selectedComponents.map((c) => c.id))
+    }
+  }, [isDragSelecting, dragStart, dragEnd, components, selectComponents, selectComponent])
 
   // 处理组件拖拽移动
   const handleComponentDragMove = useCallback((id: string, newX: number, newY: number) => {
@@ -172,15 +259,37 @@ export function Canvas() {
       }
     })
 
-    // 栅格对齐
-    let finalX = newX
-    let finalY = newY
-    if (currentPage.snapToGrid) {
-      finalX = Math.round(newX / currentPage.gridSize) * currentPage.gridSize
-      finalY = Math.round(newY / currentPage.gridSize) * currentPage.gridSize
+    // 如果多个组件被选中，一起移动
+    if (selectedIds.length > 1) {
+      const currentComponent = components.find(c => c.id === id)
+      if (!currentComponent) return
+      
+      const deltaX = newX - currentComponent.x
+      const deltaY = newY - currentComponent.y
+      
+      selectedIds.forEach(selectedId => {
+        const comp = components.find(c => c.id === selectedId)
+        if (comp) {
+          let finalX = comp.x + deltaX
+          let finalY = comp.y + deltaY
+          if (currentPage.snapToGrid) {
+            finalX = Math.round(finalX / currentPage.gridSize) * currentPage.gridSize
+            finalY = Math.round(finalY / currentPage.gridSize) * currentPage.gridSize
+          }
+          updateComponent(selectedId, { x: finalX, y: finalY })
+        }
+      })
+    } else {
+      // 栅格对齐
+      let finalX = newX
+      let finalY = newY
+      if (currentPage.snapToGrid) {
+        finalX = Math.round(newX / currentPage.gridSize) * currentPage.gridSize
+        finalY = Math.round(newY / currentPage.gridSize) * currentPage.gridSize
+      }
+      updateComponent(id, { x: finalX, y: finalY })
     }
-    updateComponent(id, { x: finalX, y: finalY })
-  }, [currentPage, updateComponent])
+  }, [currentPage, updateComponent, selectedIds, components])
 
   // 当组件更新时清除缓存
   useEffect(() => {
@@ -190,6 +299,20 @@ export function Canvas() {
 
     return clearCache
   }, [components.length])
+
+  // 计算缩放后的尺寸
+  const scaledWidth = dimensions.width * zoom
+  const scaledHeight = dimensions.height * zoom
+
+  // 框选矩形属性
+  const selectionRect = useMemo(() => {
+    if (!isDragSelecting) return null
+    const x = Math.min(dragStart.x, dragEnd.x)
+    const y = Math.min(dragStart.y, dragEnd.y)
+    const width = Math.abs(dragEnd.x - dragStart.x)
+    const height = Math.abs(dragEnd.y - dragStart.y)
+    return { x, y, width, height }
+  }, [isDragSelecting, dragStart, dragEnd])
 
   return (
     <div 
@@ -206,10 +329,16 @@ export function Canvas() {
       >
         <Stage
           ref={stageRef}
-          width={dimensions.width}
-          height={dimensions.height}
-          onClick={handleStageClick}
-          onTap={handleStageClick}
+          width={scaledWidth}
+          height={scaledHeight}
+          scaleX={zoom}
+          scaleY={zoom}
+          onClick={handleStageMouseUp}
+          onTap={handleStageMouseUp}
+          onMouseDown={handleStageMouseDown}
+          onMouseMove={handleStageMouseMove}
+          onMouseUp={handleStageMouseUp}
+          onMouseLeave={handleStageMouseUp}
         >
             <Layer>
               {/* 栅格背景 */}
@@ -221,19 +350,37 @@ export function Canvas() {
               />
             </Layer>
             
+            {/* 框选矩形层 */}
+            <Layer>
+              {selectionRect && (
+                <Rect
+                  x={selectionRect.x}
+                  y={selectionRect.y}
+                  width={selectionRect.width}
+                  height={selectionRect.height}
+                  fill="rgba(59, 130, 246, 0.15)"
+                  stroke="#3B82F6"
+                  strokeWidth={2}
+                  strokeDash={[5, 5]}
+                />
+              )}
+            </Layer>
+            
             <Layer>
               {/* 渲染可见组件 */}
               {visibleComponents.map((component) => {
+                const isSelected = selectedIds.includes(component.id)
                 const callbacks = {
                   onSelect: (e: any) => {
                     e.cancelBubble = true
-                    selectComponent(component.id)
+                    const multiSelect = e.ctrlKey || e.metaKey
+                    selectComponent(component.id, multiSelect)
                   },
                   onDragMove: (newX: number, newY: number) => handleComponentDragMove(component.id, newX, newY),
                   onTransform: (attrs: any) => updateComponent(component.id, attrs),
                 }
                 
-                return renderCachedComponent(component, selectedId === component.id, callbacks)
+                return renderCachedComponent(component, isSelected, callbacks)
               })}
             </Layer>
 
@@ -250,6 +397,15 @@ export function Canvas() {
                   {`${visibleComponents.length}/${components.length} 组件可见`}
                 </text>
               )}
+              <text
+                x={dimensions.width - 80}
+                y={20}
+                fontSize={12}
+                fill="#666"
+                opacity={0.6}
+              >
+                {`${Math.round(zoom * 100)}%`}
+              </text>
             </Layer>
           </Stage>
       </div>

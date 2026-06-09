@@ -10,6 +10,7 @@ export type {
   ErrorType,
   ErrorSource,
   ErrorContext,
+  ErrorCategory,
   
   // RAG 检索结果
   ErrorRetrievalResult,
@@ -24,6 +25,14 @@ export type {
   FixSuggestion,
   FixStep,
   AlternativeSolution,
+  
+  // 自动修复
+  AutoFixResult,
+  AppliedChange,
+  
+  // 修复验证
+  FixValidationResult,
+  ValidationResult,
   
   // 诊断结果
   DiagnosisResult,
@@ -47,9 +56,12 @@ export type {
 // 节点工厂导出
 export {
   createErrorCollectionNode,
+  createErrorClassifierNode,
   createRAGRetrievalNode,
   createRootCauseAnalysisNode,
   createFixSuggestionNode,
+  createAutoFixNode,
+  createFixValidationNode,
   createKnowledgeUpdateNode,
 } from './DiagnosticAgentNodes'
 

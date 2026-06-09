@@ -1,5 +1,6 @@
-import { create } from 'zustand'
+import { createStore } from 'zustand/vanilla'
 import { generateId } from '@ai-lowcode/common-util'
+import { pageApi } from '../lib/api'
 
 // 组件配置类型
 export interface ComponentConfig {
@@ -53,23 +54,94 @@ export interface ProjectConfig {
   isDirty: boolean
 }
 
+// 弹窗状态类型
+interface ModalState {
+  visible: boolean
+  title: string
+  content: string
+  closable: boolean
+}
+
+// 数据建模相关类型
+export interface Field {
+  id: string
+  name: string
+  label: string
+  type: 'string' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 
+        'text' | 'email' | 'phone' | 'password' | 'select' | 'textarea' | 'json'
+  required: boolean
+  primaryKey: boolean
+  defaultValue?: string | number | boolean
+  length?: number
+  options?: string[]
+}
+
+export interface Entity {
+  id: string
+  name: string
+  tableName: string
+  description: string
+  fields: Field[]
+}
+
+export interface Relation {
+  id: string
+  name: string
+  sourceEntityId: string
+  sourceFieldId?: string
+  targetEntityId: string
+  targetFieldId?: string
+  type: 'one-to-one' | 'one-to-many' | 'many-to-many'
+}
+
+export interface DataModel {
+  id: string
+  name: string
+  description: string
+  entities: Entity[]
+  relations: Relation[]
+}
+
 // 完整的画布状态类型
-interface CanvasState {
+export interface CanvasState {
   project: ProjectConfig
   currentPage: PageConfig
   components: ComponentConfig[]
   selectedId: string | null
+  selectedIds: string[]
   componentList: ComponentMeta[]
+  zoom: number
+  zoomPosition: { x: number; y: number }
+  // 弹窗状态
+  modal: ModalState
+  // 数据模型
+  dataModels: DataModel[]
   // 组件操作
   addComponent: (componentType: string, x: number, y: number) => void
   removeComponent: (id: string) => void
   updateComponent: (id: string, updates: Partial<ComponentConfig>) => void
   updateComponentProps: (id: string, props: Record<string, any>) => void
-  selectComponent: (id: string | null) => void
+  selectComponent: (id: string | null, multiSelect?: boolean) => void
+  selectComponents: (ids: string[]) => void
+  addToSelection: (id: string) => void
+  removeFromSelection: (id: string) => void
+  clearSelection: () => void
   moveComponentToFront: (id: string) => void
   moveComponentToBack: (id: string) => void
   moveComponentUp: (id: string) => void
   moveComponentDown: (id: string) => void
+  // 对齐操作
+  alignLeft: () => void
+  alignRight: () => void
+  alignTop: () => void
+  alignBottom: () => void
+  alignCenter: () => void
+  alignMiddle: () => void
+  // 缩放操作
+  zoomIn: () => void
+  zoomOut: () => void
+  resetZoom: () => void
+  setZoom: (zoom: number, position?: { x: number; y: number }) => void
   // 页面操作
   newPage: () => void
   switchPage: (pageId: string) => void
@@ -81,6 +153,16 @@ interface CanvasState {
   loadProject: (projectId: string) => Promise<void>
   autoSave: () => Promise<void>
   setProjectDirty: (isDirty: boolean) => void
+  // 导入导出
+  exportCanvasJson: () => string
+  importCanvasJson: (json: string) => void
+  // 弹窗操作
+  openModal: (title: string, content: string, closable?: boolean) => void
+  closeModal: () => void
+  // 数据模型操作
+  addDataModel: (model: DataModel) => void
+  updateDataModel: (modelId: string, updates: Partial<DataModel>) => void
+  deleteDataModel: (modelId: string) => void
 }
 
 // 组件元数据列表
@@ -92,7 +174,7 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
     icon: '🔘',
     defaultWidth: 120,
     defaultHeight: 40,
-    defaultProps: { text: '提交', type: 'primary', disabled: false },
+    defaultProps: { text: '提交', type: 'primary', disabled: false, openModal: false, modalTitle: '弹窗标题', modalContent: '弹窗内容' },
     schema: {
       type: 'object',
       properties: {
@@ -103,6 +185,9 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
           enum: ['primary', 'default', 'ghost', 'dashed', 'text', 'link']
         },
         disabled: { type: 'boolean', title: '禁用状态' },
+        openModal: { type: 'boolean', title: '点击打开弹窗' },
+        modalTitle: { type: 'string', title: '弹窗标题' },
+        modalContent: { type: 'string', title: '弹窗内容' },
       },
     },
   },
@@ -1074,6 +1159,146 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
       },
     },
   },
+  // ============ 业务流程物料 ============
+  {
+    type: 'approval',
+    name: '审批组件',
+    icon: '✅',
+    defaultWidth: 300,
+    defaultHeight: 120,
+    defaultProps: { 
+      title: '审批流程',
+      status: 'pending',
+      approver: '',
+      comment: '',
+    },
+    schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', title: '审批标题' },
+        status: { 
+          type: 'string', 
+          title: '审批状态',
+          enum: ['pending', 'approved', 'rejected']
+        },
+        approver: { type: 'string', title: '审批人' },
+        comment: { type: 'string', title: '审批意见' },
+      },
+    },
+  },
+  {
+    type: 'flowNode',
+    name: '流程节点',
+    icon: '🔹',
+    defaultWidth: 150,
+    defaultHeight: 60,
+    defaultProps: { 
+      label: '流程节点',
+      type: 'start',
+    },
+    schema: {
+      type: 'object',
+      properties: {
+        label: { type: 'string', title: '节点名称' },
+        type: { 
+          type: 'string', 
+          title: '节点类型',
+          enum: ['start', 'end', 'task', 'approval', 'condition']
+        },
+      },
+    },
+  },
+  {
+    type: 'condition',
+    name: '条件分支',
+    icon: '🔀',
+    defaultWidth: 200,
+    defaultHeight: 100,
+    defaultProps: { 
+      condition: '',
+      trueLabel: '是',
+      falseLabel: '否',
+    },
+    schema: {
+      type: 'object',
+      properties: {
+        condition: { type: 'string', title: '条件表达式' },
+        trueLabel: { type: 'string', title: '是分支标签' },
+        falseLabel: { type: 'string', title: '否分支标签' },
+      },
+    },
+  },
+  // ============ 集成与工具物料 ============
+  {
+    type: 'apiConnector',
+    name: 'API连接器',
+    icon: '🔗',
+    defaultWidth: 280,
+    defaultHeight: 100,
+    defaultProps: { 
+      url: '',
+      method: 'GET',
+      headers: {},
+      params: {},
+    },
+    schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', title: 'API地址' },
+        method: { 
+          type: 'string', 
+          title: '请求方法',
+          enum: ['GET', 'POST', 'PUT', 'DELETE']
+        },
+        headers: { type: 'object', title: '请求头' },
+        params: { type: 'object', title: '请求参数' },
+      },
+    },
+  },
+  {
+    type: 'payment',
+    name: '支付组件',
+    icon: '💳',
+    defaultWidth: 280,
+    defaultHeight: 80,
+    defaultProps: { 
+      amount: 0,
+      method: 'alipay',
+      subject: '商品名称',
+    },
+    schema: {
+      type: 'object',
+      properties: {
+        amount: { type: 'number', title: '支付金额' },
+        method: { 
+          type: 'string', 
+          title: '支付方式',
+          enum: ['alipay', 'wechat', 'card']
+        },
+        subject: { type: 'string', title: '商品名称' },
+      },
+    },
+  },
+  {
+    type: 'map',
+    name: '地图组件',
+    icon: '🗺️',
+    defaultWidth: 400,
+    defaultHeight: 300,
+    defaultProps: { 
+      center: [116.403874, 39.914889],
+      zoom: 12,
+      marker: null,
+    },
+    schema: {
+      type: 'object',
+      properties: {
+        center: { type: 'array', title: '中心点坐标' },
+        zoom: { type: 'number', title: '缩放级别' },
+        marker: { type: 'object', title: '标记点' },
+      },
+    },
+  },
 ]
 
 // 默认页面配置
@@ -1100,13 +1325,23 @@ const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   isDirty: false,
 }
 
-// 创建Zustand store
-export const useCanvasStore = create<CanvasState>((set, get) => ({
+// 创建Zustand store工厂函数
+export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
   project: DEFAULT_PROJECT_CONFIG,
   currentPage: DEFAULT_PAGE_CONFIG,
   components: [],
   selectedId: null,
+  selectedIds: [],
   componentList: DEFAULT_COMPONENT_LIST,
+  zoom: 1,
+  zoomPosition: { x: 0, y: 0 },
+  modal: {
+    visible: false,
+    title: '',
+    content: '',
+    closable: true,
+  },
+  dataModels: [],
 
   // 添加组件到画布
   addComponent: (componentType: string, x: number, y: number) => {
@@ -1182,8 +1417,61 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   // 选中组件
-  selectComponent: (id: string | null) => {
-    set({ selectedId: id })
+  selectComponent: (id: string | null, multiSelect = false) => {
+    if (!id) {
+      set({ selectedId: null, selectedIds: [] })
+      return
+    }
+    
+    if (multiSelect) {
+      set((state) => {
+        const isAlreadySelected = state.selectedIds.includes(id)
+        const newSelectedIds = isAlreadySelected
+          ? state.selectedIds.filter((sid) => sid !== id)
+          : [...state.selectedIds, id]
+        return {
+          selectedId: id,
+          selectedIds: newSelectedIds,
+        }
+      })
+    } else {
+      set({ selectedId: id, selectedIds: [id] })
+    }
+  },
+
+  // 选择多个组件
+  selectComponents: (ids: string[]) => {
+    set({
+      selectedId: ids.length > 0 ? ids[0] : null,
+      selectedIds: ids,
+    })
+  },
+
+  // 添加到选择
+  addToSelection: (id: string) => {
+    set((state) => {
+      if (state.selectedIds.includes(id)) return state
+      return {
+        selectedId: id,
+        selectedIds: [...state.selectedIds, id],
+      }
+    })
+  },
+
+  // 从选择中移除
+  removeFromSelection: (id: string) => {
+    set((state) => {
+      const newSelectedIds = state.selectedIds.filter((sid) => sid !== id)
+      return {
+        selectedId: newSelectedIds.length > 0 ? newSelectedIds[0] : null,
+        selectedIds: newSelectedIds,
+      }
+    })
+  },
+
+  // 清空选择
+  clearSelection: () => {
+    set({ selectedId: null, selectedIds: [] })
   },
 
   // 组件置顶
@@ -1255,6 +1543,136 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
         components: sortedComponents,
         project: { ...state.project, isDirty: true },
       }
+    })
+  },
+
+  // 左对齐
+  alignLeft: () => {
+    const { selectedIds, components } = get()
+    if (selectedIds.length === 0) return
+
+    const selectedComponents = components.filter((c) => selectedIds.includes(c.id))
+    const minX = Math.min(...selectedComponents.map((c) => c.x))
+
+    set((state) => ({
+      components: state.components.map((c) =>
+        selectedIds.includes(c.id) ? { ...c, x: minX } : c
+      ),
+      project: { ...state.project, isDirty: true },
+    }))
+  },
+
+  // 右对齐
+  alignRight: () => {
+    const { selectedIds, components } = get()
+    if (selectedIds.length === 0) return
+
+    const selectedComponents = components.filter((c) => selectedIds.includes(c.id))
+    const maxRight = Math.max(...selectedComponents.map((c) => c.x + c.width))
+
+    set((state) => ({
+      components: state.components.map((c) =>
+        selectedIds.includes(c.id) ? { ...c, x: maxRight - c.width } : c
+      ),
+      project: { ...state.project, isDirty: true },
+    }))
+  },
+
+  // 顶部对齐
+  alignTop: () => {
+    const { selectedIds, components } = get()
+    if (selectedIds.length === 0) return
+
+    const selectedComponents = components.filter((c) => selectedIds.includes(c.id))
+    const minY = Math.min(...selectedComponents.map((c) => c.y))
+
+    set((state) => ({
+      components: state.components.map((c) =>
+        selectedIds.includes(c.id) ? { ...c, y: minY } : c
+      ),
+      project: { ...state.project, isDirty: true },
+    }))
+  },
+
+  // 底部对齐
+  alignBottom: () => {
+    const { selectedIds, components } = get()
+    if (selectedIds.length === 0) return
+
+    const selectedComponents = components.filter((c) => selectedIds.includes(c.id))
+    const maxBottom = Math.max(...selectedComponents.map((c) => c.y + c.height))
+
+    set((state) => ({
+      components: state.components.map((c) =>
+        selectedIds.includes(c.id) ? { ...c, y: maxBottom - c.height } : c
+      ),
+      project: { ...state.project, isDirty: true },
+    }))
+  },
+
+  // 水平居中对齐
+  alignCenter: () => {
+    const { selectedIds, components } = get()
+    if (selectedIds.length === 0) return
+
+    const selectedComponents = components.filter((c) => selectedIds.includes(c.id))
+    const minX = Math.min(...selectedComponents.map((c) => c.x))
+    const maxRight = Math.max(...selectedComponents.map((c) => c.x + c.width))
+    const centerX = (minX + maxRight) / 2
+
+    set((state) => ({
+      components: state.components.map((c) =>
+        selectedIds.includes(c.id) ? { ...c, x: centerX - c.width / 2 } : c
+      ),
+      project: { ...state.project, isDirty: true },
+    }))
+  },
+
+  // 垂直居中对齐
+  alignMiddle: () => {
+    const { selectedIds, components } = get()
+    if (selectedIds.length === 0) return
+
+    const selectedComponents = components.filter((c) => selectedIds.includes(c.id))
+    const minY = Math.min(...selectedComponents.map((c) => c.y))
+    const maxBottom = Math.max(...selectedComponents.map((c) => c.y + c.height))
+    const centerY = (minY + maxBottom) / 2
+
+    set((state) => ({
+      components: state.components.map((c) =>
+        selectedIds.includes(c.id) ? { ...c, y: centerY - c.height / 2 } : c
+      ),
+      project: { ...state.project, isDirty: true },
+    }))
+  },
+
+  // 放大
+  zoomIn: () => {
+    set((state) => ({
+      zoom: Math.min(state.zoom + 0.1, 3),
+    }))
+  },
+
+  // 缩小
+  zoomOut: () => {
+    set((state) => ({
+      zoom: Math.max(state.zoom - 0.1, 0.25),
+    }))
+  },
+
+  // 重置缩放
+  resetZoom: () => {
+    set({
+      zoom: 1,
+      zoomPosition: { x: 0, y: 0 },
+    })
+  },
+
+  // 设置缩放
+  setZoom: (zoom: number, position?: { x: number; y: number }) => {
+    set({
+      zoom: Math.min(Math.max(zoom, 0.25), 3),
+      zoomPosition: position || { x: 0, y: 0 },
     })
   },
 
@@ -1332,8 +1750,11 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   saveProject: async () => {
     const { project, components, currentPage } = get()
     try {
-      // 这里调用后端API保存项目
-      console.log('保存项目:', { project, components, currentPage })
+      // 调用后端API保存画布数据
+      if (project.id && currentPage && currentPage.id) {
+        await pageApi.saveCanvas(project.id.toString(), currentPage.id, components)
+      }
+      
       set((state) => ({
         project: {
           ...state.project,
@@ -1341,6 +1762,8 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
           isDirty: false,
         },
       }))
+      
+      console.log('项目保存成功')
     } catch (error) {
       console.error('保存项目失败:', error)
       throw error
@@ -1349,20 +1772,30 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
 
   // 另存为项目
   saveProjectAs: async (name: string) => {
-    const { components, currentPage } = get()
+    const { project, components } = get()
     try {
-      // 这里调用后端API另存为项目
-      console.log('另存为项目:', { name, components, currentPage })
+      // 调用后端API创建新页面
+      const newPage = await pageApi.createPage(project.id?.toString() || '', name, components)
+      
+      const newPageId = (newPage as any)?.id?.toString() || generateId()
+      const newPageName = (newPage as any)?.name || name
+      
       set((state) => ({
         project: {
           ...state.project,
-          id: generateId(),
           name,
-          createdAt: new Date(),
           updatedAt: new Date(),
           isDirty: false,
+          currentPageId: newPageId,
+        },
+        currentPage: {
+          ...state.currentPage,
+          id: newPageId,
+          name: newPageName,
         },
       }))
+      
+      console.log('项目另存为成功')
     } catch (error) {
       console.error('另存为项目失败:', error)
       throw error
@@ -1575,4 +2008,87 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
       project: { ...state.project, isDirty },
     }))
   },
+
+  // 导出画布JSON
+  exportCanvasJson: () => {
+    const { project, components, currentPage } = get()
+    const exportData = {
+      project: {
+        id: project.id,
+        name: project.name,
+        pages: project.pages,
+        currentPageId: project.currentPageId,
+      },
+      currentPage,
+      components,
+    }
+    return JSON.stringify(exportData, null, 2)
+  },
+
+  // 导入画布JSON
+  importCanvasJson: (json: string) => {
+    try {
+      const data = JSON.parse(json)
+      set({
+        project: {
+          ...data.project,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isDirty: false,
+        },
+        currentPage: data.currentPage,
+        components: data.components || [],
+        selectedId: null,
+        selectedIds: [],
+      })
+    } catch (error) {
+      console.error('导入画布JSON失败:', error)
+      throw new Error('无效的画布JSON格式')
+    }
+  },
+
+  // 打开弹窗
+  openModal: (title: string, content: string, closable = true) => {
+    set((_state) => ({
+      modal: {
+        visible: true,
+        title,
+        content,
+        closable,
+      },
+    }))
+  },
+
+  // 关闭弹窗
+  closeModal: () => {
+    set((state) => ({
+      modal: {
+        ...state.modal,
+        visible: false,
+      },
+    }))
+  },
+
+  // 数据模型操作
+  addDataModel: (model: DataModel) => {
+    set((state) => ({
+      dataModels: [...state.dataModels, model],
+    }))
+  },
+
+  updateDataModel: (modelId: string, updates: Partial<DataModel>) => {
+    set((state) => ({
+      dataModels: state.dataModels.map((model) =>
+        model.id === modelId ? { ...model, ...updates } : model
+      ),
+    }))
+  },
+
+  deleteDataModel: (modelId: string) => {
+    set((state) => ({
+      dataModels: state.dataModels.filter((model) => model.id !== modelId),
+    }))
+  },
 }))
+
+export { useCanvasStore } from '@/providers/canvas-store-provider'

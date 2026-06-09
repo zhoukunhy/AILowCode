@@ -1,6 +1,7 @@
 /**
  * 工具调用 Agent - 协调三大内置工具
  * SQL_DDL / Nest_Crud / Http_Test
+ * 支持全链路自动化：建表 → CRUD接口生成 → 前端组件绑定
  */
 
 import type {
@@ -59,7 +60,22 @@ export interface ToolOutput {
   ddlResult?: SQLDDLOutput
   crudResults?: NestCrudOutput
   testResults?: HttpTestOutput[]
+  componentSchema?: ComponentBindingSchema
   summary: string
+}
+
+/**
+ * 组件绑定Schema
+ */
+export interface ComponentBindingSchema {
+  componentType: string
+  dataSourceId: string
+  apiEndpoint: string
+  fields: Array<{
+    fieldName: string
+    dataField: string
+    displayName?: string
+  }>
 }
 
 /**
@@ -70,6 +86,16 @@ export interface ToolCallingAgentConfig {
   nestCrudTool?: NestCrudTool
   httpTestTool?: HttpTestTool
   maxRetries?: number
+  databaseConfig?: DatabaseConfig
+}
+
+export interface DatabaseConfig {
+  host: string
+  port: number
+  username: string
+  password: string
+  database: string
+  type: 'postgresql' | 'mysql'
 }
 
 /**
@@ -82,11 +108,14 @@ export class ToolCallingAgent {
   constructor(config?: ToolCallingAgentConfig) {
     this.config = {
       maxRetries: config?.maxRetries || 3,
+      ...config,
     }
 
     // 初始化工具
     this.tools = new Map()
-    const sqlTool = config?.sqlDDLTool || createSQLDDLTool()
+    const sqlTool = config?.sqlDDLTool || createSQLDDLTool({
+      databaseType: config?.databaseConfig?.type || 'postgresql',
+    })
     const crudTool = config?.nestCrudTool || createNestCrudTool()
     const httpTool = config?.httpTestTool || createHttpTestTool()
 
@@ -262,6 +291,184 @@ export class ToolCallingAgent {
   }
 
   /**
+   * 全链路自动化执行：建表 → CRUD接口生成 → 组件绑定
+   */
+  async executeFullPipeline(userInput: string, entities: EntityDefinition[]): Promise<ToolOutput> {
+    console.log('[ToolCallingAgent] 开始全链路自动化流程')
+
+    const output: ToolOutput = {
+      summary: '',
+      executions: [] as any,
+    }
+
+    if (entities.length === 0) {
+      throw new Error('请先定义实体')
+    }
+
+    const entity = entities[0]
+    const executionSteps: ToolExecutionResult[] = []
+
+    try {
+      // ============= 第一步：生成DDL并建表 =============
+      console.log('[ToolCallingAgent] 步骤1: 生成DDL并建表')
+      const ddlInput = this.prepareDDLInput(entity)
+      const ddlResult = await this.executeTool('SQL_DDL', ddlInput)
+      executionSteps.push(ddlResult)
+
+      if (!ddlResult.success) {
+        throw new Error(`DDL执行失败: ${ddlResult.error}`)
+      }
+
+      output.ddlResult = ddlResult.output as SQLDDLOutput
+
+      // ============= 第二步：生成CRUD接口 =============
+      console.log('[ToolCallingAgent] 步骤2: 生成CRUD接口')
+      const crudInput = this.prepareCrudInput(entity)
+      const crudResult = await this.executeTool('Nest_Crud', crudInput)
+      executionSteps.push(crudResult)
+
+      if (!crudResult.success) {
+        throw new Error(`CRUD生成失败: ${crudResult.error}`)
+      }
+
+      output.crudResults = crudResult.output as NestCrudOutput
+
+      // ============= 第三步：生成组件绑定Schema =============
+      console.log('[ToolCallingAgent] 步骤3: 生成组件绑定Schema')
+      const componentSchema = this.generateComponentBindingSchema(entity)
+      output.componentSchema = componentSchema
+
+      // ============= 第四步：测试接口（可选）=============
+      console.log('[ToolCallingAgent] 步骤4: 测试CRUD接口')
+      const testResults = await this.testCrudEndpoints(entity)
+      output.testResults = testResults
+
+      // 构建摘要
+      const successfulSteps = executionSteps.filter(e => e.success).length
+      output.summary = `全链路自动化完成！\n` +
+        `- DDL建表: ${output.ddlResult?.success ? '成功' : '失败'}\n` +
+        `- CRUD接口生成: ${output.crudResults?.files.length || 0} 个文件\n` +
+        `- 接口测试: ${testResults.filter(t => t.success).length}/${testResults.length} 通过\n` +
+        `- 组件绑定Schema已生成`
+
+      console.log(`[ToolCallingAgent] 全链路流程完成: ${output.summary}`)
+
+    } catch (error) {
+      console.error('[ToolCallingAgent] 全链路流程失败:', error)
+      output.error = (error as Error).message
+      output.summary = `全链路流程失败: ${(error as Error).message}`
+    }
+
+    return output
+  }
+
+  /**
+   * 测试CRUD接口
+   */
+  async testCrudEndpoints(entity: EntityDefinition): Promise<HttpTestOutput[]> {
+    const httpTool = this.tools.get('Http_Test') as HttpTestTool
+    if (!httpTool) {
+      console.warn('[ToolCallingAgent] HttpTestTool not available, skipping tests')
+      return []
+    }
+
+    const kebabName = this.toKebabCase(entity.name)
+    const baseUrl = process.env.API_BASE_URL || 'http://localhost:3000'
+
+    const tests: HttpTestInput[] = [
+      {
+        url: `${baseUrl}/${kebabName}`,
+        method: 'GET',
+        expectedStatus: 200,
+      },
+      {
+        url: `${baseUrl}/${kebabName}`,
+        method: 'POST',
+        body: this.generateTestData(entity),
+        expectedStatus: 201,
+      },
+    ]
+
+    const results: HttpTestOutput[] = []
+    for (const test of tests) {
+      try {
+        const result = await httpTool.execute(test)
+        results.push(result)
+      } catch {
+        results.push({
+          success: false,
+          statusCode: 0,
+          statusText: 'Error',
+          headers: {},
+          body: null,
+          duration: 0,
+          message: '测试失败',
+        })
+      }
+    }
+
+    return results
+  }
+
+  /**
+   * 生成组件绑定Schema
+   */
+  private generateComponentBindingSchema(entity: EntityDefinition): ComponentBindingSchema {
+    const kebabName = this.toKebabCase(entity.name)
+    
+    return {
+      componentType: 'Table',
+      dataSourceId: `api_${entity.name.toLowerCase()}`,
+      apiEndpoint: `/api/${kebabName}`,
+      fields: entity.columns.map(col => ({
+        fieldName: col.name,
+        dataField: col.name,
+        displayName: col.description || col.name,
+      })),
+    }
+  }
+
+  /**
+   * 生成测试数据
+   */
+  private generateTestData(entity: EntityDefinition): Record<string, any> {
+    const data: Record<string, any> = {}
+    
+    for (const col of entity.columns) {
+      if (col.primaryKey) continue
+      
+      data[col.name] = this.generateTestValue(col.type)
+    }
+    
+    return data
+  }
+
+  /**
+   * 根据类型生成测试值
+   */
+  private generateTestValue(type: string): any {
+    const lowerType = type.toLowerCase()
+    
+    if (lowerType.includes('int') || lowerType.includes('number') || lowerType.includes('decimal') || lowerType.includes('float')) {
+      return Math.floor(Math.random() * 100)
+    }
+    
+    if (lowerType.includes('string') || lowerType.includes('text') || lowerType.includes('email') || lowerType.includes('url')) {
+      return `test_${Math.random().toString(36).substr(2, 9)}`
+    }
+    
+    if (lowerType.includes('boolean')) {
+      return Math.random() > 0.5
+    }
+    
+    if (lowerType.includes('date') || lowerType.includes('time') || lowerType.includes('timestamp')) {
+      return new Date().toISOString()
+    }
+    
+    return `value_${Math.random().toString(36).substr(2, 9)}`
+  }
+
+  /**
    * 准备 DDL 输入
    */
   private prepareDDLInput(entity: EntityDefinition): SQLDDLInput {
@@ -305,11 +512,9 @@ export class ToolCallingAgent {
    * 准备 HTTP 测试输入
    */
   private prepareHttpTestInput(userInput: string): HttpTestInput {
-    // 从用户输入中解析 URL 和方法
     const methodMatch = userInput.match(/\b(GET|POST|PUT|DELETE|PATCH)\b/i)
     const method = methodMatch ? methodMatch[1].toUpperCase() as HttpTestInput['method'] : 'GET'
 
-    // 简单提取 URL（实际应用中需要更复杂的解析）
     const urlMatch = userInput.match(/https?:\/\/[^\s]+/)
     const url = urlMatch ? urlMatch[0] : 'http://localhost:3000'
 
@@ -336,6 +541,10 @@ export class ToolCallingAgent {
 
   private toSnakeCase(str: string): string {
     return str.replace(/([A-Z])/g, '_$1').toLowerCase().replace(/^_/, '')
+  }
+
+  private toKebabCase(str: string): string {
+    return str.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')
   }
 }
 

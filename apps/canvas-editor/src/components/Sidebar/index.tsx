@@ -3,10 +3,12 @@
 import React, { useState } from 'react'
 import { useCanvasStore } from '@/store/canvasStore'
 import KnowledgePanel from '@/components/KnowledgePanel'
+import { DataManagementPanel } from '@/components/DataManagementPanel'
+import { DataModelingPanel } from '@/components/DataModelingPanel'
 
 export function Sidebar() {
-  const { componentList } = useCanvasStore()
-  const [activeTab, setActiveTab] = useState<'components' | 'knowledge'>('components')
+  const componentList = useCanvasStore((state) => state.componentList)
+  const [activeTab, setActiveTab] = useState<'components' | 'knowledge' | 'data' | 'modeling'>('components')
   const [expandedCategory, setExpandedCategory] = useState<string>('form')
 
   // 处理拖拽开始
@@ -15,27 +17,36 @@ export function Sidebar() {
     e.dataTransfer.effectAllowed = 'copy'
   }
 
-  // 按类别分组组件
+  // 按物料分类分组组件
   const groupedComponents = {
-    form: componentList.filter(c => 
-      ['button', 'input', 'textarea', 'select', 'checkbox', 'radio', 'switch', 
-       'datepicker', 'daterange', 'timepicker', 'numberInput', 'passwordInput', 
-       'emailInput', 'phoneInput', 'upload', 'slider', 'rate', 'cascader', 
-       'transfer', 'form'].includes(c.type)
+    layout: componentList.filter(c => 
+      ['card', 'divider', 'space', 'tabs', 'modal', 'drawer', 'steps', 'timeline', 
+       'tree', 'carousel', 'pagination'].includes(c.type)
     ),
-    list: componentList.filter(c => 
-      ['table', 'list', 'pagination', 'tabs', 'steps', 'timeline', 'tree', 'carousel'].includes(c.type)
+    formData: componentList.filter(c => 
+      ['input', 'textarea', 'select', 'checkbox', 'radio', 'switch', 'datepicker', 
+       'daterange', 'timepicker', 'numberInput', 'passwordInput', 'emailInput', 
+       'phoneInput', 'slider', 'rate', 'cascader', 'transfer', 'form', 'table', 
+       'list'].includes(c.type)
     ),
-    basic: componentList.filter(c => 
-      ['text', 'heading', 'image', 'card', 'divider', 'space', 'avatar', 'tag', 
-       'badge', 'alert', 'modal', 'drawer', 'tooltip', 'popover'].includes(c.type)
+    interaction: componentList.filter(c => 
+      ['button', 'text', 'heading', 'image', 'avatar', 'tag', 'badge', 'alert', 
+       'tooltip', 'popover'].includes(c.type)
+    ),
+    business: componentList.filter(c => 
+      ['approval', 'flowNode', 'condition'].includes(c.type)
+    ),
+    integration: componentList.filter(c => 
+      ['upload', 'apiConnector', 'payment', 'map'].includes(c.type)
     ),
   }
 
   const categoryLabels = {
-    form: '表单组件',
-    list: '列表组件',
-    basic: '基础组件',
+    layout: '布局物料',
+    formData: '表单与数据物料',
+    interaction: '交互与反馈物料',
+    business: '业务流程物料',
+    integration: '集成与工具物料',
   }
 
   return (
@@ -61,6 +72,26 @@ export function Sidebar() {
           onClick={() => setActiveTab('knowledge')}
         >
           知识库
+        </button>
+        <button
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+            activeTab === 'data'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+          onClick={() => setActiveTab('data')}
+        >
+          数据管理
+        </button>
+        <button
+          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
+            activeTab === 'modeling'
+              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+          }`}
+          onClick={() => setActiveTab('modeling')}
+        >
+          数据建模
         </button>
       </div>
 
@@ -111,8 +142,12 @@ export function Sidebar() {
               </div>
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'knowledge' ? (
           <KnowledgePanel />
+        ) : activeTab === 'data' ? (
+          <DataManagementPanel />
+        ) : (
+          <DataModelingPanel />
         )}
       </div>
     </div>

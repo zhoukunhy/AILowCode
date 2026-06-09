@@ -161,6 +161,18 @@ export class DataSourceService {
   }
 
   /**
+   * 测试连接（无需ID，用于前端配置测试）
+   */
+  async testConnectionDirect(type: string, config: Record<string, any>): Promise<{ success: boolean; error?: string }> {
+    try {
+      const validation = await this.dataSourceManager.validateDataSource(type as any, config as any)
+      return validation
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  }
+
+  /**
    * 预览数据
    */
   async previewData(dto: PreviewDataDto): Promise<{ rows: any[]; total: number; fields?: any[] }> {
