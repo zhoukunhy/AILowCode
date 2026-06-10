@@ -3,12 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-// 默认账号配置
-const DEFAULT_ACCOUNTS = [
-  { username: 'admin', password: 'admin123', role: '超级管理员', email: 'admin@example.com' },
-  { username: 'user', password: 'user123', role: '普通用户', email: 'user@example.com' },
-  { username: 'guest', password: 'guest123', role: '访客', email: 'guest@example.com' },
-]
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -56,48 +51,47 @@ export default function LoginPage() {
           setLoading(false)
           return
         }
-        // 模拟注册成功
-        const newUser = {
-          id: Date.now().toString(),
-          username: formData.username,
-          email: formData.email,
-          role: '普通用户',
+        const res = await fetch(`${API_BASE}/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            username: formData.username,
+            password: formData.password,
+            email: formData.email,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok) {
+          setError(data.message || '注册失败')
+          setLoading(false)
+          return
         }
-        localStorage.setItem('token', `token-${Date.now()}`)
-        localStorage.setItem('user', JSON.stringify(newUser))
+        localStorage.setItem('token', data.access_token)
+        localStorage.setItem('user', JSON.stringify(data.user))
         router.push('/dashboard')
         return
       }
 
-      // 登录逻辑 - 验证默认账号
-      const username = formData.username.trim()
-      const password = formData.password.trim()
-      
-      console.log('登录尝试:', { username, password })
-      console.log('默认账号:', DEFAULT_ACCOUNTS)
-      
-      const account = DEFAULT_ACCOUNTS.find(
-        (acc) => acc.username === username && acc.password === password
-      )
-
-      console.log('匹配结果:', account)
-
-      if (account) {
-        // 登录成功
-        const user = {
-          id: Date.now().toString(),
-          username: account.username,
-          email: account.email,
-          role: account.role,
-        }
-        localStorage.setItem('token', `token-${Date.now()}`)
-        localStorage.setItem('user', JSON.stringify(user))
-        router.push('/dashboard')
-      } else {
-        setError('用户名或密码错误')
+      // 登录逻辑
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: formData.username.trim(),
+          password: formData.password.trim(),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.message || '用户名或密码错误')
+        setLoading(false)
+        return
       }
+      localStorage.setItem('token', data.access_token)
+      localStorage.setItem('user', JSON.stringify(data.user))
+      router.push('/dashboard')
     } catch (err) {
-      setError('操作失败，请重试')
+      setError('网络错误，请检查后端服务是否启动')
       console.error('登录错误:', err)
     } finally {
       setLoading(false)
@@ -151,47 +145,10 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* 默认账号提示 */}
+        {/* 提示信息 */}
         {isLogin && (
-          <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm">
-            <p className="font-medium text-blue-800 mb-1">测试账号：</p>
-            <div className="text-blue-600 space-y-1">
-              <p>管理员: admin / admin123</p>
-              <p>用户: user / user123</p>
-              <p>访客: guest / guest123</p>
-            </div>
-            <div className="mt-3 pt-3 border-t border-blue-200">
-              <p className="text-xs text-blue-600 mb-2">快速登录：</p>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData({ ...formData, username: 'admin', password: 'admin123' })
-                  }}
-                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                >
-                  管理员
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData({ ...formData, username: 'user', password: 'user123' })
-                  }}
-                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                >
-                  普通用户
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData({ ...formData, username: 'guest', password: 'guest123' })
-                  }}
-                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                >
-                  访客
-                </button>
-              </div>
-            </div>
+          <div className="mb-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-700">
+            <p>请先注册账号，或使用已有账号登录</p>
           </div>
         )}
 

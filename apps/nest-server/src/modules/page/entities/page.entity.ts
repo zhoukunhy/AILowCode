@@ -18,8 +18,8 @@ export class Page {
   @PrimaryGeneratedColumn()
   id!: number
 
-  @Column({ name: 'project_id' })
-  projectId!: number
+  @Column({ name: 'project_id', nullable: true })
+  projectId?: number
 
   @Column({ length: 100 })
   name!: string
@@ -60,8 +60,8 @@ export class Page {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt!: Date
 
-  // 关联关系
-  @ManyToOne(() => Project, { onDelete: 'CASCADE' })
+  // 关联关系（可选）
+  @ManyToOne(() => Project, { onDelete: 'CASCADE', nullable: true })
   @JoinColumn({ name: 'project_id' })
-  project!: Project
+  project?: Project
 }

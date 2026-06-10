@@ -60,7 +60,6 @@ export class CreatePageDto {
 
   @ApiPropertyOptional({ description: '画布 JSON 数据' })
   @IsOptional()
-  @IsObject()
   canvasJson?: any = []
 
   @ApiPropertyOptional({ description: '是否为首页', default: false })

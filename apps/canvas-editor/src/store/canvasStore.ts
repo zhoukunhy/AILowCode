@@ -1,6 +1,6 @@
 import { createStore } from 'zustand/vanilla'
 import { generateId } from '@ai-lowcode/common-util'
-import { pageApi } from '../lib/api'
+import { pageApi, canvasPageApi } from '../lib/api'
 
 // 组件配置类型
 export interface ComponentConfig {
@@ -119,6 +119,7 @@ export interface CanvasState {
   // 组件操作
   addComponent: (componentType: string, x: number, y: number) => void
   removeComponent: (id: string) => void
+  clearCanvas: () => void
   updateComponent: (id: string, updates: Partial<ComponentConfig>) => void
   updateComponentProps: (id: string, props: Record<string, any>) => void
   selectComponent: (id: string | null, multiSelect?: boolean) => void
@@ -1396,6 +1397,16 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
     })
   },
 
+  // 清除画布（删除所有组件）
+  clearCanvas: () => {
+    set((state) => ({
+      components: [],
+      selectedId: null,
+      selectedIds: [],
+      project: { ...state.project, isDirty: true },
+    }))
+  },
+
   // 更新组件
   updateComponent: (id: string, updates: Partial<ComponentConfig>) => {
     set((state) => ({
@@ -1746,15 +1757,25 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
     }))
   },
 
-  // 保存项目
+  // 保存项目（对接数据库）
   saveProject: async () => {
     const { project, components, currentPage } = get()
     try {
-      // 调用后端API保存画布数据
-      if (project.id && currentPage && currentPage.id) {
-        await pageApi.saveCanvas(project.id.toString(), currentPage.id, components)
+      const pageIdNum = Number(currentPage?.id)
+      if (!isNaN(pageIdNum) && pageIdNum > 0) {
+        // 已存在的页面，更新画布数据
+        await canvasPageApi.saveCanvas(pageIdNum, components)
+      } else if (currentPage?.name) {
+        // 新页面，先创建
+        const created = await canvasPageApi.createPage(currentPage.name, components)
+        const newId = (created as any)?.id
+        if (newId) {
+          set((state) => ({
+            currentPage: { ...state.currentPage, id: newId.toString() },
+          }))
+        }
       }
-      
+
       set((state) => ({
         project: {
           ...state.project,
@@ -1762,217 +1783,53 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
           isDirty: false,
         },
       }))
-      
-      console.log('项目保存成功')
+
+      console.log('画布保存成功')
     } catch (error) {
-      console.error('保存项目失败:', error)
+      console.error('保存画布失败:', error)
       throw error
     }
   },
 
   // 另存为项目
   saveProjectAs: async (name: string) => {
-    const { project, components } = get()
+    const { components } = get()
     try {
-      // 调用后端API创建新页面
-      const newPage = await pageApi.createPage(project.id?.toString() || '', name, components)
-      
-      const newPageId = (newPage as any)?.id?.toString() || generateId()
-      const newPageName = (newPage as any)?.name || name
-      
+      const created = await canvasPageApi.createPage(name, components)
+      const newId = (created as any)?.id?.toString() || generateId()
+      const newName = (created as any)?.name || name
+
       set((state) => ({
         project: {
           ...state.project,
-          name,
+          name: newName,
           updatedAt: new Date(),
           isDirty: false,
-          currentPageId: newPageId,
+          currentPageId: newId,
         },
         currentPage: {
           ...state.currentPage,
-          id: newPageId,
-          name: newPageName,
+          id: newId,
+          name: newName,
         },
       }))
-      
-      console.log('项目另存为成功')
+
+      console.log('画布另存为成功')
     } catch (error) {
-      console.error('另存为项目失败:', error)
+      console.error('另存为画布失败:', error)
       throw error
     }
   },
 
-  // 加载项目
-  loadProject: async (projectId: string) => {
+  // 加载项目（从数据库）
+  loadProject: async (pageId: string) => {
     try {
-      // 模拟项目数据
-      const mockProjects: Record<string, {
-        name: string
-        components: ComponentConfig[]
-        pages: PageConfig[]
-      }> = {
-        '1': {
-          name: '电商后台管理系统',
-          pages: [DEFAULT_PAGE_CONFIG],
-          components: [
-            {
-              id: generateId(),
-              type: 'button',
-              name: '按钮',
-              x: 50,
-              y: 50,
-              width: 120,
-              height: 40,
-              props: { text: '提交订单', type: 'primary', disabled: false },
-              zIndex: 1,
-              rotation: 0,
-              opacity: 1,
-              visible: true,
-              locked: false,
-            },
-            {
-              id: generateId(),
-              type: 'input',
-              name: '输入框',
-              x: 50,
-              y: 120,
-              width: 240,
-              height: 60,
-              props: { label: '订单编号', placeholder: '请输入订单编号', required: true },
-              zIndex: 1,
-              rotation: 0,
-              opacity: 1,
-              visible: true,
-              locked: false,
-            },
-            {
-              id: generateId(),
-              type: 'table',
-              name: '数据表格',
-              x: 50,
-              y: 200,
-              width: 800,
-              height: 300,
-              props: { 
-                data: [
-                  { id: 1, name: '商品A', price: 100, quantity: 10 },
-                  { id: 2, name: '商品B', price: 200, quantity: 5 },
-                  { id: 3, name: '商品C', price: 150, quantity: 8 },
-                ],
-                columns: ['id', 'name', 'price', 'quantity'],
-                bordered: true,
-                stripe: true,
-              },
-              zIndex: 1,
-              rotation: 0,
-              opacity: 1,
-              visible: true,
-              locked: false,
-            },
-          ],
-        },
-        '2': {
-          name: 'CRM客户管理系统',
-          pages: [DEFAULT_PAGE_CONFIG],
-          components: [
-            {
-              id: generateId(),
-              type: 'card',
-              name: '卡片',
-              x: 50,
-              y: 50,
-              width: 300,
-              height: 200,
-              props: { title: '客户概览', hoverable: true },
-              zIndex: 1,
-              rotation: 0,
-              opacity: 1,
-              visible: true,
-              locked: false,
-            },
-            {
-              id: generateId(),
-              type: 'tabs',
-              name: '标签页',
-              x: 50,
-              y: 280,
-              width: 600,
-              height: 300,
-              props: { 
-                tabs: ['基本信息', '联系记录', '跟进计划'],
-                activeTab: 0,
-              },
-              zIndex: 1,
-              rotation: 0,
-              opacity: 1,
-              visible: true,
-              locked: false,
-            },
-          ],
-        },
-        '3': {
-          name: 'OA办公自动化系统',
-          pages: [DEFAULT_PAGE_CONFIG],
-          components: [
-            {
-              id: generateId(),
-              type: 'steps',
-              name: '步骤条',
-              x: 50,
-              y: 50,
-              width: 800,
-              height: 80,
-              props: { 
-                steps: ['提交申请', '部门审批', '财务审核', '完成'],
-                current: 1,
-              },
-              zIndex: 1,
-              rotation: 0,
-              opacity: 1,
-              visible: true,
-              locked: false,
-            },
-            {
-              id: generateId(),
-              type: 'form',
-              name: '表单容器',
-              x: 50,
-              y: 150,
-              width: 600,
-              height: 400,
-              props: { labelCol: 6, wrapperCol: 18 },
-              zIndex: 1,
-              rotation: 0,
-              opacity: 1,
-              visible: true,
-              locked: false,
-            },
-          ],
-        },
-      }
-
-      const projectData = mockProjects[projectId]
-      if (projectData) {
+      if (pageId === 'new') {
+        // 新建画布
         set({
           project: {
-            id: projectId,
-            name: projectData.name,
-            pages: projectData.pages,
-            currentPageId: projectData.pages[0].id,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            isDirty: false,
-          },
-          currentPage: projectData.pages[0],
-          components: projectData.components,
-          selectedId: null,
-        })
-      } else {
-        // 如果找不到项目，创建一个新项目
-        set({
-          project: {
-            id: projectId,
-            name: `项目 ${projectId}`,
+            id: 'new',
+            name: '未命名画布',
             pages: [DEFAULT_PAGE_CONFIG],
             currentPageId: DEFAULT_PAGE_CONFIG.id,
             createdAt: new Date(),
@@ -1983,11 +1840,77 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
           components: [],
           selectedId: null,
         })
+        return
       }
-      console.log('加载项目成功:', projectId)
+
+      const pageIdNum = Number(pageId)
+      if (!isNaN(pageIdNum) && pageIdNum > 0) {
+        // 从数据库加载
+        const pageData = await canvasPageApi.getPage(pageIdNum) as any
+        if (pageData?.id) {
+          const loadedComponents = pageData.canvasJson || []
+          const pageConfig: PageConfig = {
+            id: pageData.id.toString(),
+            name: pageData.name,
+            width: pageData.width || 1920,
+            height: pageData.height || 1080,
+            gridSize: pageData.gridSize || 20,
+            snapToGrid: pageData.snapToGrid ?? true,
+            showGrid: pageData.showGrid ?? true,
+            showRulers: pageData.showRulers ?? false,
+            backgroundColor: pageData.backgroundColor || '#ffffff',
+          }
+          set({
+            project: {
+              id: pageData.id.toString(),
+              name: pageData.name,
+              pages: [pageConfig],
+              currentPageId: pageData.id.toString(),
+              createdAt: new Date(pageData.createdAt),
+              updatedAt: new Date(pageData.updatedAt),
+              isDirty: false,
+            },
+            currentPage: pageConfig,
+            components: loadedComponents,
+            selectedId: null,
+          })
+          console.log('加载画布成功:', pageData.id)
+          return
+        }
+      }
+
+      // 兜底：创建空白画布
+      set({
+        project: {
+          id: pageId,
+          name: `画布 ${pageId}`,
+          pages: [DEFAULT_PAGE_CONFIG],
+          currentPageId: DEFAULT_PAGE_CONFIG.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isDirty: false,
+        },
+        currentPage: DEFAULT_PAGE_CONFIG,
+        components: [],
+        selectedId: null,
+      })
     } catch (error) {
-      console.error('加载项目失败:', error)
-      throw error
+      console.error('加载画布失败:', error)
+      // 加载失败也创建空白画布
+      set({
+        project: {
+          id: pageId,
+          name: '未命名画布',
+          pages: [DEFAULT_PAGE_CONFIG],
+          currentPageId: DEFAULT_PAGE_CONFIG.id,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          isDirty: false,
+        },
+        currentPage: DEFAULT_PAGE_CONFIG,
+        components: [],
+        selectedId: null,
+      })
     }
   },
 

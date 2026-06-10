@@ -57,30 +57,54 @@ export function ComponentRenderer({
     </Group>
   )
 
-  const renderInput = () => (
-    <Group>
-      <Rect
-        x={0}
-        y={0}
-        width={component.width}
-        height={component.height}
-        fill="#fff"
-        stroke="#d9d9d9"
-        strokeWidth={1}
-        cornerRadius={4}
-      />
-      <Text
-        x={8}
-        y={component.height / 2}
-        text={component.props.value || component.props.placeholder}
-        fontSize={14}
-        fill={component.props.value ? '#333' : '#bfbfbf'}
-        align="left"
-        verticalAlign="middle"
-        offsetY={component.height / 2}
-      />
-    </Group>
-  )
+  const renderInput = () => {
+    const labelWidth = component.props.label ? 80 : 0
+    const inputWidth = component.width - labelWidth
+    
+    return (
+      <Group>
+        {/* label */}
+        {component.props.label && (
+          <>
+            <Text
+              x={0}
+              y={component.height / 2}
+              text={component.props.label}
+              fontSize={14}
+              fill="#333"
+              align="left"
+              verticalAlign="middle"
+              offsetY={component.height / 2}
+              width={labelWidth - 8}
+            />
+          </>
+        )}
+        
+        {/* 输入框 */}
+        <Rect
+          x={labelWidth}
+          y={0}
+          width={inputWidth}
+          height={component.height}
+          fill="#fff"
+          stroke="#d9d9d9"
+          strokeWidth={1}
+          cornerRadius={4}
+        />
+        <Text
+          x={labelWidth + 8}
+          y={component.height / 2}
+          text={component.props.value || component.props.placeholder}
+          fontSize={14}
+          fill={component.props.value ? '#333' : '#bfbfbf'}
+          align="left"
+          verticalAlign="middle"
+          offsetY={component.height / 2}
+          width={inputWidth - 16}
+        />
+      </Group>
+    )
+  }
 
   const renderText = () => (
     <Group>
@@ -134,6 +158,151 @@ export function ComponentRenderer({
         text={component.props.content}
         fontSize={14}
         fill="#666"
+      />
+    </Group>
+  )
+
+  const renderTextarea = () => {
+    const labelWidth = component.props.label ? 80 : 0
+    const inputWidth = component.width - labelWidth
+    
+    return (
+      <Group>
+        {/* label */}
+        {component.props.label && (
+          <Text
+            x={0}
+            y={component.height / 2}
+            text={component.props.label}
+            fontSize={14}
+            fill="#333"
+            align="left"
+            verticalAlign="middle"
+            offsetY={component.height / 2}
+            width={labelWidth - 8}
+          />
+        )}
+        
+        {/* 文本域 */}
+        <Rect
+          x={labelWidth}
+          y={0}
+          width={inputWidth}
+          height={component.height}
+          fill="#fff"
+          stroke="#d9d9d9"
+          strokeWidth={1}
+          cornerRadius={4}
+        />
+        <Text
+          x={labelWidth + 8}
+          y={16}
+          text={component.props.value || component.props.placeholder}
+          fontSize={14}
+          fill={component.props.value ? '#333' : '#bfbfbf'}
+          align="left"
+          width={inputWidth - 16}
+          height={component.height - 24}
+        />
+        {/* 右下角显示行数 */}
+        <Text
+          x={component.width - 40}
+          y={component.height - 8}
+          text={`${component.props.rows || 4}行`}
+          fontSize={12}
+          fill="#999"
+        />
+      </Group>
+    )
+  }
+
+  const renderSelect = () => {
+    const labelWidth = component.props.label ? 80 : 0
+    const inputWidth = component.width - labelWidth
+    
+    return (
+      <Group>
+        {/* label */}
+        {component.props.label && (
+          <Text
+            x={0}
+            y={component.height / 2}
+            text={component.props.label}
+            fontSize={14}
+            fill="#333"
+            align="left"
+            verticalAlign="middle"
+            offsetY={component.height / 2}
+            width={labelWidth - 8}
+          />
+        )}
+        
+        {/* 下拉框 */}
+        <Rect
+          x={labelWidth}
+          y={0}
+          width={inputWidth}
+          height={component.height}
+          fill="#fff"
+          stroke="#d9d9d9"
+          strokeWidth={1}
+          cornerRadius={4}
+        />
+        <Text
+          x={labelWidth + 8}
+          y={component.height / 2}
+          text={component.props.value || component.props.placeholder}
+          fontSize={14}
+          fill={component.props.value ? '#333' : '#bfbfbf'}
+          align="left"
+          verticalAlign="middle"
+          offsetY={component.height / 2}
+          width={inputWidth - 32}
+        />
+        {/* 下拉箭头 */}
+        <Text
+          x={component.width - 24}
+          y={component.height / 2}
+          text="▼"
+          fontSize={12}
+          fill="#999"
+          verticalAlign="middle"
+          offsetY={component.height / 2}
+        />
+      </Group>
+    )
+  }
+
+  const renderCheckbox = () => (
+    <Group>
+      <Rect
+        x={0}
+        y={component.height / 2 - 10}
+        width={20}
+        height={20}
+        fill={component.props.checked ? '#1890ff' : '#fff'}
+        stroke="#d9d9d9"
+        strokeWidth={1}
+        cornerRadius={4}
+      />
+      {component.props.checked && (
+        <Text
+          x={4}
+          y={component.height / 2 - 4}
+          text="✓"
+          fontSize={14}
+          fill="#fff"
+          verticalAlign="middle"
+        />
+      )}
+      <Text
+        x={28}
+        y={component.height / 2}
+        text={component.props.label}
+        fontSize={14}
+        fill="#333"
+        verticalAlign="middle"
+        offsetY={component.height / 2}
       />
     </Group>
   )
@@ -251,6 +420,12 @@ export function ComponentRenderer({
         return renderButton()
       case 'input':
         return renderInput()
+      case 'textarea':
+        return renderTextarea()
+      case 'select':
+        return renderSelect()
+      case 'checkbox':
+        return renderCheckbox()
       case 'text':
         return renderText()
       case 'card':

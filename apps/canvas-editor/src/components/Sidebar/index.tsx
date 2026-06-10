@@ -3,12 +3,10 @@
 import React, { useState } from 'react'
 import { useCanvasStore } from '@/store/canvasStore'
 import KnowledgePanel from '@/components/KnowledgePanel'
-import { DataManagementPanel } from '@/components/DataManagementPanel'
-import { DataModelingPanel } from '@/components/DataModelingPanel'
 
 export function Sidebar() {
   const componentList = useCanvasStore((state) => state.componentList)
-  const [activeTab, setActiveTab] = useState<'components' | 'knowledge' | 'data' | 'modeling'>('components')
+  const [activeTab, setActiveTab] = useState<'components' | 'knowledge'>('components')
   const [expandedCategory, setExpandedCategory] = useState<string>('form')
 
   // 处理拖拽开始
@@ -73,26 +71,6 @@ export function Sidebar() {
         >
           知识库
         </button>
-        <button
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activeTab === 'data'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-          }`}
-          onClick={() => setActiveTab('data')}
-        >
-          数据管理
-        </button>
-        <button
-          className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-            activeTab === 'modeling'
-              ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-          }`}
-          onClick={() => setActiveTab('modeling')}
-        >
-          数据建模
-        </button>
       </div>
 
       {/* 内容区域 */}
@@ -142,12 +120,8 @@ export function Sidebar() {
               </div>
             </div>
           </div>
-        ) : activeTab === 'knowledge' ? (
-          <KnowledgePanel />
-        ) : activeTab === 'data' ? (
-          <DataManagementPanel />
         ) : (
-          <DataModelingPanel />
+          <KnowledgePanel />
         )}
       </div>
     </div>

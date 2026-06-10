@@ -112,7 +112,7 @@ export default function EditorPage() {
       {/* 中间区域 */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* 工具栏 */}
-        <div className="h-14 border-b border-gray-200 bg-white px-4 flex items-center justify-between">
+        <div className="h-14 border-b border-gray-200 bg-white px-4 flex items-center">
           <Toolbar />
         </div>
         

@@ -24,13 +24,16 @@ interface UserInfo {
 // 菜单配置
 const menuItems: MenuItem[] = [
   { id: 'dashboard', label: '仪表盘', icon: '📊', path: '/dashboard' },
-  { id: 'projects', label: '项目管理', icon: '📁', path: '/projects' },
   { id: 'editor', label: '画布编辑', icon: '🎨', path: '/editor' },
+  { id: 'canvas', label: '画布管理', icon: '🖼️', path: '/canvas' },
+  { id: 'data-management', label: '数据管理', icon: '📦', path: '/data-management' },
+  { id: 'data-modeling', label: '数据建模', icon: '🔧', path: '/data-modeling' },
   { id: 'workflow', label: '流程编排', icon: '🔄', path: '/workflow' },
   { id: 'ai-codegen', label: 'AI代码生成', icon: '💻', path: '/ai-codegen' },
   { id: 'knowledge', label: '知识库', icon: '📚', path: '/knowledge' },
   { id: 'users', label: '用户管理', icon: '👥', path: '/users' },
   { id: 'roles', label: '角色权限', icon: '🔐', path: '/roles' },
+  { id: 'menus', label: '菜单管理', icon: '📋', path: '/menus' },
   { id: 'settings', label: '系统设置', icon: '⚙️', path: '/settings' },
 ]
 

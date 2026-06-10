@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common'
+import { ConfigModule, ConfigService } from '@nestjs/config'
 import { PassportModule } from '@nestjs/passport'
 import { JwtModule } from '@nestjs/jwt'
 import { TypeOrmModule } from '@nestjs/typeorm'
@@ -16,7 +17,14 @@ import { User } from '../user/entities/user.entity'
   imports: [
     TypeOrmModule.forFeature([User]),
     PassportModule,
-    JwtModule.register({}),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get('JWT_SECRET', 'ai-lowcode-secret'),
+        signOptions: { expiresIn: '7d' },
+      }),
+      inject: [ConfigService],
+    }),
     CacheModule.register(), // Redis 缓存
   ],
   controllers: [AuthController],

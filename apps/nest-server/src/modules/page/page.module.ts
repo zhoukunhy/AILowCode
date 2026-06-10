@@ -6,6 +6,7 @@ import { PageService } from './page.service'
 import { PageController } from './page.controller'
 import { PageVersionService } from './page-version.service'
 import { PageVersionController } from './page-version.controller'
+import { CanvasPageController } from './canvas-page.controller'
 import { Project } from '../project/entities/project.entity'
 
 /**
@@ -14,7 +15,7 @@ import { Project } from '../project/entities/project.entity'
  */
 @Module({
   imports: [TypeOrmModule.forFeature([Page, PageVersion, Project])],
-  controllers: [PageController, PageVersionController],
+  controllers: [PageController, PageVersionController, CanvasPageController],
   providers: [PageService, PageVersionService],
   exports: [PageService, PageVersionService],
 })

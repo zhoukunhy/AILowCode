@@ -41,3 +41,7 @@ coverage
 # Temp
 tmp
 temp
+
+# Database
+*.sqlite
+*.db

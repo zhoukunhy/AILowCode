@@ -30,17 +30,19 @@ export class PageService {
    * 创建页面
    */
   async create(projectId: number, createPageDto: CreatePageDto): Promise<Page> {
-    // 检查项目是否存在
-    const project = await this.projectRepository.findOne({
-      where: { id: projectId },
-    })
-    if (!project) {
-      throw new NotFoundException('项目不存在')
+    // 只有指定了项目ID时才检查项目是否存在
+    if (projectId > 0) {
+      const project = await this.projectRepository.findOne({
+        where: { id: projectId },
+      })
+      if (!project) {
+        throw new NotFoundException('项目不存在')
+      }
     }
 
     const page = this.pageRepository.create({
       ...createPageDto,
-      projectId,
+      projectId: projectId > 0 ? projectId : undefined,
     })
 
     return this.pageRepository.save(page)
@@ -52,9 +54,14 @@ export class PageService {
   async findAll(projectId: number, query: QueryPageDto) {
     const { page = 1, pageSize = 10, name } = query
 
-    const queryBuilder = this.pageRepository
-      .createQueryBuilder('page')
-      .where('page.project_id = :projectId', { projectId })
+    const queryBuilder = this.pageRepository.createQueryBuilder('page')
+
+    // projectId 为 0 时查询所有不关联项目的页面
+    if (projectId > 0) {
+      queryBuilder.where('page.project_id = :projectId', { projectId })
+    } else {
+      queryBuilder.where('page.project_id IS NULL')
+    }
 
     // 名称模糊搜索
     if (name) {

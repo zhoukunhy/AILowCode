@@ -11,12 +11,14 @@ import { TemplateModule } from './modules/template/template.module'
 import { PageModule } from './modules/page/page.module'
 import { KnowledgeModule } from './modules/knowledge/knowledge.module'
 import { AgentModule } from './modules/agent/agent.module'
+import { MenuModule } from './modules/menu/menu.module'
 import { WorkflowModule } from './modules/workflow/workflow.module'
 import { CodegenModule } from './modules/codegen/codegen.module'
 import { DataSourceModule } from './modules/data-source/data-source.module'
 import { AiConfigModule } from './modules/ai-config/ai-config.module'
 import { LoggingModule } from './modules/logging/logging.module'
 import { RedisModule } from './common/redis/redis.module'
+import { CanvasModule } from './modules/canvas/canvas.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { RolesGuard } from './modules/auth/guards/roles.guard'
 
@@ -53,12 +55,14 @@ import { RolesGuard } from './modules/auth/guards/roles.guard'
     PageModule,
     KnowledgeModule,
     AgentModule,
+    MenuModule,
     WorkflowModule,
     CodegenModule,
     DataSourceModule,
     AiConfigModule,
     LoggingModule,
     RedisModule,
+    CanvasModule,
   ],
   providers: [
     {

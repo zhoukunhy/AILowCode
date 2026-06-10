@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 // 统计数据类型
@@ -14,29 +14,21 @@ interface StatCard {
 }
 
 const statCards: StatCard[] = [
-  { title: '项目总数', value: 128, change: '+12%', changeType: 'up', icon: '📁', color: 'blue' },
+  { title: '画布总数', value: 128, change: '+12%', changeType: 'up', icon: '🎨', color: 'blue' },
   { title: '活跃用户', value: 1043, change: '+8%', changeType: 'up', icon: '👥', color: 'green' },
   { title: 'AI 生成次数', value: 3257, change: '+23%', changeType: 'up', icon: '🤖', color: 'purple' },
   { title: '知识库文档', value: 456, change: '-3%', changeType: 'down', icon: '📚', color: 'orange' },
 ]
 
-// 最近的项目的类型
-interface RecentProject {
+// 最近的画布的类型
+interface RecentCanvas {
   id: string
   name: string
   updatedAt: string
   status: '草稿' | '已完成' | '进行中'
   components: number
+  menuName?: string
 }
-
-// 最近的项目数据
-const recentProjects: RecentProject[] = [
-  { id: '1', name: '电商后台管理系统', updatedAt: '2024-01-15 10:30', status: '进行中', components: 45 },
-  { id: '2', name: 'CRM 客户管理系统', updatedAt: '2024-01-14 16:20', status: '已完成', components: 128 },
-  { id: '3', name: 'OA 办公自动化系统', updatedAt: '2024-01-13 09:15', status: '草稿', components: 12 },
-  { id: '4', name: '供应链管理系统', updatedAt: '2024-01-12 14:45', status: '进行中', components: 67 },
-  { id: '5', name: '人力资源管理系统', updatedAt: '2024-01-11 11:00', status: '已完成', components: 89 },
-]
 
 // AI 活动记录
 interface AIActivity {
@@ -57,6 +49,47 @@ const aiActivities: AIActivity[] = [
 
 export default function DashboardPage() {
   const router = useRouter()
+  const [recentCanvases, setRecentCanvases] = useState<RecentCanvas[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // 获取最近创建的画布
+  useEffect(() => {
+    const fetchRecentCanvases = async () => {
+      try {
+        const response = await fetch('http://localhost:3002/api/menus?sort=createdAt&order=desc&limit=5', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          // 将菜单数据映射为画布数据
+          const canvases: RecentCanvas[] = data.slice(0, 5).map((menu: any, index: number) => ({
+            id: menu.pageId || `canvas-${index}`,
+            name: menu.name,
+            updatedAt: new Date(menu.createdAt).toLocaleString('zh-CN'),
+            status: menu.status ? '进行中' : '草稿',
+            components: 0,
+            menuName: menu.name,
+          }))
+          setRecentCanvases(canvases)
+        }
+      } catch (error) {
+        console.error('获取画布列表失败:', error)
+        // 使用默认数据
+        setRecentCanvases([
+          { id: '1', name: '首页画布', updatedAt: '2024-01-15 10:30', status: '进行中', components: 45, menuName: '首页' },
+          { id: '2', name: '用户管理画布', updatedAt: '2024-01-14 16:20', status: '已完成', components: 128, menuName: '用户管理' },
+          { id: '3', name: '仪表盘画布', updatedAt: '2024-01-13 09:15', status: '草稿', components: 12, menuName: '仪表盘' },
+          { id: '4', name: '订单管理画布', updatedAt: '2024-01-12 14:45', status: '进行中', components: 67, menuName: '订单管理' },
+          { id: '5', name: '数据统计画布', updatedAt: '2024-01-11 11:00', status: '已完成', components: 89, menuName: '数据统计' },
+        ])
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchRecentCanvases()
+  }, [])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -129,65 +162,71 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 最近的项目 */}
+        {/* 最近创建的画布 */}
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-800">最近的项目</h2>
+            <h2 className="text-lg font-bold text-gray-800">最近创建的画布</h2>
             <button
-              onClick={() => router.push('/projects')}
+              onClick={() => router.push('/menus')}
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
               查看全部 →
             </button>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">项目名称</th>
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">组件数</th>
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">状态</th>
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">更新时间</th>
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentProjects.map((project) => (
-                  <tr
-                    key={project.id}
-                    className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="py-4 px-6">
-                      <div className="flex items-center">
-                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-lg mr-3">
-                          📁
-                        </div>
-                        <span className="font-medium text-gray-800">{project.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-gray-600">{project.components}</td>
-                    <td className="py-4 px-6">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                          project.status
-                        )}`}
-                      >
-                        {project.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-gray-500 text-sm">{project.updatedAt}</td>
-                    <td className="py-4 px-6">
-                      <button
-                        onClick={() => router.push(`/editor/${project.id}`)}
-                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                      >
-                        编辑
-                      </button>
-                    </td>
+            {loading ? (
+              <div className="flex items-center justify-center h-48">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              </div>
+            ) : (
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">画布名称</th>
+                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">关联菜单</th>
+                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">状态</th>
+                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">创建时间</th>
+                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">操作</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recentCanvases.map((canvas) => (
+                    <tr
+                      key={canvas.id}
+                      className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="py-4 px-6">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-lg mr-3">
+                            🎨
+                          </div>
+                          <span className="font-medium text-gray-800">{canvas.name}</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-gray-600">{canvas.menuName || '-'}</td>
+                      <td className="py-4 px-6">
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                            canvas.status
+                          )}`}
+                        >
+                          {canvas.status}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-gray-500 text-sm">{canvas.updatedAt}</td>
+                      <td className="py-4 px-6">
+                        <button
+                          onClick={() => router.push(`/editor/${canvas.id}`)}
+                          className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                        >
+                          编辑
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
@@ -231,15 +270,15 @@ export default function DashboardPage() {
       {/* 快捷入口 */}
       <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
         <button
-          onClick={() => router.push('/editor/new')}
+          onClick={() => router.push('/menus')}
           className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-all flex items-center gap-3"
         >
           <div className="w-10 h-10 rounded-lg bg-blue-500 flex items-center justify-center text-xl">
             ➕
           </div>
           <div className="text-left">
-            <p className="font-medium text-gray-800">新建项目</p>
-            <p className="text-xs text-gray-500">创建新画布项目</p>
+            <p className="font-medium text-gray-800">新建画布</p>
+            <p className="text-xs text-gray-500">创建新画布页面</p>
           </div>
         </button>
 
