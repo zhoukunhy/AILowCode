@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
 
 export default function LoginPage() {
   const router = useRouter()

@@ -297,6 +297,72 @@ export interface AIConfig {
 
 export type ProcessStatus = 'draft' | 'active' | 'inactive'
 
+// ==================== RBAC 类型定义 ====================
+import {
+  DEFAULT_ROLES,
+  DEFAULT_PERMISSIONS,
+  DEFAULT_MENUS,
+  PermissionService,
+  createPermissionService,
+} from './rbac'
+import type {
+  Role,
+  Permission,
+  MenuItem,
+  UserRole,
+  RolePermission,
+} from './rbac'
+
+export {
+  DEFAULT_ROLES,
+  DEFAULT_PERMISSIONS,
+  DEFAULT_MENUS,
+  PermissionService,
+  createPermissionService,
+}
+export type {
+  Role,
+  Permission,
+  MenuItem,
+  UserRole,
+  RolePermission,
+}
+
+// ==================== Webhook 类型定义 ====================
+import {
+  WebhookEventType,
+  WebhookStatus,
+  WebhookTriggerType,
+  WebhookSignatureAlgorithm,
+  DEFAULT_RETRY_CONFIG,
+  WebhookLogStatus,
+  WEBHOOK_EVENT_GROUPS,
+  getEventGroupName,
+} from './webhook'
+import type {
+  WebhookRetryConfig,
+  WebhookConfig,
+  WebhookEventPayload,
+  WebhookLog,
+} from './webhook'
+
+export {
+  WebhookEventType,
+  WebhookStatus,
+  WebhookTriggerType,
+  WebhookSignatureAlgorithm,
+  DEFAULT_RETRY_CONFIG,
+  WebhookLogStatus,
+  WEBHOOK_EVENT_GROUPS,
+  getEventGroupName,
+}
+export type {
+  WebhookRetryConfig,
+  WebhookConfig,
+  WebhookEventPayload,
+  WebhookLog,
+}
+
 export type NodeType = 'start' | 'approve' | 'condition' | 'fork' | 'join' | 'end' | 'action'
 
 export interface ProcessNode {

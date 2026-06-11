@@ -3,6 +3,7 @@
 import React from 'react'
 import { Group, Rect, Text, Line } from 'react-konva'
 import { ComponentConfig } from '@/store/canvasStore'
+import { useComponentDataBinding, BindingMode } from '@/hooks/useComponentDataBinding'
 
 interface ComponentRendererProps {
   component: ComponentConfig
@@ -19,6 +20,37 @@ export function ComponentRenderer({
   onDragMove,
   onTransform: _onTransform,
 }: ComponentRendererProps) {
+  // 根据组件类型确定绑定模式
+  const getBindingMode = (): BindingMode => {
+    switch (component.type) {
+      case 'table':
+        return 'table'
+      case 'select':
+        return 'list'
+      case 'input':
+      case 'textarea':
+        return 'single'
+      default:
+        return 'single'
+    }
+  }
+
+  // 使用数据绑定Hook
+  const { value, data, isLoading, error } = useComponentDataBinding(component.id, {
+    bindingMode: getBindingMode(),
+    autoFetch: true,
+  })
+
+  // 获取显示值（优先使用绑定数据，其次使用props）
+  const getDisplayValue = (propsKey: string, fallback?: any) => {
+    // 如果有数据绑定且value存在，使用绑定值
+    if (component.props.dataSourceId && component.props.dataField && value !== undefined) {
+      return value
+    }
+    // 否则使用props中的值
+    return component.props[propsKey] ?? fallback
+  }
+
   const getButtonColor = (type: string) => {
     const colors: Record<string, string> = {
       primary: '#1890ff',
@@ -60,6 +92,7 @@ export function ComponentRenderer({
   const renderInput = () => {
     const labelWidth = component.props.label ? 80 : 0
     const inputWidth = component.width - labelWidth
+    const displayValue = getDisplayValue('value', '')
     
     return (
       <Group>
@@ -91,16 +124,29 @@ export function ComponentRenderer({
           strokeWidth={1}
           cornerRadius={4}
         />
+        
+        {/* 绑定状态指示器 */}
+        {component.props.dataSourceId && (
+          <Rect
+            x={labelWidth + 4}
+            y={component.height - 8}
+            width={6}
+            height={6}
+            fill={isLoading ? '#1890ff' : error ? '#ff4d4f' : '#52c41a'}
+            cornerRadius={3}
+          />
+        )}
+        
         <Text
-          x={labelWidth + 8}
+          x={labelWidth + 8 + (component.props.dataSourceId ? 8 : 0)}
           y={component.height / 2}
-          text={component.props.value || component.props.placeholder}
+          text={displayValue || component.props.placeholder}
           fontSize={14}
-          fill={component.props.value ? '#333' : '#bfbfbf'}
+          fill={displayValue ? '#333' : '#bfbfbf'}
           align="left"
           verticalAlign="middle"
           offsetY={component.height / 2}
-          width={inputWidth - 16}
+          width={inputWidth - 16 - (component.props.dataSourceId ? 12 : 0)}
         />
       </Group>
     )
@@ -165,6 +211,7 @@ export function ComponentRenderer({
   const renderTextarea = () => {
     const labelWidth = component.props.label ? 80 : 0
     const inputWidth = component.width - labelWidth
+    const displayValue = getDisplayValue('value', '')
     
     return (
       <Group>
@@ -194,15 +241,28 @@ export function ComponentRenderer({
           strokeWidth={1}
           cornerRadius={4}
         />
+        
+        {/* 绑定状态指示器 */}
+        {component.props.dataSourceId && (
+          <Rect
+            x={labelWidth + 4}
+            y={component.height - 20}
+            width={6}
+            height={6}
+            fill={isLoading ? '#1890ff' : error ? '#ff4d4f' : '#52c41a'}
+            cornerRadius={3}
+          />
+        )}
+        
         <Text
-          x={labelWidth + 8}
+          x={labelWidth + 8 + (component.props.dataSourceId ? 8 : 0)}
           y={16}
-          text={component.props.value || component.props.placeholder}
+          text={displayValue || component.props.placeholder}
           fontSize={14}
-          fill={component.props.value ? '#333' : '#bfbfbf'}
+          fill={displayValue ? '#333' : '#bfbfbf'}
           align="left"
-          width={inputWidth - 16}
-          height={component.height - 24}
+          width={inputWidth - 16 - (component.props.dataSourceId ? 12 : 0)}
+          height={component.height - 36}
         />
         {/* 右下角显示行数 */}
         <Text
@@ -219,6 +279,7 @@ export function ComponentRenderer({
   const renderSelect = () => {
     const labelWidth = component.props.label ? 80 : 0
     const inputWidth = component.width - labelWidth
+    const displayValue = getDisplayValue('value', '')
     
     return (
       <Group>
@@ -248,16 +309,29 @@ export function ComponentRenderer({
           strokeWidth={1}
           cornerRadius={4}
         />
+        
+        {/* 绑定状态指示器 */}
+        {component.props.dataSourceId && (
+          <Rect
+            x={labelWidth + 4}
+            y={component.height - 8}
+            width={6}
+            height={6}
+            fill={isLoading ? '#1890ff' : error ? '#ff4d4f' : '#52c41a'}
+            cornerRadius={3}
+          />
+        )}
+        
         <Text
-          x={labelWidth + 8}
+          x={labelWidth + 8 + (component.props.dataSourceId ? 8 : 0)}
           y={component.height / 2}
-          text={component.props.value || component.props.placeholder}
+          text={displayValue || component.props.placeholder}
           fontSize={14}
-          fill={component.props.value ? '#333' : '#bfbfbf'}
+          fill={displayValue ? '#333' : '#bfbfbf'}
           align="left"
           verticalAlign="middle"
           offsetY={component.height / 2}
-          width={inputWidth - 32}
+          width={inputWidth - 40 - (component.props.dataSourceId ? 12 : 0)}
         />
         {/* 下拉箭头 */}
         <Text
@@ -269,6 +343,17 @@ export function ComponentRenderer({
           verticalAlign="middle"
           offsetY={component.height / 2}
         />
+        
+        {/* 数据绑定选项数量提示 */}
+        {component.props.dataSourceId && data.length > 0 && (
+          <Text
+            x={labelWidth + inputWidth - 50}
+            y={component.height - 8}
+            text={`${data.length}项`}
+            fontSize={11}
+            fill="#666"
+          />
+        )}
       </Group>
     )
   }
@@ -342,29 +427,123 @@ export function ComponentRenderer({
   )
 
   const renderTable = () => {
-    const { columns, rows } = component.props
-    const cellWidth = component.width / columns
-    const cellHeight = component.height / rows
+    const { columns = 4, rows = 5 } = component.props
     const tableElements: JSX.Element[] = []
+    
+    // 根据绑定数据动态确定行数和列数
+    const displayRows = data.length > 0 ? Math.min(data.length + 1, rows) : rows
+    const displayColumns = data.length > 0 && data[0] ? Math.min(Object.keys(data[0]).length, columns) : columns
+    const cellWidth = component.width / displayColumns
+    const cellHeight = component.height / displayRows
 
-    for (let i = 0; i <= rows; i++) {
+    // 绘制水平线
+    for (let i = 0; i <= displayRows; i++) {
       tableElements.push(
         <Line
           key={`h-${i}`}
           points={[0, i * cellHeight, component.width, i * cellHeight]}
-          stroke="#e8e8e8"
-          strokeWidth={1}
+          stroke={i === 0 || i === displayRows ? '#d9d9d9' : '#e8e8e8'}
+          strokeWidth={i === 0 || i === displayRows ? 2 : 1}
         />
       )
     }
 
-    for (let i = 0; i <= columns; i++) {
+    // 绘制垂直线
+    for (let i = 0; i <= displayColumns; i++) {
       tableElements.push(
         <Line
           key={`v-${i}`}
           points={[i * cellWidth, 0, i * cellWidth, component.height]}
-          stroke="#e8e8e8"
-          strokeWidth={1}
+          stroke={i === 0 || i === displayColumns ? '#d9d9d9' : '#e8e8e8'}
+          strokeWidth={i === 0 || i === displayColumns ? 2 : 1}
+        />
+      )
+    }
+
+    // 如果有绑定数据，渲染表头和数据
+    if (data.length > 0 && data[0]) {
+      const fieldNames = Object.keys(data[0]).slice(0, displayColumns)
+      
+      // 表头背景
+      tableElements.push(
+        <Rect
+          key="header-bg"
+          x={0}
+          y={0}
+          width={component.width}
+          height={cellHeight}
+          fill="#fafafa"
+        />
+      )
+      
+      // 表头文字
+      fieldNames.forEach((field, idx) => {
+        tableElements.push(
+          <Text
+            key={`header-${idx}`}
+            x={idx * cellWidth + 8}
+            y={cellHeight / 2}
+            text={field}
+            fontSize={12}
+            fontWeight="bold"
+            fill="#333"
+            align="left"
+            verticalAlign="middle"
+            offsetY={cellHeight / 2}
+            width={cellWidth - 16}
+          />
+        )
+      })
+
+      // 数据行
+      data.slice(0, displayRows - 1).forEach((row, rowIdx) => {
+        fieldNames.forEach((field, colIdx) => {
+          const cellValue = row[field] !== undefined ? String(row[field]) : ''
+          tableElements.push(
+            <Text
+              key={`data-${rowIdx}-${colIdx}`}
+              x={colIdx * cellWidth + 8}
+              y={(rowIdx + 1) * cellHeight + cellHeight / 2}
+              text={cellValue}
+              fontSize={12}
+              fill="#666"
+              align="left"
+              verticalAlign="middle"
+              offsetY={cellHeight / 2}
+              width={cellWidth - 16}
+            />
+          )
+        })
+      })
+    } else {
+      // 无数据时显示占位提示
+      tableElements.push(
+        <Text
+          key="empty"
+          x={component.width / 2}
+          y={component.height / 2}
+          text={isLoading ? '加载中...' : component.props.dataSourceId ? '暂无数据' : '表格组件'}
+          fontSize={12}
+          fill="#999"
+          align="center"
+          verticalAlign="middle"
+          offsetX={component.width / 2}
+          offsetY={component.height / 2}
+        />
+      )
+    }
+
+    // 绑定状态指示器
+    if (component.props.dataSourceId) {
+      tableElements.push(
+        <Rect
+          key="binding-indicator"
+          x={component.width - 12}
+          y={component.height - 12}
+          width={8}
+          height={8}
+          fill={isLoading ? '#1890ff' : error ? '#ff4d4f' : '#52c41a'}
+          cornerRadius={4}
         />
       )
     }

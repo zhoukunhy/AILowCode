@@ -7,12 +7,15 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { Project } from './entities/project.entity'
 import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto'
+import { WebhookService } from '../webhook/webhook.service'
+import { WebhookEventType } from '@ai-lowcode/shared-types'
 
 @Injectable()
 export class ProjectService {
   constructor(
     @InjectRepository(Project)
-    private projectRepository: Repository<Project>
+    private projectRepository: Repository<Project>,
+    private webhookService: WebhookService,
   ) {}
 
   /**
@@ -26,7 +29,17 @@ export class ProjectService {
       ...createProjectDto,
       userId,
     })
-    return this.projectRepository.save(project)
+    const savedProject = await this.projectRepository.save(project)
+
+    // 触发项目创建Webhook
+    this.webhookService.triggerEvent({
+      eventType: WebhookEventType.PROJECT_CREATED,
+      data: savedProject,
+      projectId: savedProject.id,
+      userId,
+    }).catch(console.error)
+
+    return savedProject
   }
 
   /**
@@ -69,7 +82,16 @@ export class ProjectService {
       throw new NotFoundException('项目不存在')
     }
     Object.assign(project, updateProjectDto)
-    return this.projectRepository.save(project)
+    const updatedProject = await this.projectRepository.save(project)
+
+    // 触发项目更新Webhook
+    this.webhookService.triggerEvent({
+      eventType: WebhookEventType.PROJECT_UPDATED,
+      data: updatedProject,
+      projectId: id,
+    }).catch(console.error)
+
+    return updatedProject
   }
 
   /**
@@ -82,7 +104,19 @@ export class ProjectService {
     if (!project) {
       throw new NotFoundException('项目不存在')
     }
+
+    // 保存项目信息用于Webhook
+    const projectData = { ...project }
+
     await this.projectRepository.remove(project)
+
+    // 触发项目删除Webhook
+    this.webhookService.triggerEvent({
+      eventType: WebhookEventType.PROJECT_DELETED,
+      data: projectData,
+      projectId: id,
+    }).catch(console.error)
+
     return { message: '删除成功' }
   }
 
@@ -97,7 +131,16 @@ export class ProjectService {
       throw new NotFoundException('项目不存在')
     }
     project.status = 'archived'
-    return this.projectRepository.save(project)
+    const updatedProject = await this.projectRepository.save(project)
+
+    // 触发项目更新Webhook
+    this.webhookService.triggerEvent({
+      eventType: WebhookEventType.PROJECT_UPDATED,
+      data: updatedProject,
+      projectId: id,
+    }).catch(console.error)
+
+    return updatedProject
   }
 
   /**
@@ -111,7 +154,16 @@ export class ProjectService {
       throw new NotFoundException('项目不存在')
     }
     project.status = 'draft'
-    return this.projectRepository.save(project)
+    const updatedProject = await this.projectRepository.save(project)
+
+    // 触发项目更新Webhook
+    this.webhookService.triggerEvent({
+      eventType: WebhookEventType.PROJECT_UPDATED,
+      data: updatedProject,
+      projectId: id,
+    }).catch(console.error)
+
+    return updatedProject
   }
 
   /**

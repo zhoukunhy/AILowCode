@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
 import { User } from '../user/entities/user.entity'
+import { RoleModule } from '../role/role.module'
 
 /**
  * Auth 模块
@@ -17,6 +18,7 @@ import { User } from '../user/entities/user.entity'
   imports: [
     TypeOrmModule.forFeature([User]),
     PassportModule,
+    RoleModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({

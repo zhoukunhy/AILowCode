@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useCallback, useMemo, useEffect, useState, useReducer } from 'react'
+import React, { useRef, useCallback, useMemo, useEffect, useState } from 'react'
 import { Stage, Layer, Rect } from 'react-konva'
 import { useCanvasStore } from '@/store/canvasStore'
 import { CanvasGrid } from './CanvasGrid'
@@ -19,6 +19,7 @@ class LRUCache<K, V> {
   get(key: K): V | undefined {
     const value = this.cache.get(key)
     if (value !== undefined) {
+      // 更新访问顺序
       this.cache.delete(key)
       this.cache.set(key, value)
     }
@@ -26,9 +27,8 @@ class LRUCache<K, V> {
   }
 
   set(key: K, value: V): void {
-    if (this.cache.has(key)) {
-      this.cache.delete(key)
-    } else if (this.cache.size >= this.maxSize) {
+    if (this.cache.size >= this.maxSize) {
+      // 删除最久未访问的项
       const firstKey = this.cache.keys().next().value
       this.cache.delete(firstKey)
     }
@@ -46,49 +46,12 @@ class LRUCache<K, V> {
   keys(): IterableIterator<K> {
     return this.cache.keys()
   }
-
-  deleteByPrefix(prefix: string): void {
-    const keysToDelete: K[] = []
-    this.cache.forEach((_, key) => {
-      if (String(key).startsWith(prefix)) {
-        keysToDelete.push(key)
-      }
-    })
-    keysToDelete.forEach(key => this.cache.delete(key))
-  }
 }
 
 // 组件缓存（使用LRU）
-const componentCache = new LRUCache<string, React.ReactNode>(200)
+const componentCache = new LRUCache<string, React.ReactNode>(100)
 
-// 批量更新状态
-interface BatchUpdateState {
-  updates: Map<string, { x: number; y: number }>
-  isProcessing: boolean
-}
-
-type BatchUpdateAction =
-  | { type: 'ADD_UPDATE'; id: string; x: number; y: number }
-  | { type: 'CLEAR_UPDATES' }
-  | { type: 'SET_PROCESSING'; processing: boolean }
-
-function batchUpdateReducer(state: BatchUpdateState, action: BatchUpdateAction): BatchUpdateState {
-  switch (action.type) {
-    case 'ADD_UPDATE': {
-      const newUpdates = new Map(state.updates)
-      newUpdates.set(action.id, { x: action.x, y: action.y })
-      return { ...state, updates: newUpdates }
-    }
-    case 'CLEAR_UPDATES':
-      return { ...state, updates: new Map() }
-    case 'SET_PROCESSING':
-      return { ...state, isProcessing: action.processing }
-    default:
-      return state
-  }
-}
-
-export function Canvas() {
+export function VirtualCanvas() {
   const stageRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
@@ -96,13 +59,9 @@ export function Canvas() {
   const [isDragSelecting, setIsDragSelecting] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [dragEnd, setDragEnd] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [pendingUpdates, setPendingUpdates] = useState<Map<string, { x: number; y: number }>>(new Map())
   
-  // 使用 useReducer 管理批量更新
-  const [batchState, dispatchBatch] = useReducer(batchUpdateReducer, {
-    updates: new Map(),
-    isProcessing: false,
-  })
-
   const currentPage = useCanvasStore((state) => state.currentPage)
   const components = useCanvasStore((state) => state.components)
   const selectedIds = useCanvasStore((state) => state.selectedIds)
@@ -185,14 +144,12 @@ export function Canvas() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedIds, components, removeComponent, selectComponents, selectComponent])
 
-  // 批量更新组件位置（使用 requestAnimationFrame 优化）
+  // 批量更新组件位置
   useEffect(() => {
-    if (batchState.updates.size === 0 || batchState.isProcessing) return
+    if (pendingUpdates.size === 0) return
 
-    dispatchBatch({ type: 'SET_PROCESSING', processing: true })
-
-    const animationFrameId = requestAnimationFrame(() => {
-      batchState.updates.forEach((pos, id) => {
+    const timer = requestAnimationFrame(() => {
+      pendingUpdates.forEach((pos, id) => {
         let finalX = pos.x
         let finalY = pos.y
         if (currentPage.snapToGrid) {
@@ -201,21 +158,13 @@ export function Canvas() {
         }
         updateComponent(id, { x: finalX, y: finalY })
       })
-      dispatchBatch({ type: 'CLEAR_UPDATES' })
-      dispatchBatch({ type: 'SET_PROCESSING', processing: false })
+      setPendingUpdates(new Map())
     })
 
-    return () => cancelAnimationFrame(animationFrameId)
-  }, [batchState.updates, batchState.isProcessing, currentPage, updateComponent])
+    return () => cancelAnimationFrame(timer)
+  }, [pendingUpdates, currentPage, updateComponent])
 
-  // 当组件数量变化时清空缓存
-  useEffect(() => {
-    return () => {
-      componentCache.clear()
-    }
-  }, [components.length])
-
-  // 判断组件是否在可见区域内（带有边距）
+  // 判断组件是否在可见区域内
   const isComponentVisible = useCallback((component: any, margin: number = 150) => {
     const { x, y, width, height } = visibleRect
     const compX = component.x || 0
@@ -236,7 +185,7 @@ export function Canvas() {
     return [...components].sort((a, b) => a.zIndex - b.zIndex)
   }, [components])
 
-  // 过滤可见组件（虚拟化）- 组件数超过30启用
+  // 过滤可见组件（虚拟化）
   const visibleComponents = useMemo(() => {
     if (components.length < 30) {
       return sortedComponents
@@ -246,13 +195,10 @@ export function Canvas() {
 
   // 组件渲染缓存
   const renderCachedComponent = useCallback((component: any, isSelected: boolean, callbacks: any) => {
-    // 使用更合理的缓存键：id + zIndex + isSelected + 位置
-    const cacheKey = `${component.id}-${component.zIndex}-${isSelected}-${component.x}-${component.y}`
+    const cacheKey = `${component.id}-${component.zIndex}-${isSelected}`
     
-    // 检查缓存
-    const cached = componentCache.get(cacheKey)
-    if (cached) {
-      return cached
+    if (componentCache.get(cacheKey)) {
+      return componentCache.get(cacheKey)!
     }
 
     const element = (
@@ -266,7 +212,7 @@ export function Canvas() {
       />
     )
 
-    // 只缓存静态组件（没有动画或交互状态的组件）
+    // 只缓存静态组件
     if (!component.hasAnimation && !component.hasInteractiveState) {
       componentCache.set(cacheKey, element)
     }
@@ -295,7 +241,7 @@ export function Canvas() {
     e.dataTransfer.dropEffect = 'copy'
   }, [])
 
-  // 处理画布鼠标按下 - 开始框选
+  // 处理画布鼠标按下
   const handleStageMouseDown = useCallback((e: any) => {
     if (e.target !== e.target.getStage()) return
     
@@ -312,9 +258,9 @@ export function Canvas() {
     setDragEnd(pos)
   }, [])
 
-  // 处理画布鼠标移动 - 框选
+  // 处理画布鼠标移动
   const handleStageMouseMove = useCallback((_e: any) => {
-    if (!isDragSelecting) return
+    if (!isDragSelecting && !isDragging) return
     
     const stage = stageRef.current
     if (!stage) return
@@ -322,10 +268,12 @@ export function Canvas() {
     const pos = stage.getPointerPosition()
     if (!pos) return
     
-    setDragEnd(pos)
-  }, [isDragSelecting])
+    if (isDragSelecting) {
+      setDragEnd(pos)
+    }
+  }, [isDragSelecting, isDragging])
 
-  // 处理画布鼠标释放 - 完成框选
+  // 处理画布鼠标释放
   const handleStageMouseUp = useCallback((e: any) => {
     if (!isDragSelecting) {
       if (e.target === e.target.getStage()) {
@@ -355,12 +303,15 @@ export function Canvas() {
     }
   }, [isDragSelecting, dragStart, dragEnd, components, selectComponents, selectComponent])
 
-  // 处理组件拖拽移动（优化版本）
+  // 处理组件拖拽移动（批量优化）
   const handleComponentDragMove = useCallback((id: string, newX: number, newY: number) => {
     // 清除该组件的缓存
-    componentCache.deleteByPrefix(id)
+    componentCache.keys().forEach(key => {
+      if (key.startsWith(id)) {
+        componentCache.delete(key)
+      }
+    })
 
-    // 如果多个组件被选中，一起移动（直接更新）
     if (selectedIds.length > 1) {
       const currentComponent = components.find(c => c.id === id)
       if (!currentComponent) return
@@ -381,10 +332,22 @@ export function Canvas() {
         }
       })
     } else {
-      // 单个组件移动使用批量更新
-      dispatchBatch({ type: 'ADD_UPDATE', id, x: newX, y: newY })
+      // 使用批量更新
+      setPendingUpdates(prev => {
+        const newUpdates = new Map(prev)
+        newUpdates.set(id, { x: newX, y: newY })
+        return newUpdates
+      })
     }
   }, [currentPage, updateComponent, selectedIds, components])
+
+  // 当组件更新时清除缓存
+  useEffect(() => {
+    const clearCache = () => {
+      componentCache.clear()
+    }
+    return clearCache
+  }, [components.length])
 
   // 计算缩放后的尺寸
   const scaledWidth = dimensions.width * zoom
@@ -459,9 +422,16 @@ export function Canvas() {
                     const multiSelect = e.ctrlKey || e.metaKey
                     selectComponent(component.id, multiSelect)
                   },
-                  onDragMove: (newX: number, newY: number) => handleComponentDragMove(component.id, newX, newY),
+                  onDragMove: (newX: number, newY: number) => {
+                    setIsDragging(true)
+                    handleComponentDragMove(component.id, newX, newY)
+                  },
                   onTransform: (attrs: any) => {
-                    componentCache.deleteByPrefix(component.id)
+                    componentCache.keys().forEach(key => {
+                      if (key.startsWith(component.id)) {
+                        componentCache.delete(key)
+                      }
+                    })
                     updateComponent(component.id, attrs)
                   },
                 }

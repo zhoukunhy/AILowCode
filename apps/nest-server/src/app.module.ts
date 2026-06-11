@@ -19,8 +19,9 @@ import { AiConfigModule } from './modules/ai-config/ai-config.module'
 import { LoggingModule } from './modules/logging/logging.module'
 import { RedisModule } from './common/redis/redis.module'
 import { CanvasModule } from './modules/canvas/canvas.module'
+import { WebhookModule } from './modules/webhook/webhook.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
-import { RolesGuard } from './modules/auth/guards/roles.guard'
+import { PermissionsGuard } from './modules/auth/guards/permissions.guard'
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard'
     LoggingModule,
     RedisModule,
     CanvasModule,
+    WebhookModule,
   ],
   providers: [
     {
@@ -71,7 +73,7 @@ import { RolesGuard } from './modules/auth/guards/roles.guard'
     },
     {
       provide: APP_GUARD,
-      useClass: RolesGuard,
+      useClass: PermissionsGuard,
     },
   ],
 })

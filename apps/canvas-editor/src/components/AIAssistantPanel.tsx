@@ -1,15 +1,17 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
-import { Send, Sparkles, Loader2, CheckCircle, XCircle, MessageSquare } from 'lucide-react'
+import { Send, Sparkles, Loader2, CheckCircle, XCircle, MessageSquare, AlertCircle } from 'lucide-react'
 import { useCanvasStore } from '@/store/canvasStore'
+import { agentApi } from '@/lib/api'
 
 interface Message {
   id: string
-  type: 'user' | 'agent' | 'system'
+  type: 'user' | 'agent' | 'system' | 'error'
   content: string
   timestamp: Date
   status?: 'pending' | 'success' | 'error'
+  details?: any
 }
 
 export function AIAssistantPanel() {
@@ -26,6 +28,7 @@ export function AIAssistantPanel() {
   const [isGenerating, setIsGenerating] = useState(false)
   
   const newPage = useCanvasStore((state) => state.newPage)
+  const importCanvasSchema = useCanvasStore((state) => state.importCanvasSchema)
 
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
@@ -69,39 +72,71 @@ export function AIAssistantPanel() {
     setMessages(prev => [...prev, agentMessage])
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      // 调用后端 AI 生成页面 API
+      const response = await agentApi.generatePage(inputValue)
+      
+      if (response.success && response.schema) {
+        // 创建新页面并导入 Schema
+        newPage()
+        
+        // 提取页面名称
+        const pageName = extractPageName(inputValue) || 'AI生成页面'
+        
+        // 导入生成的 Schema 到画布
+        importCanvasSchema(response.schema)
 
-      newPage()
+        // 更新消息状态
+        setMessages(prev => prev.map(msg => 
+          msg.id === agentMessage.id 
+            ? { ...msg, content: `已成功创建页面 "${pageName}"！\n\n生成了 ${response.schema.children?.length || 0} 个组件`, status: 'success' }
+            : msg
+        ))
 
-      const pageName = extractPageName(inputValue) || 'AI生成页面'
-
+        setMessages(prev => [...prev, {
+          id: generateId(),
+          type: 'system',
+          content: '页面已创建！您可以在画布中继续编辑和调整组件布局。',
+          timestamp: new Date(),
+        }])
+      } else {
+        throw new Error(response.error || '生成失败')
+      }
+    } catch (error: any) {
+      console.error('AI 生成页面失败:', error)
       setMessages(prev => prev.map(msg => 
         msg.id === agentMessage.id 
-          ? { ...msg, content: `已成功创建页面 "${pageName}"！`, status: 'success' }
+          ? { ...msg, content: `生成失败: ${error.message || '未知错误'}`, status: 'error' }
           : msg
       ))
-
+      
       setMessages(prev => [...prev, {
         id: generateId(),
-        type: 'system',
-        content: '页面已创建！您可以在画布中添加组件并进行编辑。',
+        type: 'error',
+        content: '建议检查：\n1. 后端服务是否正常运行\n2. LLM API 配置是否正确\n3. 网络连接是否正常',
         timestamp: new Date(),
       }])
-    } catch {
-      setMessages(prev => prev.map(msg => 
-        msg.id === agentMessage.id 
-          ? { ...msg, content: '生成失败，请重试', status: 'error' }
-          : msg
-      ))
     } finally {
       setIsGenerating(false)
     }
-  }, [inputValue, isGenerating, newPage])
+  }, [inputValue, isGenerating, newPage, importCanvasSchema])
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSubmit()
+    }
+  }
+
+  const getMessageStyle = (message: Message) => {
+    switch (message.type) {
+      case 'user':
+        return 'bg-blue-100 ml-auto max-w-[85%]'
+      case 'system':
+        return 'bg-gray-100 text-sm text-gray-600 italic'
+      case 'error':
+        return 'bg-red-50 border-l-4 border-red-500 text-red-700'
+      default:
+        return 'bg-white border border-gray-200'
     }
   }
 
@@ -134,19 +169,16 @@ export function AIAssistantPanel() {
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`p-3 rounded-lg ${
-                  message.type === 'user'
-                    ? 'bg-blue-100 ml-auto max-w-[85%]'
-                    : message.type === 'system'
-                    ? 'bg-gray-100 text-sm text-gray-600 italic'
-                    : 'bg-white border border-gray-200'
-                }`}
+                className={`p-3 rounded-lg ${getMessageStyle(message)}`}
               >
                 <div className="flex items-start gap-2">
                   {message.type === 'agent' && (
                     <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs flex-shrink-0">
                       AI
                     </div>
+                  )}
+                  {message.type === 'error' && (
+                    <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                   )}
                   <div className="flex-1">
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>

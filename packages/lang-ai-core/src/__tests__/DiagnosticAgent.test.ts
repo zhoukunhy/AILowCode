@@ -15,24 +15,25 @@ import type {
   ErrorKnowledgeEntry,
 } from '../agent/diagnostic/DiagnosticAgentTypes'
 
-describe('DiagnosticAgentExecutor', () => {
-  const mockAgentConfig: DiagnosticAgentConfig = {
-    llmConfig: {
-      apiKey: 'test-api-key',
-      model: 'gpt-4',
-      temperature: 0.3,
-    },
-    ragConfig: {
-      topK: 5,
-      threshold: 0.7,
-    },
-    knowledgeBaseConfig: {
-      errorCollectionName: 'test-errors',
-      knowledgeCollectionName: 'test-knowledge',
-    },
-    collectionName: 'test-collection',
-  }
+// 共享的 mock 配置
+const mockAgentConfig: DiagnosticAgentConfig = {
+  llmConfig: {
+    apiKey: 'test-api-key',
+    model: 'gpt-4',
+    temperature: 0.3,
+  },
+  ragConfig: {
+    topK: 5,
+    threshold: 0.7,
+  },
+  knowledgeBaseConfig: {
+    errorCollectionName: 'test-errors',
+    knowledgeCollectionName: 'test-knowledge',
+  },
+  collectionName: 'test-collection',
+}
 
+describe('DiagnosticAgentExecutor', () => {
   describe('构造函数', () => {
     it('应该正确初始化执行器', () => {
       const executor = new DiagnosticAgentExecutor(mockAgentConfig)

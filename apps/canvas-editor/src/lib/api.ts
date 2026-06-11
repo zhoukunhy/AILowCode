@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
 
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return { 'Content-Type': 'application/json' }
@@ -106,7 +106,51 @@ export const pageApi = {
   },
 }
 
+// AI Agent API 响应类型
+export interface GeneratePageResponse {
+  success: boolean
+  schema?: any
+  error?: string
+  message?: string
+}
+
 // 独立画布页面 API（不依赖项目）
+// AI Agent API
+export const agentApi = {
+  async generatePage(requirement: string, knowledgeBaseIds?: number[], sessionId?: string, metadata?: Record<string, any>): Promise<GeneratePageResponse> {
+    return apiClient.post('/api/agent/generate-page', {
+      requirement,
+      knowledgeBaseIds: knowledgeBaseIds || [],
+      sessionId,
+      metadata,
+    })
+  },
+
+  async getSession(sessionId: string) {
+    return apiClient.get(`/api/agent/sessions/${sessionId}`)
+  },
+
+  async querySessions(params?: {
+    sessionId?: string
+    status?: string
+    agentType?: string
+    page?: number
+    pageSize?: number
+  }) {
+    const queryParams = new URLSearchParams()
+    if (params?.sessionId) queryParams.set('sessionId', params.sessionId)
+    if (params?.status) queryParams.set('status', params.status)
+    if (params?.agentType) queryParams.set('agentType', params.agentType)
+    if (params?.page) queryParams.set('page', String(params.page))
+    if (params?.pageSize) queryParams.set('pageSize', String(params.pageSize))
+    return apiClient.get(`/api/agent/sessions?${queryParams.toString()}`)
+  },
+
+  async deleteSession(sessionId: string) {
+    return apiClient.delete(`/api/agent/sessions/${sessionId}`)
+  },
+}
+
 export const canvasPageApi = {
   async createPage(name: string, canvasJson?: any, config?: Partial<{
     width: number

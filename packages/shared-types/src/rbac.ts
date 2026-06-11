@@ -3,7 +3,7 @@
  * 用户、角色、菜单权限管理
  */
 
-import type { Role, Permission, MenuItem, User } from '@ai-lowcode/shared-types'
+
 
 /**
  * 角色定义
@@ -27,7 +27,7 @@ export interface Permission {
   name: string
   code: string
   type: 'menu' | 'button' | 'api'
-  parentId?: string
+  parentId?: number
   path?: string
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   description?: string
@@ -159,9 +159,9 @@ export const DEFAULT_MENUS: Omit<MenuItem, 'id'>[] = [
     order: 2,
     permissions: ['project:read', 'project:write'],
     children: [
-      { name: '项目列表', path: '/projects/list', order: 1, permissions: ['project:read'] },
-      { name: '创建项目', path: '/projects/create', order: 2, permissions: ['project:write'] },
-    ],
+      { id: 'project-list', name: '项目列表', path: '/projects/list', order: 1, permissions: ['project:read'] },
+      { id: 'project-create', name: '创建项目', path: '/projects/create', order: 2, permissions: ['project:write'] },
+    ] as MenuItem[],
   },
   {
     name: '画布编辑',
@@ -191,10 +191,10 @@ export const DEFAULT_MENUS: Omit<MenuItem, 'id'>[] = [
     order: 6,
     permissions: ['user:read', 'role:read'],
     children: [
-      { name: '用户管理', path: '/admin/users', order: 1, permissions: ['user:read', 'user:write'] },
-      { name: '角色管理', path: '/admin/roles', order: 2, permissions: ['role:read', 'role:write'] },
-      { name: 'AI 配置', path: '/admin/ai-config', order: 3, permissions: ['ai:config'] },
-    ],
+      { id: 'admin-users', name: '用户管理', path: '/admin/users', order: 1, permissions: ['user:read', 'user:write'] },
+      { id: 'admin-roles', name: '角色管理', path: '/admin/roles', order: 2, permissions: ['role:read', 'role:write'] },
+      { id: 'admin-ai-config', name: 'AI 配置', path: '/admin/ai-config', order: 3, permissions: ['ai:config'] },
+    ] as MenuItem[],
   },
 ]
 

@@ -1,6 +1,6 @@
 import { createStore } from 'zustand/vanilla'
 import { generateId } from '@ai-lowcode/common-util'
-import { pageApi, canvasPageApi } from '../lib/api'
+import { canvasPageApi } from '../lib/api'
 
 // 组件配置类型
 export interface ComponentConfig {
@@ -157,6 +157,7 @@ export interface CanvasState {
   // 导入导出
   exportCanvasJson: () => string
   importCanvasJson: (json: string) => void
+  importCanvasSchema: (schema: any) => void
   // 弹窗操作
   openModal: (title: string, content: string, closable?: boolean) => void
   closeModal: () => void
@@ -1759,7 +1760,7 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
 
   // 保存项目（对接数据库）
   saveProject: async () => {
-    const { project, components, currentPage } = get()
+    const { components, currentPage } = get()
     try {
       const pageIdNum = Number(currentPage?.id)
       if (!isNaN(pageIdNum) && pageIdNum > 0) {
@@ -1946,6 +1947,129 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
       components,
     }
     return JSON.stringify(exportData, null, 2)
+  },
+
+  // 导入AI生成的画布Schema
+  importCanvasSchema: (schema: any) => {
+    try {
+      const { componentList } = get()
+      
+      // 提取页面配置
+      if (schema.config) {
+        if (schema.config.width) {
+          set((state) => ({
+            currentPage: { ...state.currentPage, width: schema.config.width },
+            project: {
+              ...state.project,
+              pages: state.project.pages.map(p => 
+                p.id === state.project.currentPageId 
+                  ? { ...p, width: schema.config.width } 
+                  : p
+              ),
+            },
+          }))
+        }
+        if (schema.config.height) {
+          set((state) => ({
+            currentPage: { ...state.currentPage, height: schema.config.height },
+            project: {
+              ...state.project,
+              pages: state.project.pages.map(p => 
+                p.id === state.project.currentPageId 
+                  ? { ...p, height: schema.config.height } 
+                  : p
+              ),
+            },
+          }))
+        }
+        if (schema.config.background) {
+          set((state) => ({
+            currentPage: { ...state.currentPage, backgroundColor: schema.config.background },
+          }))
+        }
+      }
+
+      // 转换组件格式
+      const convertedComponents: ComponentConfig[] = []
+      let zIndex = 1
+
+      const convertComponent = (comp: any, parentX = 0, parentY = 0) => {
+        if (!comp.type) return
+
+        const meta = componentList.find(m => m.type.toLowerCase() === comp.type.toLowerCase())
+        const defaultMeta = meta || {
+          name: comp.type,
+          defaultWidth: 200,
+          defaultHeight: 100,
+          defaultProps: {},
+        }
+
+        // 从style中提取位置和尺寸
+        const x = (comp.style?.x || comp.style?.left || 0) + parentX
+        const y = (comp.style?.y || comp.style?.top || 0) + parentY
+        const width = comp.style?.width || defaultMeta.defaultWidth
+        const height = comp.style?.height || defaultMeta.defaultHeight
+
+        const newComponent: ComponentConfig = {
+          id: comp.id || generateId(),
+          type: comp.type,
+          name: comp.props?.label || comp.props?.text || comp.props?.content || defaultMeta.name,
+          x: typeof x === 'number' ? x : parseInt(x) || 0,
+          y: typeof y === 'number' ? y : parseInt(y) || 0,
+          width: typeof width === 'number' ? width : parseInt(width) || defaultMeta.defaultWidth,
+          height: typeof height === 'number' ? height : parseInt(height) || defaultMeta.defaultHeight,
+          props: comp.props || { ...defaultMeta.defaultProps },
+          zIndex: zIndex++,
+          rotation: 0,
+          opacity: 1,
+          visible: true,
+          locked: false,
+        }
+
+        convertedComponents.push(newComponent)
+
+        // 递归处理子组件
+        if (comp.children && Array.isArray(comp.children)) {
+          comp.children.forEach((child: any) => {
+            convertComponent(child, newComponent.x, newComponent.y)
+          })
+        }
+      }
+
+      // 处理所有顶层组件
+      if (schema.children && Array.isArray(schema.children)) {
+        schema.children.forEach((comp: any) => convertComponent(comp))
+      }
+
+      // 更新页面名称
+      if (schema.name || schema.config?.title) {
+        const pageName = schema.name || schema.config.title
+        set((state) => ({
+          currentPage: { ...state.currentPage, name: pageName },
+          project: {
+            ...state.project,
+            pages: state.project.pages.map(p => 
+              p.id === state.project.currentPageId 
+                ? { ...p, name: pageName } 
+                : p
+            ),
+          },
+        }))
+      }
+
+      // 设置组件
+      set({
+        components: convertedComponents,
+        selectedId: null,
+        selectedIds: [],
+        project: { ...get().project, isDirty: true },
+      })
+
+      console.log('成功导入AI生成的Schema，组件数:', convertedComponents.length)
+    } catch (error) {
+      console.error('导入Schema失败:', error)
+      throw new Error('无效的Schema格式')
+    }
   },
 
   // 导入画布JSON

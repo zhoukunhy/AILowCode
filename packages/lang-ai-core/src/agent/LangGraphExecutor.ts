@@ -61,6 +61,7 @@ export class LangGraphExecutor {
       console.log(`[LangGraphExecutor] 执行节点: ${currentNode} (步骤 ${step}, 重试 ${currentRetries})`)
 
       // 执行节点
+      let shouldRetry = false
       try {
         const updates = await node.handler(currentState)
         currentState = { ...currentState, ...updates }
@@ -73,13 +74,23 @@ export class LangGraphExecutor {
         // 增加重试计数
         retryCount.set(currentNode, currentRetries + 1)
         
-        currentState.error = error.message
-        currentState.status = 'failed'
-        break
+        // 检查是否可以重试
+        if (currentRetries + 1 >= this.maxRetries) {
+          currentState.error = error.message
+          currentState.status = 'failed'
+          break
+        }
+        
+        // 标记需要重试
+        shouldRetry = true
+        console.log(`[LangGraphExecutor] 重试节点: ${currentNode} (第 ${currentRetries + 1} 次)`)
       }
 
-      // 确定下一个节点（支持条件路由）
-      currentNode = this.getNextNode(currentState, currentNode, retryCount)
+      // 如果需要重试，保持当前节点不变
+      if (!shouldRetry) {
+        // 确定下一个节点（支持条件路由）
+        currentNode = this.getNextNode(currentState, currentNode, retryCount)
+      }
     }
 
     // 最终状态

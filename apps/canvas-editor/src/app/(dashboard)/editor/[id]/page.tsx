@@ -1,11 +1,14 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { useCanvasStore } from '@/store/canvasStore'
 import { Sidebar } from '@/components/Sidebar'
 import { Toolbar } from '@/components/Toolbar'
 import { PropertyPanel } from '@/components/PropertyPanel'
+import { PerformanceMonitor } from '@/components/Canvas/PerformanceMonitor'
+import { componentPool } from '@/utils/ComponentPool'
+import { getDataBindingCacheStats } from '@/hooks/useDataBindingCache'
 
 export default function EditorPage() {
   const params = useParams<{ id: string }>()
@@ -21,7 +24,59 @@ export default function EditorPage() {
   const [zoom, setZoom] = useState(100)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [showPerformance, setShowPerformance] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
+  const [performanceMetrics, setPerformanceMetrics] = useState({
+    fps: 60,
+    componentCount: 0,
+    renderTime: 0,
+    cacheStats: { totalEntries: 0, totalSubscribers: 0, totalLoading: 0 },
+    poolStats: { total: 0, active: 0 },
+  })
+
+  // 性能监控定时器
+  useEffect(() => {
+    let stopped = false
+    const frameTimes: number[] = []
+    let lastTime = performance.now()
+    
+    const measurePerformance = () => {
+      if (stopped) return
+      
+      const currentTime = performance.now()
+      const frameTime = currentTime - lastTime
+      lastTime = currentTime
+      
+      frameTimes.push(frameTime)
+      if (frameTimes.length > 60) {
+        frameTimes.shift()
+      }
+      
+      const avgFrameTime = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length
+      const fps = Math.round(1000 / avgFrameTime)
+      const renderTime = Math.round(avgFrameTime * 100) / 100
+      
+      setPerformanceMetrics(prev => ({
+        ...prev,
+        fps,
+        componentCount: components.length,
+        renderTime,
+        cacheStats: getDataBindingCacheStats(),
+        poolStats: {
+          total: Object.values(componentPool.getStats()).reduce((a, b) => a + b, 0),
+          active: componentPool.getActiveCount(),
+        },
+      }))
+      
+      requestAnimationFrame(measurePerformance)
+    }
+    
+    const animationId = requestAnimationFrame(measurePerformance)
+    return () => {
+      stopped = true
+      cancelAnimationFrame(animationId)
+    }
+  }, [components.length])
 
   // 加载项目
   useEffect(() => {
@@ -31,7 +86,7 @@ export default function EditorPage() {
   }, [projectId, loadProject])
 
   // 处理拖拽开始
-  const handleComponentMouseDown = (e: React.MouseEvent, componentId: string) => {
+  const handleComponentMouseDown = useCallback((e: React.MouseEvent, componentId: string) => {
     e.stopPropagation()
     const component = components.find(c => c.id === componentId)
     if (!component || component.locked) return
@@ -44,10 +99,10 @@ export default function EditorPage() {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top,
     })
-  }
+  }, [components, selectComponent])
 
-  // 处理拖拽移动
-  const handleMouseMove = (e: React.MouseEvent) => {
+  // 处理拖拽移动（优化：使用防抖）
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!draggingId || !canvasRef.current) return
 
     const canvasRect = canvasRef.current.getBoundingClientRect()
@@ -69,15 +124,15 @@ export default function EditorPage() {
     newY = Math.max(0, Math.min(newY, canvasHeight - 40))
 
     updateComponent(draggingId, { x: newX, y: newY })
-  }
+  }, [draggingId, zoom, dragOffset, currentPage, updateComponent])
 
   // 处理拖拽结束
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     setDraggingId(null)
-  }
+  }, [])
 
   // 处理拖放
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     const componentType = e.dataTransfer.getData('componentType')
     if (!componentType || !canvasRef.current) return
@@ -88,19 +143,24 @@ export default function EditorPage() {
     const y = (e.clientY - canvasRect.top) / scale
 
     addComponent(componentType, x, y)
-  }
+  }, [zoom, addComponent])
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'copy'
-  }
+  }, [])
 
   // 处理画布点击 - 取消选中
-  const handleCanvasClick = (e: React.MouseEvent) => {
+  const handleCanvasClick = useCallback((e: React.MouseEvent) => {
     if (e.target === canvasRef.current) {
       selectComponent(null)
     }
-  }
+  }, [selectComponent])
+
+  // 处理缩放变化
+  const handleZoomChange = useCallback((newZoom: number) => {
+    setZoom(Math.max(50, Math.min(200, newZoom)))
+  }, [])
 
   return (
     <div className="flex h-full bg-gray-50">
@@ -112,9 +172,27 @@ export default function EditorPage() {
       {/* 中间区域 */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* 工具栏 */}
-        <div className="h-14 border-b border-gray-200 bg-white px-4 flex items-center">
+        <div className="h-14 border-b border-gray-200 bg-white px-4 flex items-center justify-between">
           <Toolbar />
+          <button
+            onClick={() => setShowPerformance(!showPerformance)}
+            className={`px-3 py-1 rounded text-sm ${
+              showPerformance 
+                ? 'bg-blue-500 text-white' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            ⚡ 性能监控
+          </button>
         </div>
+        
+        {/* 性能监控面板 */}
+        {showPerformance && (
+          <PerformanceMonitor 
+            metrics={performanceMetrics}
+            onClose={() => setShowPerformance(false)}
+          />
+        )}
         
         {/* 画布区域 */}
         <div 
@@ -698,18 +776,21 @@ export default function EditorPage() {
         {/* 底部缩放控制 */}
         <div className="h-10 border-t border-gray-200 bg-white px-4 flex items-center justify-center gap-4">
           <button 
-            onClick={() => setZoom(Math.max(50, zoom - 10))}
+            onClick={() => handleZoomChange(zoom - 10)}
             className="px-2 py-1 hover:bg-gray-100 rounded"
           >
             -
           </button>
           <span className="text-sm w-12 text-center">{zoom}%</span>
           <button 
-            onClick={() => setZoom(Math.min(200, zoom + 10))}
+            onClick={() => handleZoomChange(zoom + 10)}
             className="px-2 py-1 hover:bg-gray-100 rounded"
           >
             +
           </button>
+          <span className="text-xs text-gray-400 ml-8">
+            组件数: {components.length}
+          </span>
         </div>
       </div>
       
