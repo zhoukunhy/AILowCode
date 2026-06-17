@@ -8,7 +8,7 @@ import { ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemp
 import { StringOutputParser } from '@langchain/core/output_parsers'
 import { RunnableSequence } from '@langchain/core/runnables'
 import { RAGContextRetriever, type RAGContext } from './RAGContextRetriever'
-import { LangChainCodeOptimizer, type OptimizationOptions } from './LangChainCodeOptimizer'
+import { LangChainCodeOptimizer } from './LangChainCodeOptimizer'
 import type { GeneratedFile } from './types'
 
 /**
@@ -121,7 +121,6 @@ export interface AIRefactorConfig {
 export class AIRefactorService {
   private llm: any
   private ragRetriever: RAGContextRetriever
-  private codeOptimizer: LangChainCodeOptimizer
   private analysisChain: any
   private refactorChain: any
 
@@ -174,7 +173,6 @@ export class AIRefactorService {
   constructor(config: AIRefactorConfig) {
     this.llm = LLMFactory.createLLM(config.llmConfig)
     this.ragRetriever = config.ragRetriever
-    this.codeOptimizer = config.codeOptimizer
     this.initializeChains()
   }
 
@@ -405,7 +403,7 @@ export class AIRefactorService {
    * 重构后端代码
    */
   private async refactorBackend(
-    sourceCode: string,
+    _sourceCode: string,
     analysis: SourceAnalysis,
     context: RAGContext,
     options: RefactorOptions
@@ -533,8 +531,8 @@ Hooks: ${component.hooks.join(', ')}
    */
   private async generateServiceCode(
     service: ServiceInfo,
-    context: RAGContext,
-    options: RefactorOptions
+    _context: RAGContext,
+    _options: RefactorOptions
   ): Promise<string> {
     return `/**
  * ${service.name} 服务
@@ -566,7 +564,7 @@ export class ${service.name}Service {
   /**
    * 生成控制器代码
    */
-  private generateControllerCode(service: ServiceInfo, options: RefactorOptions): string {
+  private generateControllerCode(service: ServiceInfo, _options: RefactorOptions): string {
     return `/**
  * ${service.name} 控制器
  */
@@ -651,7 +649,7 @@ bootstrap()
   /**
    * 生成前端 package.json
    */
-  private generatePackageJson(options: RefactorOptions, dependencies: string[]): string {
+  private generatePackageJson(_options: RefactorOptions, _dependencies: string[]): string {
     const pkg = {
       name: 'refactored-frontend',
       version: '1.0.0',
@@ -679,7 +677,7 @@ bootstrap()
   /**
    * 生成后端 package.json
    */
-  private generateBackendPackageJson(options: RefactorOptions): string {
+  private generateBackendPackageJson(_options: RefactorOptions): string {
     const pkg = {
       name: 'refactored-backend',
       version: '1.0.0',
@@ -707,7 +705,7 @@ bootstrap()
   /**
    * 生成前端入口文件
    */
-  private generateEntryFile(options: RefactorOptions): string {
+  private generateEntryFile(_options: RefactorOptions): string {
     return `import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { MainComponent } from './components/MainComponent'

@@ -17,6 +17,8 @@ export interface ComponentConfig {
   opacity: number
   visible: boolean
   locked: boolean
+  hasAnimation?: boolean
+  hasInteractiveState?: boolean
 }
 
 // 组件元数据类型
@@ -1769,7 +1771,8 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
       } else if (currentPage?.name) {
         // 新页面，先创建
         const created = await canvasPageApi.createPage(currentPage.name, components)
-        const newId = (created as any)?.id
+        // API 返回格式: { code: 200, data: { id: ... } }
+        const newId = (created as any)?.data?.id || (created as any)?.id
         if (newId) {
           set((state) => ({
             currentPage: { ...state.currentPage, id: newId.toString() },
@@ -1847,9 +1850,14 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
       const pageIdNum = Number(pageId)
       if (!isNaN(pageIdNum) && pageIdNum > 0) {
         // 从数据库加载
-        const pageData = await canvasPageApi.getPage(pageIdNum) as any
+        const response = await canvasPageApi.getPage(pageIdNum) as any
+        // API 返回格式: { code: 200, data: { ... } }
+        const pageData = response?.data || response
         if (pageData?.id) {
-          const loadedComponents = pageData.canvasJson || []
+          const loadedComponents = (pageData.canvasJson || []).map((comp: any) => ({
+          ...comp,
+          props: comp.props || {},
+        }))
           const pageConfig: PageConfig = {
             id: pageData.id.toString(),
             name: pageData.name,

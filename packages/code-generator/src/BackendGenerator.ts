@@ -3,17 +3,15 @@
  * 生成 NestJS 接口代码和 PostgreSQL 建表 SQL
  */
 import type { PageSchema } from '@ai-lowcode/lang-ai-core'
-import { GeneratedFile, TableDefinition, ColumnDefinition, ApiEndpoint } from './types'
+import { GeneratedFile, TableDefinition, ApiEndpoint } from './types'
 import { ASTParser } from './ASTParser'
 
 export class BackendGenerator {
-  private schema: PageSchema
   private parser: ASTParser
   private tables: TableDefinition[] = []
   private endpoints: ApiEndpoint[] = []
 
   constructor(schema: PageSchema) {
-    this.schema = schema
     this.parser = new ASTParser(schema)
     this.parseSchema()
   }
@@ -395,7 +393,7 @@ ${columns}
    * 生成 Create DTO
    */
   private generateCreateDto(table: TableDefinition, modelName: string): GeneratedFile {
-    const dtoProps = table.columns
+    const columns = table.columns
       .filter(col => !col.primary && !col.autoIncrement)
       .map(col => {
         const validators = []
@@ -419,7 +417,7 @@ ${columns}
             validators.push('@IsDate()')
             break
         }
-        return `${validators.join('\n  ')}\n  ${col.name}${col.nullable ? '?' : ''}: ${this.mapSqlType(col.type)}`
+        return `${validators.join('\n  ')}\n  ${col.name}: ${this.mapSqlType(col.type)}`
       }).join('\n\n')
 
     return {
@@ -427,7 +425,7 @@ ${columns}
       content: `import { IsNotEmpty, IsString, IsNumber, IsBoolean, IsDate } from 'class-validator'
 
 export class Create${modelName}Dto {
-${dtoProps}
+${columns}
 }
 `,
     }
@@ -436,31 +434,7 @@ ${dtoProps}
   /**
    * 生成 Update DTO
    */
-  private generateUpdateDto(table: TableDefinition, modelName: string): GeneratedFile {
-    const dtoProps = table.columns
-      .filter(col => !col.primary && !col.autoIncrement)
-      .map(col => {
-        const validators = []
-        switch (col.type.toLowerCase()) {
-          case 'varchar':
-          case 'text':
-            validators.push('@IsOptional()', '@IsString()')
-            break
-          case 'integer':
-          case 'float':
-            validators.push('@IsOptional()', '@IsNumber()')
-            break
-          case 'boolean':
-            validators.push('@IsOptional()', '@IsBoolean()')
-            break
-          case 'date':
-          case 'timestamp':
-            validators.push('@IsOptional()', '@IsDate()')
-            break
-        }
-        return `${validators.join('\n  ')}\n  ${col.name}?: ${this.mapSqlType(col.type)}`
-      }).join('\n\n')
-
+  private generateUpdateDto(_table: TableDefinition, modelName: string): GeneratedFile {
     return {
       path: `src/modules/${modelName.toLowerCase()}/dto/update-${modelName.toLowerCase()}.dto.ts`,
       content: `import { PartialType } from '@nestjs/mapped-types'
@@ -474,7 +448,7 @@ export class Update${modelName}Dto extends PartialType(Create${modelName}Dto) {}
   /**
    * 生成服务类
    */
-  private generateService(table: TableDefinition, modelName: string): GeneratedFile {
+  private generateService(_table: TableDefinition, modelName: string): GeneratedFile {
     return {
       path: `src/modules/${modelName.toLowerCase()}/${modelName.toLowerCase()}.service.ts`,
       content: `import { Injectable, NotFoundException } from '@nestjs/common'
@@ -573,7 +547,7 @@ export class ${modelName}Controller {
   /**
    * 生成模块
    */
-  private generateModule(table: TableDefinition, modelName: string): GeneratedFile {
+  private generateModule(_table: TableDefinition, modelName: string): GeneratedFile {
     return {
       path: `src/modules/${modelName.toLowerCase()}/${modelName.toLowerCase()}.module.ts`,
       content: `import { Module } from '@nestjs/common'

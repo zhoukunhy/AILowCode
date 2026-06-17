@@ -29,7 +29,7 @@ class LRUCache<K, V> {
   set(key: K, value: V): void {
     if (this.cache.size >= this.maxSize) {
       // 删除最久未访问的项
-      const firstKey = this.cache.keys().next().value
+      const firstKey = this.cache.keys().next().value!
       this.cache.delete(firstKey)
     }
     this.cache.set(key, value)
@@ -306,7 +306,7 @@ export function VirtualCanvas() {
   // 处理组件拖拽移动（批量优化）
   const handleComponentDragMove = useCallback((id: string, newX: number, newY: number) => {
     // 清除该组件的缓存
-    componentCache.keys().forEach(key => {
+    Array.from(componentCache.keys()).forEach(key => {
       if (key.startsWith(id)) {
         componentCache.delete(key)
       }
@@ -427,7 +427,7 @@ export function VirtualCanvas() {
                     handleComponentDragMove(component.id, newX, newY)
                   },
                   onTransform: (attrs: any) => {
-                    componentCache.keys().forEach(key => {
+                    Array.from(componentCache.keys()).forEach(key => {
                       if (key.startsWith(component.id)) {
                         componentCache.delete(key)
                       }

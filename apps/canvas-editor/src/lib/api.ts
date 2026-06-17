@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return { 'Content-Type': 'application/json' }
@@ -148,6 +148,79 @@ export const agentApi = {
 
   async deleteSession(sessionId: string) {
     return apiClient.delete(`/api/agent/sessions/${sessionId}`)
+  },
+}
+
+export interface GeneratedFile {
+  path: string
+  content: string
+}
+
+export interface GenerateCodeResponse {
+  sessionId: string
+  success: boolean
+  files: GeneratedFile[]
+  fileCount: number
+  duration: number
+  error?: string
+  ragRetrievalTime?: number
+  optimizedFiles?: number
+}
+
+export interface GenerationLog {
+  sessionId: string
+  generationType: string
+  schema: string
+  fileCount: number
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  startTime: string
+  endTime?: string
+  duration?: number
+  errorMessage?: string
+  createdAt: string
+}
+
+export const codegenApi = {
+  async generateCode(
+    schema: any,
+    type: 'frontend' | 'backend' | 'fullstack',
+    framework?: string,
+    sessionId?: string,
+    enableRAG?: boolean,
+    enableOptimization?: boolean
+  ): Promise<GenerateCodeResponse> {
+    return apiClient.post('/api/codegen/generate', {
+      schema,
+      type,
+      framework,
+      sessionId,
+      enableRAG,
+      enableOptimization,
+    })
+  },
+
+  async downloadCode(
+    schema: any,
+    type: 'frontend' | 'backend' | 'fullstack',
+    framework?: string
+  ): Promise<Blob> {
+    const response = await fetch(`${BASE_URL}/api/codegen/download`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ schema, type, framework }),
+    })
+    return response.blob()
+  },
+
+  async getGenerationLog(sessionId: string): Promise<GenerationLog> {
+    return apiClient.get(`/api/codegen/logs/${sessionId}`)
+  },
+
+  async queryLogs(page: number = 1, pageSize: number = 10): Promise<{
+    logs: GenerationLog[]
+    total: number
+  }> {
+    return apiClient.get(`/api/codegen/logs?page=${page}&pageSize=${pageSize}`)
   },
 }
 

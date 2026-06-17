@@ -5,10 +5,10 @@
 
 import axios from 'axios'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: `${API_BASE_URL}/api`,
   timeout: 30000,
 })
 
@@ -80,7 +80,7 @@ export const createKnowledgeBase = async (data: {
   dimension?: number
 }): Promise<KnowledgeBase> => {
   const response = await api.post('/knowledge/bases', data)
-  return response.data
+  return response.data.data || response.data
 }
 
 /**
@@ -88,7 +88,7 @@ export const createKnowledgeBase = async (data: {
  */
 export const getKnowledgeBases = async (): Promise<KnowledgeBase[]> => {
   const response = await api.get('/knowledge/bases')
-  return response.data
+  return response.data.data || []
 }
 
 /**
@@ -96,7 +96,7 @@ export const getKnowledgeBases = async (): Promise<KnowledgeBase[]> => {
  */
 export const getKnowledgeBase = async (id: number): Promise<KnowledgeBase> => {
   const response = await api.get(`/knowledge/bases/${id}`)
-  return response.data
+  return response.data.data || response.data
 }
 
 /**
@@ -107,7 +107,7 @@ export const updateKnowledgeBase = async (
   data: Partial<KnowledgeBase>
 ): Promise<KnowledgeBase> => {
   const response = await api.put(`/knowledge/bases/${id}`, data)
-  return response.data
+  return response.data.data || response.data
 }
 
 /**
@@ -130,7 +130,7 @@ export const uploadDocument = async (data: {
   metadata?: Record<string, any>
 }): Promise<KnowledgeDocument> => {
   const response = await api.post('/knowledge/documents/upload', data)
-  return response.data
+  return response.data.data || response.data
 }
 
 /**
@@ -146,12 +146,8 @@ export const uploadDocumentFile = async (
   formData.append('type', type)
   formData.append('file', file)
 
-  const response = await api.post('/knowledge/documents/upload-file', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  })
-  return response.data
+  const response = await api.post('/knowledge/documents/upload-file', formData)
+  return response.data.data || response.data
 }
 
 /**
@@ -161,7 +157,7 @@ export const getDocuments = async (knowledgeBaseId: number): Promise<KnowledgeDo
   const response = await api.get('/knowledge/documents', {
     params: { knowledgeBaseId },
   })
-  return response.data
+  return response.data.data || []
 }
 
 /**
@@ -169,7 +165,7 @@ export const getDocuments = async (knowledgeBaseId: number): Promise<KnowledgeDo
  */
 export const getDocument = async (id: number): Promise<KnowledgeDocument> => {
   const response = await api.get(`/knowledge/documents/${id}`)
-  return response.data
+  return response.data.data || response.data
 }
 
 /**
@@ -191,7 +187,7 @@ export const searchKnowledge = async (data: {
   threshold?: number
 }): Promise<SearchResult[]> => {
   const response = await api.post('/knowledge/search', data)
-  return response.data
+  return response.data.data || []
 }
 
 /**
@@ -205,7 +201,7 @@ export const getDocumentChunks = async (
   const response = await api.get(`/knowledge/chunks/${documentId}`, {
     params: { page, pageSize },
   })
-  return response.data
+  return response.data.data || response.data
 }
 
 /**
@@ -228,7 +224,7 @@ export interface KnowledgeBaseStats {
 
 export const getKnowledgeBaseStats = async (knowledgeBaseId: number): Promise<KnowledgeBaseStats> => {
   const response = await api.get(`/knowledge/bases/${knowledgeBaseId}/stats`)
-  return response.data
+  return response.data.data || response.data
 }
 
 /**
@@ -241,7 +237,7 @@ export const hybridSearchKnowledge = async (data: {
   threshold?: number
 }): Promise<SearchResult[]> => {
   const response = await api.post('/knowledge/hybrid-search', data)
-  return response.data
+  return response.data.data || []
 }
 
 /**
@@ -249,7 +245,7 @@ export const hybridSearchKnowledge = async (data: {
  */
 export const revectorizeDocument = async (documentId: number): Promise<KnowledgeDocument> => {
   const response = await api.post(`/knowledge/documents/${documentId}/revectorize`)
-  return response.data
+  return response.data.data || response.data
 }
 
 /**
@@ -276,5 +272,5 @@ export const getVectorizationLogs = async (documentId?: string): Promise<Vectori
   const response = await api.get('/knowledge/logs', {
     params: documentId ? { documentId } : {},
   })
-  return response.data
+  return response.data.data || []
 }

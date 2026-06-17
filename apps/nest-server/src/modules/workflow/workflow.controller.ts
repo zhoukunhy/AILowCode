@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common'
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus, ParseIntPipe, DefaultValuePipe } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
 import { WorkflowService } from './workflow.service'
 import {
@@ -19,8 +19,8 @@ export class WorkflowController {
   @ApiOperation({ summary: '获取流程定义列表' })
   @ApiResponse({ status: 200, description: '成功获取流程列表' })
   async findAll(
-    @Query('page') page: number = 1,
-    @Query('pageSize') pageSize: number = 10,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe) pageSize: number,
   ) {
     const result = await this.workflowService.findAllProcessDefinitions(page, pageSize)
     return {

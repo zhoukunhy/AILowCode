@@ -1,12 +1,26 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 
 // 设置分类
 interface SettingCategory {
   id: string
   name: string
   icon: string
+}
+
+// AI 配置接口
+interface AIConfig {
+  id: number
+  name: string
+  provider: string
+  model?: string
+  apiKey: string
+  baseUrl?: string
+  config?: Record<string, any>
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 // 设置分类
@@ -17,6 +31,73 @@ const categories: SettingCategory[] = [
   { id: 'notification', name: '通知设置', icon: '🔔' },
   { id: 'backup', name: '备份与恢复', icon: '💾' },
 ]
+
+// API 基础地址
+const API_BASE = 'http://localhost:3002/api'
+
+// 获取认证头
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('token')
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
+
+// API 函数
+async function fetchAIConfigs(): Promise<AIConfig[]> {
+  const response = await fetch(`${API_BASE}/ai-config/llm`, { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error('获取 AI 配置失败')
+  const data = await response.json()
+  return data.data || []
+}
+
+async function createAIConfig(data: {
+  name: string
+  provider: string
+  model?: string
+  apiKey: string
+  baseUrl?: string
+  config?: Record<string, any>
+  isActive?: boolean
+}): Promise<AIConfig> {
+  const response = await fetch(`${API_BASE}/ai-config/llm`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error('创建 AI 配置失败')
+  const result = await response.json()
+  return result.data || result
+}
+
+async function updateAIConfig(
+  id: number,
+  data: {
+    name?: string
+    model?: string
+    apiKey?: string
+    baseUrl?: string
+    config?: Record<string, any>
+    isActive?: boolean
+  }
+): Promise<void> {
+  const response = await fetch(`${API_BASE}/ai-config/llm/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  if (!response.ok) throw new Error('更新 AI 配置失败')
+}
+
+async function deleteAIConfig(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/ai-config/llm/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) throw new Error('删除 AI 配置失败')
+}
 
 export default function SettingsPage() {
   const [activeCategory, setActiveCategory] = useState('general')
@@ -32,16 +113,19 @@ export default function SettingsPage() {
     language: 'zh-CN',
   })
 
-  // AI 设置表单
-  const [aiSettings, setAiSettings] = useState({
-    openaiApiKey: 'sk-*******',
-    openaiModel: 'gpt-4',
-    maxTokens: 4000,
-    temperature: 0.7,
-    enableRAG: true,
-    vectorDb: 'chroma',
-    embeddingModel: 'text-embedding-ada-002',
+  // AI 配置
+  const [aiConfigs, setAiConfigs] = useState<AIConfig[]>([])
+  const [showCreateAIConfigModal, setShowCreateAIConfigModal] = useState(false)
+  const [editingAIConfig, setEditingAIConfig] = useState<AIConfig | null>(null)
+  const [aiConfigForm, setAiConfigForm] = useState({
+    name: '',
+    provider: 'openai',
+    model: 'gpt-4',
+    apiKey: '',
+    baseUrl: '',
+    isActive: true,
   })
+  const [aiConfigLoading, setAiConfigLoading] = useState(false)
 
   // 安全设置表单
   const [securitySettings, setSecuritySettings] = useState({
@@ -53,7 +137,112 @@ export default function SettingsPage() {
     enableAuditLog: true,
   })
 
-  const handleSave = () => {
+  // 加载 AI 配置
+  useEffect(() => {
+    if (activeCategory === 'ai') {
+      loadAIConfigs()
+    }
+  }, [activeCategory])
+
+  const loadAIConfigs = async () => {
+    try {
+      setAiConfigLoading(true)
+      const data = await fetchAIConfigs()
+      setAiConfigs(data)
+    } catch (error) {
+      console.error('加载 AI 配置失败:', error)
+    } finally {
+      setAiConfigLoading(false)
+    }
+  }
+
+  // 打开创建 AI 配置弹窗
+  const handleOpenCreateAIConfigModal = () => {
+    setAiConfigForm({
+      name: '',
+      provider: 'openai',
+      model: 'gpt-4',
+      apiKey: '',
+      baseUrl: '',
+      isActive: true,
+    })
+    setEditingAIConfig(null)
+    setShowCreateAIConfigModal(true)
+  }
+
+  // 打开编辑 AI 配置弹窗
+  const handleOpenEditAIConfigModal = (config: AIConfig) => {
+    setAiConfigForm({
+      name: config.name,
+      provider: config.provider,
+      model: config.model || 'gpt-4',
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl || '',
+      isActive: config.isActive,
+    })
+    setEditingAIConfig(config)
+    setShowCreateAIConfigModal(true)
+  }
+
+  // 创建/更新 AI 配置
+  const handleSaveAIConfig = async () => {
+    try {
+      if (editingAIConfig) {
+        await updateAIConfig(editingAIConfig.id, {
+          name: aiConfigForm.name,
+          model: aiConfigForm.model,
+          apiKey: aiConfigForm.apiKey,
+          baseUrl: aiConfigForm.baseUrl || undefined,
+          isActive: aiConfigForm.isActive,
+        })
+        setAiConfigs(
+          aiConfigs.map((config) =>
+            config.id === editingAIConfig.id
+              ? {
+                  ...config,
+                  name: aiConfigForm.name,
+                  model: aiConfigForm.model,
+                  apiKey: aiConfigForm.apiKey,
+                  baseUrl: aiConfigForm.baseUrl,
+                  isActive: aiConfigForm.isActive,
+                }
+              : config
+          )
+        )
+      } else {
+        const newConfig = await createAIConfig({
+          name: aiConfigForm.name,
+          provider: aiConfigForm.provider,
+          model: aiConfigForm.model,
+          apiKey: aiConfigForm.apiKey,
+          baseUrl: aiConfigForm.baseUrl || undefined,
+          isActive: aiConfigForm.isActive,
+        })
+        setAiConfigs([newConfig, ...aiConfigs])
+      }
+      setShowCreateAIConfigModal(false)
+      setEditingAIConfig(null)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 3000)
+    } catch (error) {
+      console.error('保存 AI 配置失败:', error)
+      alert('保存 AI 配置失败，请重试')
+    }
+  }
+
+  // 删除 AI 配置
+  const handleDeleteAIConfig = async (id: number, name: string) => {
+    if (!confirm(`确定要删除 AI 配置 "${name}" 吗？`)) return
+    try {
+      await deleteAIConfig(id)
+      setAiConfigs(aiConfigs.filter((config) => config.id !== id))
+    } catch (error) {
+      console.error('删除 AI 配置失败:', error)
+      alert('删除 AI 配置失败，请重试')
+    }
+  }
+
+  const handleSave = async () => {
     setSaved(true)
     setTimeout(() => setSaved(false), 3000)
   }
@@ -95,7 +284,7 @@ export default function SettingsPage() {
           {activeCategory === 'general' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h2 className="text-lg font-bold text-gray-800 mb-6">基本设置</h2>
-              
+
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -152,7 +341,7 @@ export default function SettingsPage() {
                       }
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                     >
-                      <option value="Asia/Shanghai"> Asia/Shanghai (UTC+8)</option>
+                      <option value="Asia/Shanghai">Asia/Shanghai (UTC+8)</option>
                       <option value="Asia/Tokyo">Asia/Tokyo (UTC+9)</option>
                       <option value="America/New_York">America/New_York (UTC-5)</option>
                       <option value="Europe/London">Europe/London (UTC+0)</option>
@@ -194,138 +383,195 @@ export default function SettingsPage() {
           {/* AI 配置 */}
           {activeCategory === 'ai' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <h2 className="text-lg font-bold text-gray-800 mb-6">AI 配置</h2>
-              
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    OpenAI API Key
-                  </label>
-                  <input
-                    type="password"
-                    value={aiSettings.openaiApiKey}
-                    onChange={(e) =>
-                      setAiSettings({ ...aiSettings, openaiApiKey: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    用于调用 OpenAI GPT 模型，请妥善保管不要泄露
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      AI 模型
-                    </label>
-                    <select
-                      value={aiSettings.openaiModel}
-                      onChange={(e) =>
-                        setAiSettings({ ...aiSettings, openaiModel: e.target.value })
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    >
-                      <option value="gpt-4">GPT-4</option>
-                      <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                      <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Embedding 模型
-                    </label>
-                    <select
-                      value={aiSettings.embeddingModel}
-                      onChange={(e) =>
-                        setAiSettings({ ...aiSettings, embeddingModel: e.target.value })
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    >
-                      <option value="text-embedding-ada-002">Ada</option>
-                      <option value="text-embedding-3-small">Embedding V3 Small</option>
-                      <option value="text-embedding-3-large">Embedding V3 Large</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      最大 Token 数
-                    </label>
-                    <input
-                      type="number"
-                      value={aiSettings.maxTokens}
-                      onChange={(e) =>
-                        setAiSettings({ ...aiSettings, maxTokens: Number(e.target.value) })
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Temperature
-                    </label>
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="2"
-                      value={aiSettings.temperature}
-                      onChange={(e) =>
-                        setAiSettings({ ...aiSettings, temperature: Number(e.target.value) })
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      向量数据库
-                    </label>
-                    <select
-                      value={aiSettings.vectorDb}
-                      onChange={(e) =>
-                        setAiSettings({ ...aiSettings, vectorDb: e.target.value })
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                    >
-                      <option value="chroma">Chroma</option>
-                      <option value="milvus">Milvus</option>
-                      <option value="pinecone">Pinecone</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={aiSettings.enableRAG}
-                      onChange={(e) =>
-                        setAiSettings({ ...aiSettings, enableRAG: e.target.checked })
-                      }
-                      className="w-4 h-4 text-blue-600 rounded"
-                    />
-                    <span className="text-sm text-gray-700">启用 RAG 检索增强</span>
-                  </label>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
-                {saved && (
-                  <span className="text-green-600 text-sm">✓ 设置已保存</span>
-                )}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-bold text-gray-800">AI 配置</h2>
                 <button
-                  onClick={handleSave}
-                  className="ml-auto px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  onClick={handleOpenCreateAIConfigModal}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                 >
-                  保存设置
+                  <span>➕</span>
+                  <span>新建配置</span>
                 </button>
               </div>
+
+              {aiConfigLoading ? (
+                <div className="text-center py-12">
+                  <div className="text-4xl mb-4 animate-spin">⏳</div>
+                  <p className="text-gray-500">加载中...</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {aiConfigs.length === 0 ? (
+                    <div className="text-center py-12">
+                      <div className="text-6xl mb-4">🤖</div>
+                      <h3 className="text-lg font-medium text-gray-800 mb-2">暂无 AI 配置</h3>
+                      <p className="text-gray-500 mb-4">创建您的第一个 AI 配置开始吧</p>
+                      <button
+                        onClick={handleOpenCreateAIConfigModal}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        新建配置
+                      </button>
+                    </div>
+                  ) : (
+                    aiConfigs.map((config) => (
+                      <div
+                        key={config.id}
+                        className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="font-medium text-gray-800">{config.name}</h3>
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                {config.provider}
+                              </span>
+                              {config.isActive && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                  已启用
+                                </span>
+                              )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                              <div>
+                                <span className="text-gray-500">模型：</span>
+                                {config.model || '-'}
+                              </div>
+                              <div>
+                                <span className="text-gray-500">Base URL：</span>
+                                {config.baseUrl || '-'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleOpenEditAIConfigModal(config)}
+                              className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            >
+                              编辑
+                            </button>
+                            <button
+                              onClick={() => handleDeleteAIConfig(config.id, config.name)}
+                              className="px-3 py-1 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            >
+                              删除
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* 创建/编辑 AI 配置弹窗 */}
+              {showCreateAIConfigModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                  <div className="bg-white rounded-xl p-6 w-full max-w-md">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">
+                      {editingAIConfig ? '编辑 AI 配置' : '新建 AI 配置'}
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          配置名称
+                        </label>
+                        <input
+                          type="text"
+                          value={aiConfigForm.name}
+                          onChange={(e) => setAiConfigForm({ ...aiConfigForm, name: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          placeholder="请输入配置名称"
+                          autoFocus
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          提供商
+                        </label>
+                        <select
+                          value={aiConfigForm.provider}
+                          onChange={(e) => setAiConfigForm({ ...aiConfigForm, provider: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        >
+                          <option value="openai">OpenAI</option>
+                          <option value="deepseek">DeepSeek</option>
+                          <option value="qwen">通义千问</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          模型名称
+                        </label>
+                        <input
+                          type="text"
+                          value={aiConfigForm.model}
+                          onChange={(e) => setAiConfigForm({ ...aiConfigForm, model: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          placeholder="gpt-4"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          API Key
+                        </label>
+                        <input
+                          type="password"
+                          value={aiConfigForm.apiKey}
+                          onChange={(e) => setAiConfigForm({ ...aiConfigForm, apiKey: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          placeholder="请输入 API Key"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Base URL（可选）
+                        </label>
+                        <input
+                          type="text"
+                          value={aiConfigForm.baseUrl}
+                          onChange={(e) => setAiConfigForm({ ...aiConfigForm, baseUrl: e.target.value })}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          placeholder="https://api.openai.com/v1"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={aiConfigForm.isActive}
+                          onChange={(e) => setAiConfigForm({ ...aiConfigForm, isActive: e.target.checked })}
+                          className="w-4 h-4 text-blue-600 rounded"
+                        />
+                        <span className="text-sm text-gray-700">启用此配置</span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-6">
+                      <button
+                        onClick={() => {
+                          setShowCreateAIConfigModal(false)
+                          setEditingAIConfig(null)
+                        }}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        取消
+                      </button>
+                      <button
+                        onClick={handleSaveAIConfig}
+                        disabled={!aiConfigForm.name.trim() || !aiConfigForm.apiKey.trim()}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                      >
+                        {editingAIConfig ? '保存' : '创建'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -333,7 +579,7 @@ export default function SettingsPage() {
           {activeCategory === 'security' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h2 className="text-lg font-bold text-gray-800 mb-6">安全设置</h2>
-              
+
               <div className="space-y-6">
                 <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
                   <div>
@@ -476,7 +722,7 @@ export default function SettingsPage() {
           {activeCategory === 'backup' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h2 className="text-lg font-bold text-gray-800 mb-6">备份与恢复</h2>
-              
+
               <div className="space-y-6">
                 <div className="p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-medium text-gray-800 mb-2">自动备份</h3>

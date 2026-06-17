@@ -52,7 +52,7 @@ export class PageService {
    * 查询项目的所有页面
    */
   async findAll(projectId: number, query: QueryPageDto) {
-    const { page = 1, pageSize = 10, name } = query
+    const { page = 1, pageSize = 10, name, status } = query
 
     const queryBuilder = this.pageRepository.createQueryBuilder('page')
 
@@ -66,6 +66,11 @@ export class PageService {
     // 名称模糊搜索
     if (name) {
       queryBuilder.andWhere('page.name LIKE :name', { name: `%${name}%` })
+    }
+
+    // 状态筛选
+    if (status) {
+      queryBuilder.andWhere('page.status = :status', { status })
     }
 
     const [list, total] = await queryBuilder

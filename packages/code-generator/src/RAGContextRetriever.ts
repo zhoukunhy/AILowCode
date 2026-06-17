@@ -68,6 +68,7 @@ export interface RAGContext {
  */
 export interface RAGContextConfig {
   chromaConfig: ChromaConfig
+  ragConfig?: RAGConfig
   collectionName: string
   maxResults: number
   minScore: number
@@ -91,9 +92,13 @@ export class RAGContextRetriever {
   constructor(config: RAGContextConfig) {
     this.config = config
     this.vectorStore = new ChromaVectorStore(config.chromaConfig)
+    const ragConfig = config.ragConfig || {
+      embeddingApiKey: '',
+      embeddingModel: 'text-embedding-ada-002',
+    }
     this.retrievalService = new VectorRetrievalService(
       config.chromaConfig,
-      {},
+      ragConfig,
       config.collectionName
     )
     
@@ -239,7 +244,7 @@ export class UserService {
       context.relevantDocs = docs
 
       // 4. 生成建议
-      context.suggestions = this.generateSuggestions(query, context)
+      context.suggestions = this.generateSuggestions(context)
 
       console.log(`[RAGContext] 检索完成: ${context.codingStandards.length} 规范, ${context.codeSnippets.length} 代码片段`)
       
@@ -320,7 +325,7 @@ export class UserService {
   /**
    * 生成代码建议
    */
-  private generateSuggestions(query: string, context: RAGContext): string[] {
+  private generateSuggestions(context: RAGContext): string[] {
     const suggestions: string[] = []
 
     // 基于编码规范生成建议

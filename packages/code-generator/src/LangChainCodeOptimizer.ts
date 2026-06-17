@@ -57,7 +57,6 @@ export interface CodeOptimizerConfig {
  */
 export class LangChainCodeOptimizer {
   private llm: any
-  private config: CodeOptimizerConfig
   private optimizationChain: any
 
   // 系统提示模板
@@ -92,7 +91,6 @@ export class LangChainCodeOptimizer {
 请严格按照以上规则优化代码，并输出优化后的代码。`
 
   constructor(config: CodeOptimizerConfig) {
-    this.config = config
     this.llm = LLMFactory.createLLM(config.llmConfig)
     this.initializeChain()
   }
@@ -167,7 +165,7 @@ export class LangChainCodeOptimizer {
       const changes = this.analyzeChanges(code, optimizedCode, opts)
       
       // 计算优化评分
-      const score = this.calculateScore(changes, opts)
+      const score = this.calculateScore(changes)
       
       // 生成建议
       const suggestions = this.generateSuggestions(changes)
@@ -326,7 +324,7 @@ export class LangChainCodeOptimizer {
   /**
    * 计算优化评分
    */
-  private calculateScore(changes: CodeChange[], options: OptimizationOptions): number {
+  private calculateScore(changes: CodeChange[]): number {
     let score = 60 // 基础分
 
     // 根据变更类型加分

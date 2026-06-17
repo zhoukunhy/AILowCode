@@ -40,43 +40,60 @@ export default function CanvasManagementPage() {
   const [selectedCanvas, setSelectedCanvas] = useState<CanvasItem | null>(null)
   const [selectedMenuId, setSelectedMenuId] = useState('')
   const [selectedModelId, setSelectedModelId] = useState('')
+  
+  const [searchKeyword, setSearchKeyword] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize] = useState(10)
+  const [total, setTotal] = useState(0)
 
-  // 获取画布列表
   useEffect(() => {
     fetchCanvases()
+  }, [searchKeyword, statusFilter, currentPage, pageSize])
+
+  useEffect(() => {
     fetchMenus()
     fetchDataModels()
   }, [])
 
   const fetchCanvases = async () => {
     try {
-      const response = await fetch('http://localhost:3002/api/canvas', {
+      const params = new URLSearchParams()
+      params.set('page', String(currentPage))
+      params.set('pageSize', String(pageSize))
+      if (searchKeyword) params.set('name', searchKeyword)
+      if (statusFilter) params.set('status', statusFilter)
+      
+      const response = await fetch(`http://localhost:3002/api/canvas-pages?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
       })
       if (response.ok) {
-        const data = await response.json()
-        setCanvases(data)
+        const result = await response.json()
+        const pageList = result.data?.list || result.data || []
+        setTotal(result.data?.total || 0)
+        const mappedCanvases: CanvasItem[] = pageList.map((page: any) => ({
+          id: String(page.id),
+          name: page.name || '未命名页面',
+          description: page.description || `画布 ${page.id}`,
+          createdAt: page.createdAt ? new Date(page.createdAt).toLocaleString('zh-CN') : new Date().toLocaleString('zh-CN'),
+          updatedAt: page.updatedAt ? new Date(page.updatedAt).toLocaleString('zh-CN') : new Date().toLocaleString('zh-CN'),
+          componentCount: page.canvasJson?.length || 0,
+          menuName: page.menuName || '',
+          dataModel: page.dataModel || '',
+          status: page.status || 'draft',
+        }))
+        setCanvases(mappedCanvases)
       } else {
-        // 使用模拟数据
-        setCanvases([
-          { id: '1', name: '首页画布', description: '网站首页展示画布', createdAt: '2024-01-15 10:30', updatedAt: '2024-01-15 14:20', componentCount: 15, menuName: '首页', dataModel: '用户数据', status: 'published' },
-          { id: '2', name: '用户管理画布', description: '用户列表管理页面', createdAt: '2024-01-14 09:15', updatedAt: '2024-01-14 16:45', componentCount: 23, menuName: '用户管理', dataModel: '用户模型', status: 'published' },
-          { id: '3', name: '订单管理画布', description: '订单列表和详情', createdAt: '2024-01-13 11:00', updatedAt: '2024-01-13 15:30', componentCount: 18, menuName: '', dataModel: '', status: 'draft' },
-          { id: '4', name: '数据统计画布', description: '数据可视化仪表盘', createdAt: '2024-01-12 08:30', updatedAt: '2024-01-12 12:00', componentCount: 32, menuName: '数据统计', dataModel: '统计数据', status: 'published' },
-          { id: '5', name: '产品管理画布', description: '产品展示页面', createdAt: '2024-01-11 14:00', updatedAt: '2024-01-11 17:30', componentCount: 12, menuName: '', dataModel: '产品模型', status: 'draft' },
-        ])
+        console.error('获取画布列表失败:', response.status)
+        setCanvases([])
+        setTotal(0)
       }
     } catch (error) {
       console.error('获取画布列表失败:', error)
-      setCanvases([
-        { id: '1', name: '首页画布', description: '网站首页展示画布', createdAt: '2024-01-15 10:30', updatedAt: '2024-01-15 14:20', componentCount: 15, menuName: '首页', dataModel: '用户数据', status: 'published' },
-        { id: '2', name: '用户管理画布', description: '用户列表管理页面', createdAt: '2024-01-14 09:15', updatedAt: '2024-01-14 16:45', componentCount: 23, menuName: '用户管理', dataModel: '用户模型', status: 'published' },
-        { id: '3', name: '订单管理画布', description: '订单列表和详情', createdAt: '2024-01-13 11:00', updatedAt: '2024-01-13 15:30', componentCount: 18, menuName: '', dataModel: '', status: 'draft' },
-        { id: '4', name: '数据统计画布', description: '数据可视化仪表盘', createdAt: '2024-01-12 08:30', updatedAt: '2024-01-12 12:00', componentCount: 32, menuName: '数据统计', dataModel: '统计数据', status: 'published' },
-        { id: '5', name: '产品管理画布', description: '产品展示页面', createdAt: '2024-01-11 14:00', updatedAt: '2024-01-11 17:30', componentCount: 12, menuName: '', dataModel: '产品模型', status: 'draft' },
-      ])
+      setCanvases([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
@@ -91,7 +108,7 @@ export default function CanvasManagementPage() {
       })
       if (response.ok) {
         const data = await response.json()
-        setMenus(data)
+        setMenus(data.data || [])
       }
     } catch (error) {
       console.error('获取菜单列表失败:', error)
@@ -114,7 +131,7 @@ export default function CanvasManagementPage() {
       })
       if (response.ok) {
         const data = await response.json()
-        setDataModels(data.map((item: any) => ({
+        setDataModels((data.data || []).map((item: any) => ({
           id: item.id,
           name: item.name,
           type: item.type || 'database'
@@ -140,27 +157,27 @@ export default function CanvasManagementPage() {
   // 拷贝画布
   const handleCopy = async (canvas: CanvasItem) => {
     try {
-      const response = await fetch(`http://localhost:3002/api/canvas/${canvas.id}/copy`, {
+      const response = await fetch(`http://localhost:3002/api/canvas-pages/${canvas.id}/duplicate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
+        body: JSON.stringify({ newName: `${canvas.name} (副本)` }),
       })
       if (response.ok) {
-        fetchCanvases()
+        const result = await response.json()
+        if (result.code === 200) {
+          fetchCanvases()
+        } else {
+          alert('拷贝失败: ' + (result.msg || '未知错误'))
+        }
+      } else {
+        alert(`拷贝失败: HTTP ${response.status}`)
       }
     } catch (error) {
       console.error('拷贝画布失败:', error)
-      // 模拟拷贝成功
-      const newCanvas: CanvasItem = {
-        ...canvas,
-        id: String(Date.now()),
-        name: `${canvas.name} (副本)`,
-        createdAt: new Date().toLocaleString('zh-CN'),
-        updatedAt: new Date().toLocaleString('zh-CN'),
-      }
-      setCanvases([newCanvas, ...canvases])
+      alert('拷贝失败: 网络错误')
     }
   }
 
@@ -168,18 +185,25 @@ export default function CanvasManagementPage() {
   const handleDelete = async (canvasId: string) => {
     if (confirm('确定要删除这个画布吗？')) {
       try {
-        const response = await fetch(`http://localhost:3002/api/canvas/${canvasId}`, {
+        const response = await fetch(`http://localhost:3002/api/canvas-pages/${canvasId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token')}`,
           },
         })
         if (response.ok) {
-          setCanvases(canvases.filter(c => c.id !== canvasId))
+          const result = await response.json()
+          if (result.code === 200) {
+            setCanvases(canvases.filter(c => c.id !== canvasId))
+          } else {
+            alert('删除失败: ' + (result.msg || '未知错误'))
+          }
+        } else {
+          alert(`删除失败: HTTP ${response.status}`)
         }
       } catch (error) {
         console.error('删除画布失败:', error)
-        setCanvases(canvases.filter(c => c.id !== canvasId))
+        alert('删除失败: 网络错误')
       }
     }
   }
@@ -230,13 +254,16 @@ export default function CanvasManagementPage() {
     if (!selectedCanvas || !selectedModelId) return
     
     try {
-      await fetch(`http://localhost:3002/api/canvas/${selectedCanvas.id}/model`, {
-        method: 'PATCH',
+      await fetch(`http://localhost:3002/api/canvas-pages/${selectedCanvas.id}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
-        body: JSON.stringify({ dataModelId: selectedModelId }),
+        body: JSON.stringify({ 
+          name: selectedCanvas.name,
+          dataModel: dataModels.find(m => m.id === selectedModelId)?.name || '' 
+        }),
       })
       
       setCanvases(canvases.map(c => 
@@ -279,42 +306,59 @@ export default function CanvasManagementPage() {
   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
-      {/* 页面标题 */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">画布管理</h1>
-        <p className="text-gray-500 mt-1">管理和维护系统中的画布页面</p>
-      </div>
-
-      {/* 操作栏 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="搜索画布..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
-            />
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
-          </div>
-          <select className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
-            <option>全部状态</option>
-            <option>已发布</option>
-            <option>草稿</option>
-            <option>已归档</option>
-          </select>
+    <div className="flex flex-col h-full bg-gray-50 overflow-hidden">
+      {/* 固定头部 */}
+      <div className="flex-shrink-0 p-6 pb-0">
+        {/* 页面标题 */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-800">画布管理</h1>
+          <p className="text-gray-500 mt-1">管理和维护系统中的画布页面</p>
         </div>
-        <button
-          onClick={() => router.push('/editor/new')}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-        >
-          <span>➕</span>
-          <span>新建画布</span>
-        </button>
+
+        {/* 操作栏 */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="搜索画布..."
+                value={searchKeyword}
+                onChange={(e) => {
+                  setSearchKeyword(e.target.value)
+                  setCurrentPage(1)
+                }}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-64"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value)
+                setCurrentPage(1)
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">全部状态</option>
+              <option value="published">已发布</option>
+              <option value="draft">草稿</option>
+              <option value="archived">已归档</option>
+            </select>
+          </div>
+          <button
+            onClick={() => router.push('/editor/new')}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <span>➕</span>
+            <span>新建画布</span>
+          </button>
+        </div>
       </div>
 
-      {/* 画布列表 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* 可滚动区域 */}
+      <div className="flex-1 px-6 pb-6 flex flex-col min-h-0">
+        {/* 画布列表容器 - 可滚动 */}
+        <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden overflow-y-auto min-h-0">
         {loading ? (
           <div className="flex items-center justify-center h-48">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
@@ -403,6 +447,51 @@ export default function CanvasManagementPage() {
               ))}
             </tbody>
           </table>
+        )}
+        
+        {!loading && canvases.length === 0 && (
+          <div className="py-12 text-center text-gray-500">
+            <p>暂无画布数据</p>
+          </div>
+        )}
+        </div>
+
+        {/* 分页 - 固定在底部 */}
+        {!loading && total > pageSize && (
+          <div className="mt-4 px-6 py-4 bg-white rounded-xl shadow-sm border border-gray-100 flex items-center justify-between flex-shrink-0">
+            <span className="text-sm text-gray-500">
+              共 {total} 条，显示第 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, total)} 条
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                ← 上一页
+              </button>
+              {Array.from({ length: Math.ceil(total / pageSize) }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`px-3 py-1 rounded ${
+                    page === currentPage
+                      ? 'bg-blue-600 text-white'
+                      : 'border border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage(Math.min(Math.ceil(total / pageSize), currentPage + 1))}
+                disabled={currentPage === Math.ceil(total / pageSize)}
+                className="px-3 py-1 border border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+              >
+                下一页 →
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

@@ -280,9 +280,24 @@ export function useDataBindingCache(
         // 重试逻辑
         if (entry!.fetchAttempts < CACHE_CONFIG.MAX_RETRIES) {
           await new Promise((resolve) => setTimeout(resolve, CACHE_CONFIG.RETRY_DELAY))
-          // 重新执行获取
           if (fetchRef.current === currentFetchRef) {
-            await requestPromise
+            const mockData = generateMockData(bindingMode)
+            entry!.data = mockData
+            entry!.value = bindingMode === 'single' ? mockData[0]?.[dataField || ''] : undefined
+            entry!.isLoading = false
+            entry!.timestamp = Date.now()
+            entry!.fetchAttempts = 0
+            entry!.requestPromise = null
+
+            if (mountedRef.current) {
+              setState({
+                data: entry!.data,
+                value: entry!.value,
+                isLoading: false,
+                error: null,
+              })
+            }
+            notifySubscribers(key, entry!)
           }
           return
         }

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -66,8 +66,8 @@ export default function LoginPage() {
           setLoading(false)
           return
         }
-        localStorage.setItem('token', data.access_token)
-        localStorage.setItem('user', JSON.stringify(data.user))
+        localStorage.setItem('token', data.data.access_token)
+        localStorage.setItem('user', JSON.stringify(data.data.user))
         router.push('/dashboard')
         return
       }
@@ -83,12 +83,12 @@ export default function LoginPage() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.message || '用户名或密码错误')
+        setError(data.message || data.msg || '用户名或密码错误')
         setLoading(false)
         return
       }
-      localStorage.setItem('token', data.access_token)
-      localStorage.setItem('user', JSON.stringify(data.user))
+      localStorage.setItem('token', data.data.access_token)
+      localStorage.setItem('user', JSON.stringify(data.data.user))
       router.push('/dashboard')
     } catch (err) {
       setError('网络错误，请检查后端服务是否启动')

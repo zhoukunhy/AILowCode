@@ -2,7 +2,7 @@
  * 代码生成模块 DTO
  */
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
-import { IsString, IsNotEmpty, IsEnum, IsObject, IsOptional } from 'class-validator'
+import { IsString, IsNotEmpty, IsEnum, IsObject, IsOptional, IsBoolean } from 'class-validator'
 
 /**
  * 生成类型枚举
@@ -36,6 +36,20 @@ export class GenerateCodeDto {
   @IsString()
   @IsOptional()
   sessionId?: string
+
+  @ApiPropertyOptional({ description: '启用 RAG 检索', default: false })
+  @IsBoolean()
+  @IsOptional()
+  enableRAG?: boolean
+
+  @ApiPropertyOptional({ description: '启用代码优化', default: false })
+  @IsBoolean()
+  @IsOptional()
+  enableOptimization?: boolean
+
+  @ApiPropertyOptional({ description: '知识库 ID 列表' })
+  @IsOptional()
+  knowledgeBaseIds?: number[]
 }
 
 /**
@@ -59,4 +73,10 @@ export class GenerateCodeResponseDto {
 
   @ApiProperty({ description: '执行时长（毫秒）' })
   duration!: number
+
+  @ApiPropertyOptional({ description: 'RAG 检索时间（毫秒）' })
+  ragRetrievalTime?: number
+
+  @ApiPropertyOptional({ description: '优化文件数量' })
+  optimizedFiles?: number
 }

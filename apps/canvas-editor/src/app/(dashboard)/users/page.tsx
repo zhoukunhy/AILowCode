@@ -1,100 +1,139 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { RefreshCw } from 'lucide-react'
 
-// 用户类型
-interface User {
-  id: string
-  username: string
-  email: string
-  role: '超级管理员' | '管理员' | '普通用户' | '访客'
-  status: '启用' | '禁用'
-  avatar?: string
-  lastLogin?: string
-  createdAt: string
-  projects: number
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('token')
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
 }
 
-// 模拟用户数据
-const mockUsers: User[] = [
-  {
-    id: '1',
-    username: 'admin',
-    email: 'admin@example.com',
-    role: '超级管理员',
-    status: '启用',
-    lastLogin: '2024-01-15 10:30',
-    createdAt: '2023-01-01',
-    projects: 12,
-  },
-  {
-    id: '2',
-    username: 'zhangsan',
-    email: 'zhangsan@example.com',
-    role: '管理员',
-    status: '启用',
-    lastLogin: '2024-01-15 09:15',
-    createdAt: '2023-03-15',
-    projects: 8,
-  },
-  {
-    id: '3',
-    username: 'lisi',
-    email: 'lisi@example.com',
-    role: '普通用户',
-    status: '启用',
-    lastLogin: '2024-01-14 16:45',
-    createdAt: '2023-06-20',
-    projects: 5,
-  },
-  {
-    id: '4',
-    username: 'wangwu',
-    email: 'wangwu@example.com',
-    role: '普通用户',
-    status: '禁用',
-    lastLogin: '2024-01-10 11:20',
-    createdAt: '2023-08-01',
-    projects: 3,
-  },
-  {
-    id: '5',
-    username: 'zhaoliu',
-    email: 'zhaoliu@example.com',
-    role: '访客',
-    status: '启用',
-    lastLogin: '2024-01-13 14:30',
-    createdAt: '2023-12-01',
-    projects: 1,
-  },
-  {
-    id: '6',
-    username: 'qianqi',
-    email: 'qianqi@example.com',
-    role: '管理员',
-    status: '启用',
-    lastLogin: '2024-01-15 08:00',
-    createdAt: '2023-02-10',
-    projects: 10,
-  },
-]
+interface User {
+  id: number
+  username: string
+  email: string
+  role?: string
+  roleId?: number
+  status: string
+  avatarUrl?: string
+  lastLoginAt?: string
+  createdAt: string
+  updatedAt: string
+  aiCallCount?: number
+  aiCallLimit?: number
+}
 
-// 角色选项
+interface Role {
+  id: number
+  name: string
+  code: string
+}
+
 const roleOptions = ['全部', '超级管理员', '管理员', '普通用户', '访客']
-const statusOptions = ['全部', '启用', '禁用']
+const statusOptions = ['全部', 'active', 'disabled']
+
+async function fetchUsers(): Promise<User[]> {
+  const res = await fetch(`${API_BASE}/users`, { headers: getAuthHeaders() })
+  const data = await res.json()
+  return data.data || []
+}
+
+async function fetchRoles(): Promise<Role[]> {
+  const res = await fetch(`${API_BASE}/roles`, { headers: getAuthHeaders() })
+  const data = await res.json()
+  return data.data || []
+}
+
+async function createUser(username: string, password: string, email: string): Promise<User> {
+  const res = await fetch(`${API_BASE}/users`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ username, password, email }),
+  })
+  const data = await res.json()
+  return data.data || data
+}
+
+async function updateUser(id: number, data: Partial<User>): Promise<User> {
+  const res = await fetch(`${API_BASE}/users/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(data),
+  })
+  const result = await res.json()
+  return result.data || result
+}
+
+async function deleteUser(id: number): Promise<void> {
+  await fetch(`${API_BASE}/users/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+}
+
+function getRoleDisplayName(role?: string): string {
+  if (!role) return '普通用户'
+  if (role.includes('super') || role.includes('admin')) return '管理员'
+  return '普通用户'
+}
+
+function getRoleColor(role?: string): string {
+  const name = getRoleDisplayName(role)
+  switch (name) {
+    case '超级管理员':
+      return 'bg-red-100 text-red-700'
+    case '管理员':
+      return 'bg-purple-100 text-purple-700'
+    case '普通用户':
+      return 'bg-blue-100 text-blue-700'
+    default:
+      return 'bg-gray-100 text-gray-700'
+  }
+}
+
+function getStatusColor(status: string): string {
+  return status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+}
 
 export default function UsersPage() {
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [users, setUsers] = useState<User[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [selectedRole, setSelectedRole] = useState('全部')
   const [selectedStatus, setSelectedStatus] = useState('全部')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showRoleModal, setShowRoleModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [selectedUserRole, setSelectedUserRole] = useState<string>('')
 
-  // 过滤用户
-  const filteredUsers = mockUsers.filter((user) => {
-    const matchRole = selectedRole === '全部' || user.role === selectedRole
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [usersData, rolesData] = await Promise.all([fetchUsers(), fetchRoles()])
+      setUsers(usersData)
+      setRoles(rolesData)
+    } catch (error) {
+      console.error('加载数据失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  const filteredUsers = users.filter((user) => {
+    const displayRole = getRoleDisplayName(user.role)
+    const matchRole = selectedRole === '全部' || displayRole === selectedRole
     const matchStatus = selectedStatus === '全部' || user.status === selectedStatus
     const matchKeyword =
       user.username.toLowerCase().includes(searchKeyword.toLowerCase()) ||
@@ -102,53 +141,82 @@ export default function UsersPage() {
     return matchRole && matchStatus && matchKeyword
   })
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case '超级管理员':
-        return 'bg-red-100 text-red-700'
-      case '管理员':
-        return 'bg-purple-100 text-purple-700'
-      case '普通用户':
-        return 'bg-blue-100 text-blue-700'
-      case '访客':
-        return 'bg-gray-100 text-gray-700'
-      default:
-        return 'bg-gray-100 text-gray-700'
+  const handleEditRole = (user: User) => {
+    setSelectedUser(user)
+    setSelectedUserRole(user.roleId?.toString() || '')
+    setShowRoleModal(true)
+  }
+
+  const handleSaveRole = async () => {
+    if (!selectedUser) return
+    try {
+      setSaving(true)
+      await updateUser(selectedUser.id, { roleId: parseInt(selectedUserRole) || undefined })
+      await loadData()
+      setShowRoleModal(false)
+    } catch (error) {
+      console.error('更新角色失败:', error)
+      alert('更新失败')
+    } finally {
+      setSaving(false)
     }
   }
 
-  const getStatusColor = (status: string) => {
-    return status === '启用'
-      ? 'bg-green-100 text-green-700'
-      : 'bg-red-100 text-red-700'
+  const handleCreateUser = async (username: string, password: string, email: string) => {
+    try {
+      setSaving(true)
+      await createUser(username, password, email)
+      await loadData()
+      setShowCreateModal(false)
+    } catch (error) {
+      console.error('创建用户失败:', error)
+      alert('创建失败')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleEditRole = (user: User) => {
-    setSelectedUser(user)
-    setShowRoleModal(true)
+  const handleDeleteUser = async (user: User) => {
+    if (!confirm(`确定要删除用户 "${user.username}" 吗？`)) return
+    try {
+      await deleteUser(user.id)
+      await loadData()
+    } catch (error) {
+      console.error('删除用户失败:', error)
+      alert('删除失败')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-2" />
+          <p className="text-gray-500">加载中...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* 页面标题和操作 */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">用户管理</h1>
           <p className="text-gray-500 mt-1">管理系统用户和权限</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-        >
-          <span>➕</span>
-          <span>添加用户</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={loadData} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button onClick={() => setShowCreateModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            添加用户
+          </button>
+        </div>
       </div>
 
-      {/* 搜索和筛选 */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
         <div className="flex flex-wrap items-center gap-4">
-          {/* 搜索框 */}
           <div className="flex-1 min-w-[200px]">
             <div className="relative">
               <input
@@ -158,13 +226,10 @@ export default function UsersPage() {
                 placeholder="搜索用户名或邮箱..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
               />
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                🔍
-              </span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             </div>
           </div>
 
-          {/* 角色筛选 */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500">角色:</span>
             {roleOptions.map((role) => (
@@ -172,9 +237,7 @@ export default function UsersPage() {
                 key={role}
                 onClick={() => setSelectedRole(role)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  selectedRole === role
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  selectedRole === role ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
                 {role}
@@ -182,7 +245,6 @@ export default function UsersPage() {
             ))}
           </div>
 
-          {/* 状态筛选 */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-500">状态:</span>
             {statusOptions.map((status) => (
@@ -190,312 +252,195 @@ export default function UsersPage() {
                 key={status}
                 onClick={() => setSelectedStatus(status)}
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                  selectedStatus === status
-                    ? 'bg-blue-100 text-blue-700'
-                    : 'text-gray-600 hover:bg-gray-100'
+                  selectedStatus === status ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'
                 }`}
               >
-                {status}
+                {status === '全部' ? status : status === 'active' ? '启用' : '禁用'}
               </button>
             ))}
-          </div>
-
-          {/* 视图切换 */}
-          <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 ${viewMode === 'grid' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
-            >
-              <span>▦</span>
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 ${viewMode === 'list' ? 'bg-blue-50 text-blue-600' : 'text-gray-500 hover:bg-gray-50'}`}
-            >
-              <span>☰</span>
-            </button>
           </div>
         </div>
       </div>
 
-      {/* 用户列表/网格 */}
-      {viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredUsers.map((user) => (
-            <div
-              key={user.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow"
-            >
-              {/* 用户头像和信息 */}
-              <div className="flex items-start gap-4 mb-4">
-                <div className="w-14 h-14 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-xl text-white font-bold">
-                  {user.username[0].toUpperCase()}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredUsers.map((user) => (
+          <div key={user.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+                  {user.username.charAt(0).toUpperCase()}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-gray-800 truncate">{user.username}</h3>
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                        user.status
-                      )}`}
-                    >
-                      {user.status}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                <div>
+                  <h3 className="font-bold text-gray-800">{user.username}</h3>
+                  <p className="text-sm text-gray-500">{user.email}</p>
                 </div>
               </div>
+              <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(user.status)}`}>
+                {user.status === 'active' ? '启用' : '禁用'}
+              </span>
+            </div>
 
-              {/* 角色标签 */}
-              <div className="mb-4">
-                <span
-                  className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getRoleColor(
-                    user.role
-                  )}`}
-                >
-                  {user.role}
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">角色</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${getRoleColor(user.role)}`}>
+                  {getRoleDisplayName(user.role)}
                 </span>
               </div>
-
-              {/* 统计信息 */}
-              <div className="flex items-center gap-4 text-sm text-gray-500 mb-4">
-                <span className="flex items-center gap-1">
-                  <span>📦</span> {user.projects} 个项目
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">AI 调用</span>
+                <span className="text-gray-700">
+                  {user.aiCallCount || 0} / {user.aiCallLimit || 100}
                 </span>
               </div>
-
-              {/* 底部信息 */}
-              <div className="pt-4 border-t border-gray-100">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-500">
-                    最后登录: {user.lastLogin || '从未'}
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleEditRole(user)}
-                      className="text-blue-600 hover:text-blue-700 font-medium"
-                    >
-                      编辑
-                    </button>
-                    <button className="text-gray-500 hover:text-gray-700">
-                      删除
-                    </button>
-                  </div>
-                </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">创建时间</span>
+                <span className="text-gray-700">{new Date(user.createdAt).toLocaleDateString()}</span>
               </div>
             </div>
-          ))}
-        </div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50">
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">
-                  用户
-                </th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">
-                  角色
-                </th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">
-                  状态
-                </th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">
-                  项目数
-                </th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">
-                  最后登录
-                </th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-600">
-                  操作
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((user) => (
-                <tr
-                  key={user.id}
-                  className="border-b border-gray-50 hover:bg-gray-50 transition-colors"
-                >
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold">
-                        {user.username[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">{user.username}</p>
-                        <p className="text-sm text-gray-500">{user.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(
-                        user.role
-                      )}`}
-                    >
-                      {user.role}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
-                        user.status
-                      )}`}
-                    >
-                      {user.status}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6 text-gray-600">{user.projects}</td>
-                  <td className="py-4 px-6 text-gray-500 text-sm">
-                    {user.lastLogin || '从未'}
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleEditRole(user)}
-                        className="text-blue-600 hover:text-blue-700 text-sm font-medium"
-                      >
-                        编辑
-                      </button>
-                      <button className="text-red-600 hover:text-red-700 text-sm font-medium">
-                        删除
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
 
-      {/* 空状态 */}
+            <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
+              <button
+                onClick={() => handleEditRole(user)}
+                className="flex-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-sm font-medium"
+              >
+                设置角色
+              </button>
+              <button
+                onClick={() => handleDeleteUser(user)}
+                className="px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 text-sm font-medium"
+              >
+                删除
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {filteredUsers.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <div className="text-6xl mb-4">👤</div>
-          <h3 className="text-lg font-medium text-gray-800 mb-2">暂无用户</h3>
-          <p className="text-gray-500 mb-4">添加您的第一个用户</p>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            添加用户
-          </button>
+        <div className="text-center py-12 text-gray-500">
+          <p>暂无用户</p>
         </div>
       )}
 
-      {/* 创建用户弹窗 */}
       {showCreateModal && (
+        <CreateUserModal onClose={() => setShowCreateModal(false)} onCreate={handleCreateUser} saving={saving} />
+      )}
+
+      {showRoleModal && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">添加用户</h3>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">设置用户角色 - {selectedUser.username}</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  用户名
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="请输入用户名"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  邮箱
-                </label>
-                <input
-                  type="email"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="请输入邮箱"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  角色
-                </label>
-                <select className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
-                  <option>普通用户</option>
-                  <option>管理员</option>
-                  <option>超级管理员</option>
-                  <option>访客</option>
+                <label className="block text-sm font-medium text-gray-700 mb-2">选择角色</label>
+                <select
+                  value={selectedUserRole}
+                  onChange={(e) => setSelectedUserRole(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="">普通用户</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                取消
-              </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                创建
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 编辑角色弹窗 */}
-      {showRoleModal && selectedUser && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">编辑用户角色</h3>
-            <div className="flex items-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-xl text-white font-bold">
-                {selectedUser.username[0].toUpperCase()}
-              </div>
-              <div>
-                <p className="font-medium text-gray-800">{selectedUser.username}</p>
-                <p className="text-sm text-gray-500">{selectedUser.email}</p>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                选择角色
-              </label>
-              <div className="space-y-2">
-                {['超级管理员', '管理员', '普通用户', '访客'].map((role) => (
-                  <label
-                    key={role}
-                    className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50"
-                  >
-                    <input
-                      type="radio"
-                      name="role"
-                      value={role}
-                      defaultChecked={selectedUser.role === role}
-                      className="w-4 h-4 text-blue-600"
-                    />
-                    <div>
-                      <p className="font-medium text-gray-800">{role}</p>
-                      <p className="text-xs text-gray-500">
-                        {role === '超级管理员' && '拥有系统所有权限'}
-                        {role === '管理员' && '拥有大部分管理权限'}
-                        {role === '普通用户' && '可以使用大部分功能'}
-                        {role === '访客' && '只有查看权限'}
-                      </p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button
                 onClick={() => setShowRoleModal(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                disabled={saving}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50"
               >
                 取消
               </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                保存
+              <button
+                onClick={handleSaveRole}
+                disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {saving && <RefreshCw className="w-4 h-4 animate-spin" />}
+                {saving ? '保存中...' : '保存'}
               </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+interface CreateUserModalProps {
+  onClose: () => void
+  onCreate: (username: string, password: string, email: string) => Promise<void>
+  saving: boolean
+}
+
+function CreateUserModal({ onClose, onCreate, saving }: CreateUserModalProps) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('')
+
+  const handleSubmit = async () => {
+    if (!username.trim() || !password.trim() || !email.trim()) {
+      alert('请填写所有字段')
+      return
+    }
+    await onCreate(username, password, email)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 w-full max-w-md">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">添加用户</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="请输入用户名"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">邮箱</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="请输入邮箱"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">密码</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="请输入密码"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
+          <button onClick={onClose} disabled={saving} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50">
+            取消
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+          >
+            {saving && <RefreshCw className="w-4 h-4 animate-spin" />}
+            {saving ? '创建中...' : '创建'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

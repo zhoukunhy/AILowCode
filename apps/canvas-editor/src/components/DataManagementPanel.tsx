@@ -1,8 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useCanvasStore } from '@/store/canvasStore'
-import { Database, Plus, Trash2, Edit2, Table, List } from 'lucide-react'
+import { Database, Plus, Trash2, Edit2, Table, List, RefreshCw } from 'lucide-react'
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
 interface FieldConfig {
   id: string
@@ -16,7 +18,7 @@ interface FieldConfig {
 }
 
 interface TableSchema {
-  id: string
+  id: number
   name: string
   tableName: string
   fields: FieldConfig[]
@@ -33,22 +35,58 @@ const defaultFieldTypes = [
   { value: 'password', label: '密码', icon: '🔐' },
 ]
 
+// 获取 auth header
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('token')
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
+
+// API 函数
+async function fetchSchemas(): Promise<TableSchema[]> {
+  const response = await fetch(`${API_BASE}/schema`, { headers: getAuthHeaders() })
+  if (!response.ok) throw new Error('获取数据表失败')
+  const data = await response.json()
+  return data.data || []
+}
+
+async function saveSchema(schema: Omit<TableSchema, 'id'>): Promise<TableSchema> {
+  const response = await fetch(`${API_BASE}/schema`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(schema),
+  })
+  if (!response.ok) throw new Error('保存数据表失败')
+  return response.json()
+}
+
+async function updateSchema(id: number, schema: Partial<TableSchema>): Promise<TableSchema> {
+  const response = await fetch(`${API_BASE}/schema/${id}`, {
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(schema),
+  })
+  if (!response.ok) throw new Error('更新数据表失败')
+  return response.json()
+}
+
+async function deleteSchema(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/schema/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+  if (!response.ok) throw new Error('删除数据表失败')
+}
+
 export function DataManagementPanel() {
   const addComponent = useCanvasStore((state) => state.addComponent)
-  const [schemas, setSchemas] = useState<TableSchema[]>([
-    {
-      id: '1',
-      name: '用户表',
-      tableName: 'users',
-      fields: [
-        { id: 'f1', name: 'id', label: 'ID', type: 'number', required: true },
-        { id: 'f2', name: 'name', label: '姓名', type: 'string', required: true, placeholder: '请输入姓名' },
-        { id: 'f3', name: 'email', label: '邮箱', type: 'email', required: true, placeholder: '请输入邮箱' },
-        { id: 'f4', name: 'status', label: '状态', type: 'boolean', required: false },
-      ],
-    },
-  ])
-  const [selectedSchema, setSelectedSchema] = useState<TableSchema | null>(schemas[0] || null)
+  const [schemas, setSchemas] = useState<TableSchema[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [selectedSchema, setSelectedSchema] = useState<TableSchema | null>(null)
   const [showFieldModal, setShowFieldModal] = useState(false)
   const [editingField, setEditingField] = useState<FieldConfig | null>(null)
   const [newField, setNewField] = useState<FieldConfig>({
@@ -59,22 +97,57 @@ export function DataManagementPanel() {
     required: false,
   })
 
-  const handleAddSchema = () => {
-    const newSchema: TableSchema = {
-      id: Date.now().toString(),
-      name: '新数据表',
-      tableName: `table_${Date.now()}`,
-      fields: [],
+  // 加载数据
+  useEffect(() => {
+    loadSchemas()
+  }, [])
+
+  const loadSchemas = async () => {
+    try {
+      setLoading(true)
+      const data = await fetchSchemas()
+      setSchemas(data)
+      if (data.length > 0 && !selectedSchema) {
+        setSelectedSchema(data[0])
+      }
+    } catch (error) {
+      console.error('加载数据表失败:', error)
+    } finally {
+      setLoading(false)
     }
-    setSchemas([...schemas, newSchema])
-    setSelectedSchema(newSchema)
   }
 
-  const handleDeleteSchema = (schemaId: string) => {
+  const handleAddSchema = async () => {
+    const name = prompt('请输入数据表名称：', '新数据表')
+    if (!name) return
+    
+    const tableName = prompt('请输入表名（英文）：', `table_${Date.now()}`)
+    if (!tableName) return
+
+    try {
+      setSaving(true)
+      const saved = await saveSchema({ name, tableName, fields: [] })
+      setSchemas([...schemas, saved])
+      setSelectedSchema(saved)
+    } catch (error) {
+      console.error('创建数据表失败:', error)
+      alert('创建数据表失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteSchema = async (schemaId: number) => {
     if (!confirm('确定要删除这个数据表吗？')) return
-    setSchemas(schemas.filter(s => s.id !== schemaId))
-    if (selectedSchema?.id === schemaId) {
-      setSelectedSchema(schemas.find(s => s.id !== schemaId) || null)
+    try {
+      await deleteSchema(schemaId)
+      setSchemas(schemas.filter(s => s.id !== schemaId))
+      if (selectedSchema?.id === schemaId) {
+        setSelectedSchema(schemas.find(s => s.id !== schemaId) || null)
+      }
+    } catch (error) {
+      console.error('删除数据表失败:', error)
+      alert('删除数据表失败')
     }
   }
 
@@ -85,7 +158,7 @@ export function DataManagementPanel() {
     } else {
       setEditingField(null)
       setNewField({
-        id: Date.now().toString(),
+        id: `f_${Date.now()}`,
         name: '',
         label: '',
         type: 'string',
@@ -95,57 +168,58 @@ export function DataManagementPanel() {
     setShowFieldModal(true)
   }
 
-  const handleSaveField = () => {
+  const handleSaveField = async () => {
     if (!newField.name || !newField.label) {
       alert('请填写字段名称和标签')
       return
     }
 
-    if (selectedSchema) {
-      const updatedSchemas = schemas.map(schema => {
-        if (schema.id === selectedSchema.id) {
-          if (editingField) {
-            return {
-              ...schema,
-              fields: schema.fields.map(f => f.id === editingField.id ? newField : f),
-            }
-          } else {
-            return {
-              ...schema,
-              fields: [...schema.fields, newField],
-            }
-          }
-        }
-        return schema
-      })
-      setSchemas(updatedSchemas)
-      const updated = updatedSchemas.find(s => s.id === selectedSchema.id)
-      if (updated) {
-        setSelectedSchema(updated)
-      }
+    if (!selectedSchema) {
+      alert('请先选择一个数据表')
+      return
     }
-    setShowFieldModal(false)
-    setEditingField(null)
-    setNewField({ id: '', name: '', label: '', type: 'string', required: false })
+
+    try {
+      setSaving(true)
+      let updatedFields: FieldConfig[]
+      
+      if (editingField) {
+        updatedFields = selectedSchema.fields.map(f => 
+          f.id === editingField.id ? newField : f
+        )
+      } else {
+        updatedFields = [...selectedSchema.fields, newField]
+      }
+
+      const updated = await updateSchema(selectedSchema.id, { fields: updatedFields })
+      setSchemas(schemas.map(s => s.id === selectedSchema.id ? updated : s))
+      setSelectedSchema(updated)
+      setShowFieldModal(false)
+      setEditingField(null)
+      setNewField({ id: '', name: '', label: '', type: 'string', required: false })
+    } catch (error) {
+      console.error('保存字段失败:', error)
+      alert('保存字段失败')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleDeleteField = (fieldId: string) => {
+  const handleDeleteField = async (fieldId: string) => {
     if (!confirm('确定要删除这个字段吗？')) return
-    if (selectedSchema) {
-      const updatedSchemas = schemas.map(schema => {
-        if (schema.id === selectedSchema.id) {
-          return {
-            ...schema,
-            fields: schema.fields.filter(f => f.id !== fieldId),
-          }
-        }
-        return schema
-      })
-      setSchemas(updatedSchemas)
-      const updated = updatedSchemas.find(s => s.id === selectedSchema.id)
-      if (updated) {
-        setSelectedSchema(updated)
-      }
+    if (!selectedSchema) return
+
+    try {
+      setSaving(true)
+      const updatedFields = selectedSchema.fields.filter(f => f.id !== fieldId)
+      const updated = await updateSchema(selectedSchema.id, { fields: updatedFields })
+      setSchemas(schemas.map(s => s.id === selectedSchema.id ? updated : s))
+      setSelectedSchema(updated)
+    } catch (error) {
+      console.error('删除字段失败:', error)
+      alert('删除字段失败')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -222,117 +296,157 @@ export function DataManagementPanel() {
           <div className="flex items-center gap-2">
             <Database className="w-5 h-5 text-blue-600" />
             <h2 className="font-semibold text-gray-800">数据管理</h2>
+            {saving && <span className="text-xs text-blue-500 animate-pulse">保存中...</span>}
           </div>
-          <button
-            onClick={handleAddSchema}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="新建数据表"
-          >
-            <Plus className="w-4 h-4 text-blue-600" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={loadSchemas}
+              disabled={loading}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              title="刷新"
+            >
+              <RefreshCw className={`w-4 h-4 text-gray-500 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button
+              onClick={handleAddSchema}
+              disabled={saving}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+              title="新建数据表"
+            >
+              <Plus className="w-4 h-4 text-blue-600" />
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* 加载状态 */}
+      {loading && (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mx-auto mb-2" />
+            <p className="text-sm text-gray-500">加载中...</p>
+          </div>
+        </div>
+      )}
 
       {/* 数据表列表 */}
+      {!loading && (
       <div className="p-3 border-b border-gray-200">
-        <div className="space-y-1">
-          {schemas.map((schema) => (
-            <div
-              key={schema.id}
-              className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                selectedSchema?.id === schema.id
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'hover:bg-gray-50 text-gray-700'
-              }`}
-              onClick={() => setSelectedSchema(schema)}
+        {schemas.length === 0 ? (
+          <div className="text-center py-4 text-gray-400">
+            <p className="text-sm">暂无数据表</p>
+            <button
+              onClick={handleAddSchema}
+              className="mt-2 px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
             >
-              <span className="text-sm font-medium truncate flex-1">{schema.name}</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDeleteSchema(schema.id)
-                }}
-                className="p-1 hover:bg-red-100 rounded"
-              >
-                <Trash2 className="w-3 h-3 text-red-500" />
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 字段列表 */}
-      <div className="flex-1 overflow-auto p-3">
-        {selectedSchema ? (
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-medium text-gray-700">
-                {selectedSchema.name} ({selectedSchema.fields.length} 个字段)
-              </h3>
-              <button
-                onClick={() => handleOpenFieldModal()}
-                className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
-              >
-                <Plus className="w-3 h-3" />
-                添加字段
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              {selectedSchema.fields.length === 0 ? (
-                <div className="text-center py-8 text-gray-400">
-                  <Database className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">暂无字段</p>
-                  <button
-                    onClick={() => handleOpenFieldModal()}
-                    className="mt-2 px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
-                  >
-                    添加第一个字段
-                  </button>
-                </div>
-              ) : (
-                selectedSchema.fields.map((field) => (
-                  <div
-                    key={field.id}
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-gray-800 truncate">
-                        {field.label}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {field.name} ({field.type})
-                        {field.required && <span className="text-red-500 ml-1">*</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleOpenFieldModal(field)}
-                        className="p-1 hover:bg-gray-200 rounded"
-                        title="编辑"
-                      >
-                        <Edit2 className="w-3 h-3 text-gray-500" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteField(field.id)}
-                        className="p-1 hover:bg-red-100 rounded"
-                        title="删除"
-                      >
-                        <Trash2 className="w-3 h-3 text-red-500" />
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+              创建第一个数据表
+            </button>
           </div>
         ) : (
-          <div className="text-center py-8 text-gray-400">
-            <Database className="w-12 h-12 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">请选择一个数据表</p>
+          <div className="space-y-1">
+            {schemas.map((schema) => (
+              <div
+                key={schema.id}
+                className={`flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                  selectedSchema?.id === schema.id
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'hover:bg-gray-50 text-gray-700'
+                }`}
+                onClick={() => setSelectedSchema(schema)}
+              >
+                <span className="text-sm font-medium truncate flex-1">{schema.name}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteSchema(schema.id)
+                  }}
+                  className="p-1 hover:bg-red-100 rounded"
+                >
+                  <Trash2 className="w-3 h-3 text-red-500" />
+                </button>
+              </div>
+            ))}
           </div>
         )}
       </div>
+      )}
+
+      {/* 字段列表 */}
+      {!loading && selectedSchema && (
+      <div className="flex-1 overflow-auto p-3">
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-gray-700">
+              {selectedSchema.name} ({selectedSchema.fields.length} 个字段)
+            </h3>
+            <button
+              onClick={() => handleOpenFieldModal()}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-600 rounded hover:bg-blue-200 transition-colors"
+            >
+              <Plus className="w-3 h-3" />
+              添加字段
+            </button>
+          </div>
+
+          <div className="space-y-2">
+            {selectedSchema.fields.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <Database className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">暂无字段</p>
+                <button
+                  onClick={() => handleOpenFieldModal()}
+                  className="mt-2 px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600"
+                >
+                  添加第一个字段
+                </button>
+              </div>
+            ) : (
+              selectedSchema.fields.map((field) => (
+                <div
+                  key={field.id}
+                  className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-800 truncate">
+                      {field.label}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {field.name} ({field.type})
+                      {field.required && <span className="text-red-500 ml-1">*</span>}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleOpenFieldModal(field)}
+                      className="p-1 hover:bg-gray-200 rounded"
+                      title="编辑"
+                    >
+                      <Edit2 className="w-3 h-3 text-gray-500" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteField(field.id)}
+                      className="p-1 hover:bg-red-100 rounded"
+                      title="删除"
+                    >
+                      <Trash2 className="w-3 h-3 text-red-500" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+      )}
+
+      {!loading && !selectedSchema && schemas.length > 0 && (
+        <div className="flex-1 flex items-center justify-center text-gray-400">
+          <div className="text-center">
+            <Database className="w-12 h-12 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">请选择一个数据表</p>
+          </div>
+        </div>
+      )}
 
       {/* 生成按钮 */}
       {selectedSchema && selectedSchema.fields.length > 0 && (

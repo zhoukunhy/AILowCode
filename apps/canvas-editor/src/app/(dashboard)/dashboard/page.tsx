@@ -64,7 +64,7 @@ export default function DashboardPage() {
         if (response.ok) {
           const data = await response.json()
           // 将菜单数据映射为画布数据
-          const canvases: RecentCanvas[] = data.slice(0, 5).map((menu: any, index: number) => ({
+          const canvases: RecentCanvas[] = (data.data || []).slice(0, 5).map((menu: any, index: number) => ({
             id: menu.pageId || `canvas-${index}`,
             name: menu.name,
             updatedAt: new Date(menu.createdAt).toLocaleString('zh-CN'),

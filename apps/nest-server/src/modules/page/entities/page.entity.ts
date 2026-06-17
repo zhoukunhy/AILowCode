@@ -54,6 +54,18 @@ export class Page {
   @Column({ name: 'is_home', default: false })
   isHome!: boolean
 
+  @Column({ name: 'status', length: 20, default: 'draft' })
+  status!: string
+
+  @Column({ name: 'menu_id', nullable: true })
+  menuId?: number
+
+  @Column({ name: 'data_model', length: 100, nullable: true })
+  dataModel?: string
+
+  @Column({ name: 'description', length: 500, nullable: true })
+  description?: string
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date
 

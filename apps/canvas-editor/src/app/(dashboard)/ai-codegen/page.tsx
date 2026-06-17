@@ -1,74 +1,56 @@
 'use client'
 
-import React, { useState } from 'react'
+declare global {
+  interface Window {
+    showSaveFilePicker?: (options: {
+      suggestedName?: string
+      types?: Array<{
+        description: string
+        accept: Record<string, string[]>
+      }>
+    }) => Promise<FileSystemFileHandle>
+  }
+}
 
-// Agent 类型定义
-interface AgentType {
-  id: string
+import React, { useState, useCallback } from 'react'
+import { codegenApi, type GeneratedFile, type GenerateCodeResponse } from '@/lib/api'
+
+interface FileNode {
+  name: string
+  path: string
+  type: 'file' | 'folder'
+  children?: FileNode[]
+  content?: string
+}
+
+interface GenerationTypeOption {
+  value: 'frontend' | 'backend' | 'fullstack'
   label: string
-  icon: string
   description: string
-  features: string[]
+  icon: string
 }
 
-// Agent 功能状态
-interface AgentFeature {
-  id: string
-  label: string
-  status: 'completed' | 'pending' | 'processing'
-  result?: string
-}
-
-// Agent 配置
-const agentTypes: AgentType[] = [
+const generationTypes: GenerationTypeOption[] = [
   {
-    id: 'ai2-page-gen',
-    label: 'AI2 页面生成规划',
-    icon: '🎯',
-    description: 'LangGraph状态机工作流：需求解析→RAG召回→Schema生成→格式校验→输出画布JSON',
-    features: [
-      'AI2-1: 用户自然语言描述页面需求',
-      'AI2-2: Agent自动路由RAG节点，检索项目历史页面、组件规范',
-      'AI2-3: LLM生成标准化CanvasSchema，自检JSON格式，格式错误自动循环修正',
-      'AI2-4: 合规JSON返回前端，画布自动渲染完整页面；全流程会话日志入库',
-    ],
+    value: 'frontend',
+    label: '前端项目',
+    description: '生成 React + TypeScript 前端项目',
+    icon: '🎨',
   },
   {
-    id: 'ai3-tool-call',
-    label: 'AI3 工具调用',
-    icon: '🔧',
-    description: 'LangGraph工具调用Agent（三大内置工具：Zod结构化定义）',
-    features: [
-      'AI3-工具1: SQL_DDL工具：根据业务字段描述自动生成PG建表语句并执行建表',
-      'AI3-工具2: Nest_Crud工具：自动生成对应CRUD接口，写入数据源配置',
-      'AI3-工具3: Http_Test工具：自动发起接口测试，校验数据源连通',
-      'AI3-1: 用户描述业务字段→Agent自主决策调用工具→自动建表+生成接口+组件自动绑定数据源',
-    ],
+    value: 'backend',
+    label: '后端项目',
+    description: '生成 NestJS + TypeORM 后端项目',
+    icon: '⚙️',
   },
   {
-    id: 'ai4-error-fix',
-    label: 'AI4 智能排错',
-    icon: '🔍',
-    description: 'LangGraph智能排错Agent',
-    features: [
-      'AI4-1: 画布数据源报错/接口异常时，自动收集报错堆栈',
-      'AI4-2: RAG检索项目故障知识库，同类报错解决方案',
-      'AI4-3: Agent生成修复建议，前端弹窗展示；解决方案自动入库扩充知识库',
-    ],
-  },
-  {
-    id: 'ai5-openapi',
-    label: 'AI5 OpenAPI解析',
-    icon: '📄',
-    description: 'OpenAPI智能解析Agent',
-    features: [
-      'AI5-1: 用户导入OpenAPI文档，LangGraph解析接口信息',
-      'AI5-2: 自动生成数据源配置+画布列表页面，一键完成接口接入',
-    ],
+    value: 'fullstack',
+    label: '全栈项目',
+    description: '同时生成前后端完整项目',
+    icon: '🔄',
   },
 ]
 
-// 预设模板
 const presets = [
   { id: 'user-page', label: '用户管理页面', description: '创建带筛选分页的用户管理页，包含新增弹窗' },
   { id: 'product-list', label: '商品列表页面', description: '商品列表展示，支持搜索、筛选、排序功能' },
@@ -76,338 +58,389 @@ const presets = [
   { id: 'dashboard', label: '数据仪表盘', description: '数据统计仪表盘，包含图表和关键指标' },
 ]
 
+function buildFileTree(files: GeneratedFile[]): FileNode[] {
+  const root: FileNode = { name: '/', path: '', type: 'folder', children: [] }
+  
+  for (const file of files) {
+    const parts = file.path.split('/')
+    let current = root
+    
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i]
+      const isFile = i === parts.length - 1
+      
+      if (!current.children) current.children = []
+      
+      let child = current.children.find((c) => c.name === part)
+      
+      if (!child) {
+        child = {
+          name: part,
+          path: current.path ? `${current.path}/${part}` : part,
+          type: isFile ? 'file' : 'folder',
+          ...(isFile ? { content: file.content } : { children: [] }),
+        }
+        current.children.push(child)
+      }
+      
+      current = child
+    }
+  }
+  
+  return root.children || []
+}
+
+function FileTree({ files, onSelectFile, selectedPath }: { files: FileNode[]; onSelectFile: (path: string, content: string) => void; selectedPath?: string }) {
+  const renderNode = (node: FileNode, depth: number = 0) => {
+    const isSelected = node.path === selectedPath
+    
+    return (
+      <div key={node.path}>
+        <div
+          className={`flex items-center gap-2 py-1 px-2 rounded cursor-pointer transition-colors ${
+            isSelected ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-700'
+          }`}
+          style={{ paddingLeft: `${depth * 16 + 8}px` }}
+          onClick={() => {
+            if (node.type === 'file') {
+              onSelectFile(node.path, node.content || '')
+            }
+          }}
+        >
+          <span className="text-sm">
+            {node.type === 'folder' ? '📁' : getFileIcon(node.name)}
+          </span>
+          <span className="text-sm truncate">{node.name}</span>
+        </div>
+        {node.type === 'folder' && node.children?.map((child) => renderNode(child, depth + 1))}
+      </div>
+    )
+  }
+  
+  return <div className="space-y-0">{files.map(renderNode)}</div>
+}
+
+function getFileIcon(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase()
+  const icons: Record<string, string> = {
+    ts: '📄',
+    tsx: '📘',
+    js: '📜',
+    jsx: '📗',
+    css: '🎨',
+    scss: '🎨',
+    html: '🌐',
+    json: '📋',
+    sql: '🗄️',
+    md: '📝',
+    env: '🔧',
+  }
+  return icons[ext || ''] || '📄'
+}
+
+function CodePreview({ content, fileName }: { content: string; fileName?: string }) {
+  const getLanguage = (name?: string) => {
+    const ext = name?.split('.').pop()?.toLowerCase()
+    const langMap: Record<string, string> = {
+      ts: 'typescript',
+      tsx: 'typescript',
+      js: 'javascript',
+      jsx: 'javascript',
+      css: 'css',
+      html: 'html',
+      json: 'json',
+      sql: 'sql',
+    }
+    return langMap[ext || ''] || 'typescript'
+  }
+  
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+        <span className="text-sm text-gray-300 truncate">{fileName}</span>
+        <span className="text-xs text-gray-500">{getLanguage(fileName)}</span>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <pre className="p-4 text-sm text-gray-300 whitespace-pre-wrap font-mono">
+          {content || '选择文件查看代码'}
+        </pre>
+      </div>
+    </div>
+  )
+}
+
 export default function AiCodegenPage() {
-  const [selectedAgent, setSelectedAgent] = useState('ai2-page-gen')
+  const [generationType, setGenerationType] = useState<'frontend' | 'backend' | 'fullstack'>('frontend')
   const [inputPrompt, setInputPrompt] = useState('')
-  const [generatedCode, setGeneratedCode] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [generatedResult, setGeneratedResult] = useState<GenerateCodeResponse | null>(null)
+  const [fileTree, setFileTree] = useState<FileNode[]>([])
+  const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null)
   const [copied, setCopied] = useState(false)
-  const [agentFeatures, setAgentFeatures] = useState<AgentFeature[]>([])
+  const [error, setError] = useState('')
   const [workflowSteps, setWorkflowSteps] = useState<string[]>([])
   const [currentStep, setCurrentStep] = useState(0)
+  const [enableRAG, setEnableRAG] = useState(false)
+  const [enableOptimization, setEnableOptimization] = useState(false)
 
-  // 初始化 Agent 功能状态
-  const initializeAgentFeatures = (agentId: string) => {
-    const agent = agentTypes.find((a) => a.id === agentId)
-    if (!agent) return
-
-    const features: AgentFeature[] = agent.features.map((feature, index) => ({
-      id: `${agentId}-feature-${index}`,
-      label: feature,
-      status: 'pending',
-    }))
-    setAgentFeatures(features)
-    setWorkflowSteps([])
-    setCurrentStep(0)
-  }
-
-  // 选择 Agent 时初始化
-  const handleAgentChange = (agentId: string) => {
-    setSelectedAgent(agentId)
-    initializeAgentFeatures(agentId)
-    setGeneratedCode('')
-  }
-
-  // 执行 Agent 工作流
-  const executeAgentWorkflow = async () => {
-    if (!inputPrompt.trim() || isGenerating) return
-
-    setIsGenerating(true)
-    setGeneratedCode('')
-
-    const selectedAgentData = agentTypes.find((a) => a.id === selectedAgent)
-    if (!selectedAgentData) return
-
-    // 模拟工作流执行
-    const workflow = [
-      '📋 解析用户需求...',
-      '🔍 检索相关知识库...',
-      '🧠 LLM 生成代码...',
+  const simulateWorkflow = useCallback(async () => {
+    const steps = [
+      '📋 解析需求 Schema...',
+      ...(enableRAG ? ['🔍 检索相关知识库...'] : []),
+      '🧠 生成代码文件...',
+      ...(enableOptimization ? ['✨ 优化代码结构...'] : []),
       '✅ 格式校验通过...',
       '📤 生成结果输出...',
     ]
-
-    setWorkflowSteps(workflow)
-
-    for (let i = 0; i < workflow.length; i++) {
+    setWorkflowSteps(steps)
+    
+    for (let i = 0; i < steps.length; i++) {
       setCurrentStep(i)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      await new Promise((resolve) => setTimeout(resolve, 600))
+    }
+    
+    setCurrentStep(steps.length)
+  }, [enableRAG, enableOptimization])
 
-      // 更新功能状态
-      if (i < agentFeatures.length) {
-        setAgentFeatures((prev) =>
-          prev.map((feature, index) =>
-            index === i ? { ...feature, status: 'processing' } : feature
-          )
-        )
+  const executeGeneration = useCallback(async () => {
+    if (!inputPrompt.trim() || isGenerating) return
+    
+    setIsGenerating(true)
+    setError('')
+    setGeneratedResult(null)
+    setFileTree([])
+    setSelectedFile(null)
+    
+    await simulateWorkflow()
+    
+    try {
+      const mockSchema = {
+        name: inputPrompt.trim(),
+        children: [
+          {
+            id: 'component_1',
+            type: 'Container',
+            props: { title: '主要内容区' },
+            children: [
+              {
+                id: 'component_2',
+                type: 'Card',
+                props: { title: '数据卡片' },
+                children: [
+                  {
+                    id: 'component_3',
+                    type: 'Text',
+                    props: { content: '这是一个自动生成的页面', tag: 'p' },
+                  },
+                ],
+              },
+              {
+                id: 'component_4',
+                type: 'Button',
+                props: { text: '点击按钮', type: 'primary' },
+              },
+            ],
+          },
+        ],
       }
-    }
-
-    // 完成所有功能
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    setAgentFeatures((prev) =>
-      prev.map((feature) => ({ ...feature, status: 'completed' }))
-    )
-
-    // 生成结果
-    const result = generateAgentResult(selectedAgent, inputPrompt)
-    setGeneratedCode(result)
-    setIsGenerating(false)
-  }
-
-  // 生成 Agent 结果
-  const generateAgentResult = (agentId: string, prompt: string): string => {
-    const cleanPrompt = prompt.trim()
-
-    switch (agentId) {
-      case 'ai2-page-gen':
-        return `// AI2 页面生成规划 Agent 执行结果
-// 需求: ${cleanPrompt}
-
-{
-  "canvasSchema": {
-    "id": "page_${Date.now()}",
-    "name": "${cleanPrompt}",
-    "version": "1.0.0",
-    "components": [
-      {
-        "id": "search-bar",
-        "type": "SearchBar",
-        "props": {
-          "placeholder": "搜索...",
-          "filters": ["name", "email", "status"]
+      
+      const response = await codegenApi.generateCode(
+        mockSchema,
+        generationType,
+        'react',
+        undefined,
+        enableRAG,
+        enableOptimization
+      )
+      
+      if (response.success) {
+        setGeneratedResult(response)
+        const tree = buildFileTree(response.files)
+        setFileTree(tree)
+        
+        if (response.files.length > 0) {
+          setSelectedFile({
+            path: response.files[0].path,
+            content: response.files[0].content,
+          })
         }
-      },
-      {
-        "id": "data-table",
-        "type": "DataTable",
-        "props": {
-          "dataSource": "/api/users",
-          "columns": [
-            { "key": "id", "title": "ID", "width": 80 },
-            { "key": "name", "title": "姓名", "width": 120 },
-            { "key": "email", "title": "邮箱", "width": 200 },
-            { "key": "status", "title": "状态", "width": 100 },
-            { "key": "createdAt", "title": "创建时间", "width": 180 }
-          ],
-          "pagination": {
-            "pageSize": 20,
-            "showSizeChanger": true
-          }
-        }
-      },
-      {
-        "id": "add-modal",
-        "type": "Modal",
-        "props": {
-          "title": "新增用户",
-          "form": {
-            "fields": [
-              { "name": "name", "label": "姓名", "required": true },
-              { "name": "email", "label": "邮箱", "required": true },
-              { "name": "phone", "label": "电话" }
-            ]
-          }
-        }
+      } else {
+        setError(response.error || '代码生成失败')
       }
-    ],
-    "layout": {
-      "type": "vertical",
-      "spacing": 16
+    } catch (err: any) {
+      console.error('Code generation failed:', err)
+      setError(err.message || '代码生成失败，请检查后端服务')
+    } finally {
+      setIsGenerating(false)
     }
-  },
-  "metadata": {
-    "generatedAt": new Date().toISOString(),
-    "agent": "AI2-Page-Gen",
-    "workflowSteps": ${workflowSteps.length}
-  }
-}`
+  }, [inputPrompt, generationType, isGenerating, simulateWorkflow])
 
-      case 'ai3-tool-call':
-        return `// AI3 工具调用 Agent 执行结果
-// 需求: ${cleanPrompt}
-
-=== 工具1: SQL_DDL ===
-✅ 已生成建表语句并执行
-
-CREATE TABLE IF NOT EXISTS \`users\` (
-  \`id\` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  \`name\` VARCHAR(255) NOT NULL COMMENT '姓名',
-  \`email\` VARCHAR(255) UNIQUE COMMENT '邮箱',
-  \`phone\` VARCHAR(20) COMMENT '电话',
-  \`status\` TINYINT DEFAULT 1 COMMENT '状态',
-  \`created_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  \`updated_at\` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (\`id\`),
-  INDEX \`idx_email\` (\`email\`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-=== 工具2: Nest_Crud ===
-✅ 已生成 CRUD 接口
-
-- POST /api/users - 创建用户
-- GET /api/users - 获取用户列表
-- GET /api/users/:id - 获取用户详情
-- PUT /api/users/:id - 更新用户
-- DELETE /api/users/:id - 删除用户
-
-=== 工具3: Http_Test ===
-✅ 接口测试通过
-
-GET /api/users - Status: 200 OK
-Response time: 45ms
-
-=== 数据源配置 ===
-✅ 已自动配置数据源并绑定组件
-DataSource ID: ds_${Date.now()}`
-
-      case 'ai4-error-fix':
-        return `// AI4 智能排错 Agent 执行结果
-// 需求: ${cleanPrompt}
-
-=== 错误分析 ===
-❌ 原始错误:
-TypeError: Cannot read property 'data' of undefined
-  at DataTable.render (components/DataTable.tsx:45:12)
-
-=== 根因分析 ===
-🔍 问题定位:
-- 组件在数据未加载完成时尝试访问 undefined.data
-- 缺少空值检查和加载状态处理
-
-=== RAG 检索结果 ===
-📚 知识库匹配:
-找到 3 个相似问题解决方案
-- 方案1: 添加可选链操作符 (?.)
-- 方案2: 使用默认值 (|| [])
-- 方案3: 添加加载状态判断
-
-=== 修复建议 ===
-✅ 推荐修复方案:
-
-// 修改前
-const { data } = useQuery(['users'], fetchUsers)
-return <Table data={data.rows} />
-
-// 修改后
-const { data, isLoading } = useQuery(['users'], fetchUsers)
-if (isLoading) return <Loading />
-return <Table data={data?.rows || []} />
-
-=== 知识库更新 ===
-✅ 解决方案已自动入库
-Knowledge ID: kb_${Date.now()}`
-
-      case 'ai5-openapi':
-        return `// AI5 OpenAPI 解析 Agent 执行结果
-// 需求: ${cleanPrompt}
-
-=== OpenAPI 文档解析 ===
-✅ 成功解析接口文档
-- 总接口数: 12
-- GET 接口: 8
-- POST 接口: 3
-- PUT 接口: 1
-
-=== 数据源配置 ===
-✅ 已生成数据源配置
-
-{
-  "id": "ds_openapi_${Date.now()}",
-  "name": "OpenAPI 数据源",
-  "type": "rest",
-  "baseUrl": "https://api.example.com",
-  "headers": {
-    "Authorization": "Bearer {{token}}"
-  },
-  "endpoints": [
-    {
-      "id": "get-users",
-      "method": "GET",
-      "path": "/users",
-      "description": "获取用户列表"
-    },
-    {
-      "id": "create-user",
-      "method": "POST",
-      "path": "/users",
-      "description": "创建用户"
+  const downloadCode = useCallback(async () => {
+    if (!generatedResult) return
+    
+    try {
+      const mockSchema = {
+        name: inputPrompt.trim(),
+        children: [],
+      }
+      
+      const blob = await codegenApi.downloadCode(
+        mockSchema,
+        generationType,
+        'react'
+      )
+      
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${generationType}-project.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      console.error('Download failed:', err)
+      setError(err.message || '下载失败')
     }
-  ]
-}
+  }, [generatedResult, inputPrompt, generationType])
 
-=== 画布页面生成 ===
-✅ 已生成用户列表页面
-
-Page ID: page_${Date.now()}
-Components: [SearchBar, DataTable, AddModal, EditModal]
-Layout: Vertical Layout
-
-=== 接入完成 ===
-🎉 一键完成接口接入！
-- 数据源配置: ✅
-- 页面生成: ✅
-- 组件绑定: ✅`
-
-      default:
-        return `// 代码生成结果
-// 需求: ${cleanPrompt}
-
-// AI 已根据您的需求生成相应代码
-// 请查看具体实现细节`
-    }
-  }
-
-  // 复制代码
-  const copyCode = async () => {
-    if (!generatedCode) return
-    await navigator.clipboard.writeText(generatedCode)
+  const copyCode = useCallback(async () => {
+    if (!selectedFile?.content) return
+    await navigator.clipboard.writeText(selectedFile.content)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }
+  }, [selectedFile])
 
-  // 使用预设
+  const saveCode = useCallback(async () => {
+    if (!selectedFile?.content) return
+    
+    try {
+      const fileName = selectedFile.path.split('/').pop() || 'code.ts'
+      
+      if ('showSaveFilePicker' in window) {
+        const handle = await window.showSaveFilePicker!({
+          suggestedName: fileName,
+          types: [
+            {
+              description: '代码文件',
+              accept: {
+                'text/typescript': ['.ts', '.tsx'],
+                'text/javascript': ['.js', '.jsx'],
+                'text/css': ['.css'],
+                'text/html': ['.html'],
+                'application/json': ['.json'],
+                'text/plain': ['.txt'],
+              },
+            },
+          ],
+        })
+        
+        const writable = await handle.createWritable()
+        await writable.write(selectedFile.content)
+        await writable.close()
+      } else {
+        const blob = new Blob([selectedFile.content], { type: 'text/plain' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = fileName
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.error('Save failed:', err)
+        setError(err.message || '保存失败')
+      }
+    }
+  }, [selectedFile])
+
   const applyPreset = (preset: typeof presets[0]) => {
     setInputPrompt(preset.description)
   }
 
-  // 获取当前选中的 Agent
-  const currentAgent = agentTypes.find((a) => a.id === selectedAgent)
+  const handleSelectFile = (path: string, content: string) => {
+    setSelectedFile({ path, content })
+  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* 页面标题 */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">💻 AI 代码生成 Agent</h1>
-          <p className="text-gray-500 mt-1">LangGraph 智能工作流，自动化代码生成</p>
+          <h1 className="text-2xl font-bold text-gray-800">💻 AI 代码生成</h1>
+          <p className="text-gray-500 mt-1">基于 AI 的自动化代码生成，支持前后端全栈项目</p>
         </div>
+        {generatedResult && (
+          <button
+            onClick={downloadCode}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <span>📥</span>
+            <span>下载项目 (.zip)</span>
+          </button>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 左侧：Agent 选择和输入 */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Agent 选择 */}
+      <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        {/* 左侧：输入和配置 */}
+        <div className="xl:col-span-1 space-y-6">
+          {/* 生成类型选择 */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">🤖 选择 Agent</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">🎯 生成类型</h3>
             <div className="space-y-3">
-              {agentTypes.map((agent) => (
+              {generationTypes.map((type) => (
                 <button
-                  key={agent.id}
-                  onClick={() => handleAgentChange(agent.id)}
+                  key={type.value}
+                  onClick={() => setGenerationType(type.value)}
                   className={`w-full text-left p-4 rounded-lg transition-all ${
-                    selectedAgent === agent.id
+                    generationType === type.value
                       ? 'bg-blue-50 border-2 border-blue-500'
                       : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
                   }`}
                 >
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">{agent.icon}</span>
-                    <span className="font-medium text-gray-800">{agent.label}</span>
+                    <span className="text-xl">{type.icon}</span>
+                    <span className="font-medium text-gray-800">{type.label}</span>
                   </div>
-                  <p className="text-sm text-gray-600">{agent.description}</p>
+                  <p className="text-sm text-gray-600">{type.description}</p>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* 增强选项 */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">⚡ 增强选项</h3>
+            <div className="space-y-4">
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <div className="font-medium text-gray-800">启用 RAG 检索</div>
+                  <div className="text-sm text-gray-500">基于知识库检索编码规范和代码片段</div>
+                </div>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={enableRAG}
+                    onChange={(e) => setEnableRAG(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </div>
+              </label>
+
+              <label className="flex items-center justify-between cursor-pointer">
+                <div>
+                  <div className="font-medium text-gray-800">启用代码优化</div>
+                  <div className="text-sm text-gray-500">使用 AI 自动优化代码结构和质量</div>
+                </div>
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    checked={enableOptimization}
+                    onChange={(e) => setEnableOptimization(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </div>
+              </label>
             </div>
           </div>
 
@@ -425,36 +458,6 @@ Layout: Vertical Layout
                   <div className="text-sm text-gray-500 mt-1">{preset.description}</div>
                 </button>
               ))}
-            </div>
-          </div>
-        </div>
-
-        {/* 中间：输入和工作流 */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Agent 功能列表 */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">⚡ Agent 功能</h3>
-            <div className="space-y-3">
-              {currentAgent?.features.map((feature, index) => {
-                const featureStatus = agentFeatures[index]?.status || 'pending'
-                return (
-                  <div
-                    key={index}
-                    className={`flex items-start gap-3 p-3 rounded-lg ${
-                      featureStatus === 'completed'
-                        ? 'bg-green-50 border border-green-200'
-                        : featureStatus === 'processing'
-                        ? 'bg-blue-50 border border-blue-200'
-                        : 'bg-gray-50 border border-gray-200'
-                    }`}
-                  >
-                    <span className="mt-0.5">
-                      {featureStatus === 'completed' ? '✅' : featureStatus === 'processing' ? '⏳' : '⭕'}
-                    </span>
-                    <span className="text-sm text-gray-700">{feature}</span>
-                  </div>
-                )
-              })}
             </div>
           </div>
 
@@ -481,19 +484,27 @@ Layout: Vertical Layout
               </div>
             </div>
           )}
+        </div>
 
+        {/* 中间：输入和结果统计 */}
+        <div className="xl:col-span-1 space-y-6">
           {/* 输入区域 */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">✍️ 需求描述</h3>
             <textarea
               value={inputPrompt}
               onChange={(e) => setInputPrompt(e.target.value)}
-              placeholder="请描述您的需求，Agent 将自动执行工作流..."
+              placeholder="请描述您的页面需求...&#10;&#10;例如：创建一个用户管理页面，包含搜索框、数据表格和新增按钮"
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
-              rows={4}
+              rows={6}
             />
+            {error && (
+              <div className="mt-3 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
+                ❌ {error}
+              </div>
+            )}
             <button
-              onClick={executeAgentWorkflow}
+              onClick={executeGeneration}
               disabled={isGenerating || !inputPrompt.trim()}
               className={`w-full mt-4 px-6 py-3 rounded-xl font-medium transition-colors ${
                 isGenerating || !inputPrompt.trim()
@@ -504,82 +515,137 @@ Layout: Vertical Layout
               {isGenerating ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="animate-spin">⏳</span>
-                  执行中...
+                  生成中...
                 </span>
               ) : (
-                <span>🚀 执行 Agent</span>
+                <span>🚀 生成代码</span>
               )}
             </button>
           </div>
-        </div>
 
-        {/* 右侧：结果输出 */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 h-full">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">📤 执行结果</h3>
-              <button
-                onClick={copyCode}
-                disabled={!generatedCode}
-                className={`px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-2 ${
-                  generatedCode
-                    ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                }`}
-              >
-                {copied ? (
-                  <span className="flex items-center gap-1">
-                    <span>✓</span>
-                    <span>已复制</span>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    <span>📋</span>
-                    <span>复制</span>
-                  </span>
-                )}
-              </button>
-            </div>
-
-            {/* 结果显示区域 */}
-            <div className="bg-gray-900 rounded-xl p-4 h-[600px] overflow-auto">
-              {generatedCode ? (
-                <pre className="text-sm text-gray-300 whitespace-pre-wrap">
-                  <code>{generatedCode}</code>
-                </pre>
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-500">
-                  <div className="text-center">
-                    <div className="text-4xl mb-3">🤖</div>
-                    <p>选择 Agent 并输入需求描述</p>
-                    <p className="text-sm mt-1">Agent 将自动执行工作流</p>
-                  </div>
+          {/* 生成结果统计 */}
+          {generatedResult && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">📊 生成统计</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-600">{generatedResult.fileCount}</div>
+                  <div className="text-sm text-gray-600">文件数量</div>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-green-600">{generatedResult.duration}ms</div>
+                  <div className="text-sm text-gray-600">生成耗时</div>
+                </div>
+              </div>
+              {(generatedResult.ragRetrievalTime !== undefined || generatedResult.optimizedFiles !== undefined) && (
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  {generatedResult.ragRetrievalTime !== undefined && (
+                    <div className="bg-purple-50 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-purple-600">{generatedResult.ragRetrievalTime}ms</div>
+                      <div className="text-sm text-gray-600">RAG 检索</div>
+                    </div>
+                  )}
+                  {generatedResult.optimizedFiles !== undefined && (
+                    <div className="bg-orange-50 rounded-lg p-4 text-center">
+                      <div className="text-2xl font-bold text-orange-600">{generatedResult.optimizedFiles}</div>
+                      <div className="text-sm text-gray-600">优化文件</div>
+                    </div>
+                  )}
                 </div>
               )}
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <div className="text-sm text-gray-700">
+                  <span className="font-medium">会话 ID:</span> {generatedResult.sessionId.slice(0, 8)}...
+                </div>
+              </div>
             </div>
+          )}
+
+          {/* 使用说明 */}
+          <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+            <h3 className="text-lg font-semibold text-blue-800 mb-3">📖 使用说明</h3>
+            <ul className="space-y-2 text-sm text-blue-700">
+              <li>• 选择生成类型（前端/后端/全栈）</li>
+              <li>• 可选启用 RAG 检索和代码优化</li>
+              <li>• 输入需求描述或选择预设模板</li>
+              <li>• 点击生成代码按钮</li>
+              <li>• 在右侧查看生成的文件和代码</li>
+              <li>• 点击下载按钮获取完整项目包</li>
+            </ul>
           </div>
         </div>
-      </div>
 
-      {/* 使用说明 */}
-      <div className="mt-6 bg-blue-50 rounded-xl p-6 border border-blue-100">
-        <h3 className="text-lg font-semibold text-blue-800 mb-3">📖 Agent 说明</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm text-blue-700">
-          <div>
-            <strong className="block mb-1">🎯 AI2 页面生成</strong>
-            <p>自然语言描述 → 自动生成完整页面配置</p>
-          </div>
-          <div>
-            <strong className="block mb-1">🔧 AI3 工具调用</strong>
-            <p>自动建表 + 生成接口 + 绑定数据源</p>
-          </div>
-          <div>
-            <strong className="block mb-1">🔍 AI4 智能排错</strong>
-            <p>自动分析错误 + 提供修复方案</p>
-          </div>
-          <div>
-            <strong className="block mb-1">📄 AI5 OpenAPI</strong>
-            <p>一键解析 API 文档 + 生成页面</p>
+        {/* 右侧：文件树和代码预览 */}
+        <div className="xl:col-span-2">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 h-[calc(100vh-180px)] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">📁 项目文件</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={copyCode}
+                  disabled={!selectedFile}
+                  className={`px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-2 ${
+                    selectedFile
+                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {copied ? (
+                    <span className="flex items-center gap-1">
+                      <span>✓</span>
+                      <span>已复制</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <span>📋</span>
+                      <span>复制代码</span>
+                    </span>
+                  )}
+                </button>
+                <button
+                  onClick={saveCode}
+                  disabled={!selectedFile}
+                  className={`px-3 py-1.5 rounded-lg text-sm transition-colors flex items-center gap-2 ${
+                    selectedFile
+                      ? 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  <span className="flex items-center gap-1">
+                    <span>💾</span>
+                    <span>另存为</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 flex gap-4 overflow-hidden">
+              {/* 文件树 */}
+              <div className="w-64 border-r border-gray-200 overflow-auto">
+                {fileTree.length > 0 ? (
+                  <FileTree
+                    files={fileTree}
+                    onSelectFile={handleSelectFile}
+                    selectedPath={selectedFile?.path}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <div className="text-4xl mb-3">📁</div>
+                      <p>生成代码后查看文件</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 代码预览 */}
+              <div className="flex-1 bg-gray-900 rounded-xl overflow-hidden">
+                <CodePreview
+                  content={selectedFile?.content || ''}
+                  fileName={selectedFile?.path}
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

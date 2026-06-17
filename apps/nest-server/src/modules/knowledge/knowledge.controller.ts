@@ -1,12 +1,13 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Put, 
-  Delete, 
-  Body, 
-  Param, 
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
   ParseIntPipe,
+  DefaultValuePipe,
   Query,
   UseInterceptors,
   UploadedFile,
@@ -15,11 +16,11 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes, ApiBody, ApiParam } from '@nestjs/swagger'
 import { KnowledgeService } from './knowledge.service'
-import { 
-  CreateKnowledgeBaseDto, 
-  UpdateKnowledgeBaseDto, 
-  UploadDocumentDto, 
-  SearchKnowledgeDto
+import {
+  CreateKnowledgeBaseDto,
+  UpdateKnowledgeBaseDto,
+  UploadDocumentDto,
+  SearchKnowledgeDto,
 } from './dto/knowledge.dto'
 
 /**
@@ -28,7 +29,7 @@ import {
  */
 @ApiTags('知识库')
 @ApiBearerAuth('JWT-auth')
-@Controller('knowledge')
+@Controller('api/knowledge')
 export class KnowledgeController {
   constructor(private readonly knowledgeService: KnowledgeService) {}
 
@@ -97,22 +98,31 @@ export class KnowledgeController {
   })
   @UseInterceptors(FileInterceptor('file'))
   async uploadDocumentFile(
-    @Body('knowledgeBaseId') knowledgeBaseId: string,
-    @Body('type') type: string,
+    @Body() body: any,
     @UploadedFile() file: any
   ) {
     if (!file) {
       throw new BadRequestException('文件不能为空')
     }
 
+    const knowledgeBaseId = parseInt(body.knowledgeBaseId)
+    const type = body.type
     const content = file.buffer.toString('utf-8')
     const name = file.originalname
 
+    if (!knowledgeBaseId) {
+      throw new BadRequestException('知识库ID不能为空')
+    }
+
+    if (!type) {
+      throw new BadRequestException('文档类型不能为空')
+    }
+
     return this.knowledgeService.uploadDocument({
-      knowledgeBaseId: parseInt(knowledgeBaseId),
+      knowledgeBaseId,
       name,
       content,
-      type: type as any,
+      type,
     })
   }
 
@@ -152,13 +162,13 @@ export class KnowledgeController {
   @ApiResponse({ status: 200, description: '查询成功' })
   async getDocumentChunks(
     @Param('documentId', ParseIntPipe) documentId: number,
-    @Query('page') page?: number,
-    @Query('pageSize') pageSize?: number
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('pageSize', new DefaultValuePipe(10), ParseIntPipe) pageSize: number,
   ) {
     return this.knowledgeService.getDocumentChunks({
       documentId,
-      page: page || 1,
-      pageSize: pageSize || 10,
+      page,
+      pageSize,
     })
   }
 

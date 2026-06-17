@@ -21,6 +21,13 @@ export class UserService {
    * @param id 用户ID
    * @returns 用户信息（不含密码）
    */
+  async findAll(): Promise<Omit<User, 'password'>[]> {
+    const users = await this.userRepository.find({
+      order: { createdAt: 'DESC' },
+    })
+    return users.map(({ password, ...user }) => user)
+  }
+
   async findById(id: number): Promise<Omit<User, 'password'>> {
     const user = await this.userRepository.findOne({ where: { id } })
     if (!user) {
@@ -66,5 +73,24 @@ export class UserService {
 
     await this.userRepository.remove(user)
     return { message: '删除成功' }
+  }
+
+  /**
+   * 创建用户
+   * @param username 用户名
+   * @param password 密码
+   * @param email 邮箱
+   * @returns 创建后的用户信息（不含密码）
+   */
+  async create(username: string, password: string, email: string): Promise<Omit<User, 'password'>> {
+    const hashedPassword = await bcrypt.hash(password, 10)
+    const user = this.userRepository.create({
+      username,
+      password: hashedPassword,
+      email,
+    })
+    await this.userRepository.save(user)
+    const { password: _, ...result } = user
+    return result
   }
 }

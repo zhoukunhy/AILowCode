@@ -1,118 +1,53 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { RefreshCw } from 'lucide-react'
 
-// 权限类型
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return { 'Content-Type': 'application/json' }
+  const token = localStorage.getItem('token')
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+}
+
 interface Permission {
-  id: string
+  id: number
   name: string
-  key: string
-  description: string
-  category: string
+  code: string
+  type: string
+  description?: string
+  category?: string
+  parentId?: number
+  path?: string
+  method?: string
 }
 
-// 角色类型
 interface Role {
-  id: string
+  id: number
   name: string
-  key: string
-  description: string
-  color: string
-  userCount: number
-  permissions: string[]
+  code: string
+  description?: string
+  status: string
+  isSystem: boolean
+  permissions: Permission[]
+  menus?: any[]
+  createdAt: string
+  updatedAt: string
 }
 
-// 权限列表
-const allPermissions: Permission[] = [
-  // 用户权限
-  { id: '1', name: '查看用户', key: 'user:view', description: '查看用户列表', category: '用户管理' },
-  { id: '2', name: '创建用户', key: 'user:create', description: '创建新用户', category: '用户管理' },
-  { id: '3', name: '编辑用户', key: 'user:edit', description: '编辑用户信息', category: '用户管理' },
-  { id: '4', name: '删除用户', key: 'user:delete', description: '删除用户', category: '用户管理' },
-  
-  // 角色权限
-  { id: '5', name: '查看角色', key: 'role:view', description: '查看角色列表', category: '角色权限' },
-  { id: '6', name: '创建角色', key: 'role:create', description: '创建新角色', category: '角色权限' },
-  { id: '7', name: '编辑角色', key: 'role:edit', description: '编辑角色信息', category: '角色权限' },
-  { id: '8', name: '删除角色', key: 'role:delete', description: '删除角色', category: '角色权限' },
-  
-  // 项目权限
-  { id: '9', name: '查看项目', key: 'project:view', description: '查看项目列表', category: '项目管理' },
-  { id: '10', name: '创建项目', key: 'project:create', description: '创建新项目', category: '项目管理' },
-  { id: '11', name: '编辑项目', key: 'project:edit', description: '编辑项目信息', category: '项目管理' },
-  { id: '12', name: '删除项目', key: 'project:delete', description: '删除项目', category: '项目管理' },
-  { id: '13', name: '导出项目', key: 'project:export', description: '导出项目代码', category: '项目管理' },
-  
-  // 知识库权限
-  { id: '14', name: '查看知识库', key: 'knowledge:view', description: '查看知识库', category: '知识库' },
-  { id: '15', name: '上传文档', key: 'knowledge:upload', description: '上传文档', category: '知识库' },
-  { id: '16', name: '删除文档', key: 'knowledge:delete', description: '删除文档', category: '知识库' },
-  
-  // AI 权限
-  { id: '17', name: '使用 AI 生成', key: 'ai:generate', description: '使用 AI 代码生成', category: 'AI 功能' },
-  { id: '18', name: '使用 AI 优化', key: 'ai:optimize', description: '使用 AI 代码优化', category: 'AI 功能' },
-  { id: '19', name: '使用 AI 重构', key: 'ai:refactor', description: '使用 AI 代码重构', category: 'AI 功能' },
-  { id: '20', name: '管理 AI 配置', key: 'ai:config', description: '管理 AI 配置', category: 'AI 功能' },
-  
-  // 系统权限
-  { id: '21', name: '系统设置', key: 'system:config', description: '系统设置', category: '系统' },
-  { id: '22', name: '查看日志', key: 'system:log', description: '查看系统日志', category: '系统' },
-]
+const categoryColors: Record<string, string> = {
+  '用户管理': 'bg-blue-100 text-blue-700',
+  '角色权限': 'bg-purple-100 text-purple-700',
+  '项目管理': 'bg-green-100 text-green-700',
+  '知识库': 'bg-yellow-100 text-yellow-700',
+  'AI 功能': 'bg-pink-100 text-pink-700',
+  '系统': 'bg-gray-100 text-gray-700',
+}
 
-// 模拟角色数据
-const mockRoles: Role[] = [
-  {
-    id: '1',
-    name: '超级管理员',
-    key: 'super_admin',
-    description: '拥有系统所有权限',
-    color: 'red',
-    userCount: 2,
-    permissions: allPermissions.map((p) => p.key),
-  },
-  {
-    id: '2',
-    name: '管理员',
-    key: 'admin',
-    description: '拥有大部分管理权限',
-    color: 'purple',
-    userCount: 5,
-    permissions: [
-      'user:view', 'user:create', 'user:edit',
-      'role:view',
-      'project:view', 'project:create', 'project:edit', 'project:delete',
-      'knowledge:view', 'knowledge:upload', 'knowledge:delete',
-      'ai:generate', 'ai:optimize', 'ai:refactor',
-    ],
-  },
-  {
-    id: '3',
-    name: '普通用户',
-    key: 'user',
-    description: '可以使用大部分功能',
-    color: 'blue',
-    userCount: 128,
-    permissions: [
-      'project:view', 'project:create', 'project:edit',
-      'knowledge:view',
-      'ai:generate', 'ai:optimize', 'ai:refactor',
-    ],
-  },
-  {
-    id: '4',
-    name: '访客',
-    key: 'guest',
-    description: '只有查看权限',
-    color: 'gray',
-    userCount: 15,
-    permissions: [
-      'project:view',
-      'knowledge:view',
-    ],
-  },
-]
-
-// 权限分类
 const permissionCategories = [
   '用户管理',
   '角色权限',
@@ -122,146 +57,264 @@ const permissionCategories = [
   '系统',
 ]
 
-// 角色颜色映射
-const getRoleColor = (color: string) => {
-  switch (color) {
-    case 'red':
-      return 'bg-red-100 text-red-700 border-red-200'
-    case 'purple':
-      return 'bg-purple-100 text-purple-700 border-purple-200'
-    case 'blue':
-      return 'bg-blue-100 text-blue-700 border-blue-200'
-    case 'gray':
-      return 'bg-gray-100 text-gray-700 border-gray-200'
-    default:
-      return 'bg-gray-100 text-gray-700 border-gray-200'
+async function fetchRoles(): Promise<Role[]> {
+  const res = await fetch(`${API_BASE}/roles`, { headers: getAuthHeaders() })
+  const data = await res.json()
+  return data.data || []
+}
+
+async function fetchPermissions(): Promise<Permission[]> {
+  const res = await fetch(`${API_BASE}/roles/permissions/tree`, { headers: getAuthHeaders() })
+  const data = await res.json()
+  return flattenPermissions(data.data || [])
+}
+
+function flattenPermissions(permissions: any[]): Permission[] {
+  const result: Permission[] = []
+  for (const p of permissions) {
+    result.push({
+      id: p.id,
+      name: p.name,
+      code: p.code,
+      type: p.type,
+      description: p.description,
+      category: p.category,
+      parentId: p.parentId,
+    })
+    if (p.children && p.children.length > 0) {
+      result.push(...flattenPermissions(p.children))
+    }
   }
+  return result
+}
+
+async function createRole(name: string, code: string, description: string): Promise<Role> {
+  const res = await fetch(`${API_BASE}/roles`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ name, code, description }),
+  })
+  const data = await res.json()
+  return data.data || data
+}
+
+async function assignPermissions(roleId: number, permissionIds: number[]): Promise<void> {
+  await fetch(`${API_BASE}/roles/${roleId}/permissions`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ permissionIds }),
+  })
+}
+
+async function deleteRole(id: number): Promise<void> {
+  await fetch(`${API_BASE}/roles/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+}
+
+function getRoleColor(color: string): string {
+  const colors: Record<string, string> = {
+    red: 'bg-red-100 text-red-700 border-red-200',
+    purple: 'bg-purple-100 text-purple-700 border-purple-200',
+    blue: 'bg-blue-100 text-blue-700 border-blue-200',
+    green: 'bg-green-100 text-green-700 border-green-200',
+    yellow: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+    gray: 'bg-gray-100 text-gray-700 border-gray-200',
+  }
+  return colors[color] || colors.blue
+}
+
+function getRoleEmoji(color: string): string {
+  const emojis: Record<string, string> = {
+    red: '👑',
+    purple: '⭐',
+    blue: '👤',
+    green: '👤',
+    yellow: '👤',
+    gray: '👁️',
+  }
+  return emojis[color] || '👤'
+}
+
+function getRoleColorFromCode(code: string): string {
+  if (code.includes('super')) return 'red'
+  if (code.includes('admin')) return 'purple'
+  if (code.includes('user')) return 'blue'
+  return 'gray'
 }
 
 export default function RolesPage() {
-  const [roles, setRoles] = useState<Role[]>(mockRoles)
+  const [roles, setRoles] = useState<Role[]>([])
+  const [allPermissions, setAllPermissions] = useState<Permission[]>([])
   const [selectedRole, setSelectedRole] = useState<Role | null>(null)
   const [showRoleModal, setShowRoleModal] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<string[]>(permissionCategories)
 
-  // 切换分类展开/收起
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [rolesData, permsData] = await Promise.all([fetchRoles(), fetchPermissions()])
+      setRoles(rolesData)
+      setAllPermissions(permsData)
+    } catch (error) {
+      console.error('加载数据失败:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((c) => c !== category)
-        : [...prev, category]
+      prev.includes(category) ? prev.filter((c) => c !== category) : [...prev, category]
     )
   }
 
-  // 切换角色权限
-  const togglePermission = (permissionKey: string) => {
+  const togglePermission = async (permissionId: number) => {
     if (!selectedRole) return
-    setRoles((prev) =>
-      prev.map((role) => {
-        if (role.id !== selectedRole.id) return role
-        const hasPermission = role.permissions.includes(permissionKey)
-        return {
-          ...role,
-          permissions: hasPermission
-            ? role.permissions.filter((p) => p !== permissionKey)
-            : [...role.permissions, permissionKey],
-        }
-      })
+    const hasPerm = selectedRole.permissions.some((p) => p.id === permissionId)
+    const newPerms = hasPerm
+      ? selectedRole.permissions.filter((p) => p.id !== permissionId)
+      : [...selectedRole.permissions, allPermissions.find((p) => p.id === permissionId)!]
+    
+    const updatedRole = { ...selectedRole, permissions: newPerms }
+    setSelectedRole(updatedRole)
+    setRoles((prev) => prev.map((r) => (r.id === selectedRole.id ? updatedRole : r)))
+  }
+
+  const handleSavePermissions = async () => {
+    if (!selectedRole) return
+    try {
+      setSaving(true)
+      const permissionIds = selectedRole.permissions.map((p) => p.id)
+      await assignPermissions(selectedRole.id, permissionIds)
+      await loadData()
+      alert('保存成功')
+    } catch (error) {
+      console.error('保存权限失败:', error)
+      alert('保存失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleCreateRole = async (name: string, code: string, description: string) => {
+    try {
+      setSaving(true)
+      await createRole(name, code, description)
+      await loadData()
+      setShowRoleModal(false)
+    } catch (error) {
+      console.error('创建角色失败:', error)
+      alert('创建失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDeleteRole = async (role: Role) => {
+    if (role.isSystem) {
+      alert('系统角色不能删除')
+      return
+    }
+    if (!confirm(`确定要删除角色 "${role.name}" 吗？`)) return
+    try {
+      await deleteRole(role.id)
+      if (selectedRole?.id === role.id) setSelectedRole(null)
+      await loadData()
+    } catch (error) {
+      console.error('删除角色失败:', error)
+      alert('删除失败')
+    }
+  }
+
+  const getPermissionsByCategory = (category: string) => {
+    return allPermissions.filter((p) => p.category === category)
+  }
+
+  const isPermissionChecked = (permissionId: number) => {
+    return selectedRole?.permissions.some((p) => p.id === permissionId) || false
+  }
+
+  const getCategoryPermissionCount = (category: string) => {
+    const categoryPerms = getPermissionsByCategory(category)
+    const checkedCount = categoryPerms.filter((p) => isPermissionChecked(p.id)).length
+    return `${checkedCount}/${categoryPerms.length}`
+  }
+
+  if (loading) {
+    return (
+      <div className="p-6 bg-gray-50 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-2" />
+          <p className="text-gray-500">加载中...</p>
+        </div>
+      </div>
     )
-    setSelectedRole((prev) => {
-      if (!prev) return null
-      const hasPermission = prev.permissions.includes(permissionKey)
-      return {
-        ...prev,
-        permissions: hasPermission
-          ? prev.permissions.filter((p) => p !== permissionKey)
-          : [...prev.permissions, permissionKey],
-      }
-    })
   }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* 页面标题 */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">角色权限管理</h1>
           <p className="text-gray-500 mt-1">管理系统角色和权限配置</p>
         </div>
-        <button
-          onClick={() => setShowRoleModal(true)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-        >
-          <span>➕</span>
-          <span>新建角色</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={loadData} className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">
+            <RefreshCw className="w-4 h-4" />
+          </button>
+          <button onClick={() => setShowRoleModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            新建角色
+          </button>
+        </div>
       </div>
 
-      {/* 角色卡片列表 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        {roles.map((role) => (
-          <div
-            key={role.id}
-            className={`bg-white rounded-xl shadow-sm border-2 p-6 cursor-pointer transition-all hover:shadow-md ${
-              selectedRole?.id === role.id
-                ? 'border-blue-500 ring-2 ring-blue-100'
-                : 'border-transparent'
-            }`}
-            onClick={() => setSelectedRole(role)}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div
-                className={`px-3 py-1 rounded-full text-sm font-medium border ${getRoleColor(
-                  role.color
-                )}`}
-              >
-                {role.name}
+        {roles.map((role) => {
+          const color = getRoleColorFromCode(role.code)
+          return (
+            <div
+              key={role.id}
+              className={`bg-white rounded-xl shadow-sm border-2 p-6 cursor-pointer transition-all hover:shadow-md ${
+                selectedRole?.id === role.id ? 'border-blue-500 ring-2 ring-blue-100' : 'border-transparent'
+              }`}
+              onClick={() => setSelectedRole(role)}
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className={`px-3 py-1 rounded-full text-sm font-medium border ${getRoleColor(color)}`}>
+                  {role.name}
+                </div>
+                <div className="text-2xl">{getRoleEmoji(color)}</div>
               </div>
-              <div className="text-2xl">
-                {role.color === 'red' && '👑'}
-                {role.color === 'purple' && '⭐'}
-                {role.color === 'blue' && '👤'}
-                {role.color === 'gray' && '👁️'}
+              <p className="text-sm text-gray-500 mb-4">{role.description || '暂无描述'}</p>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">
+                  <span className="font-medium text-gray-700">{role.isSystem ? '系统' : '自定义'}</span>
+                </span>
+                <span className="text-gray-500">
+                  <span className="font-medium text-gray-700">{role.permissions.length}</span> 项权限
+                </span>
               </div>
+              {!role.isSystem && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleDeleteRole(role); }}
+                  className="mt-3 text-xs text-red-500 hover:text-red-700"
+                >
+                  删除角色
+                </button>
+              )}
             </div>
-
-            <p className="text-sm text-gray-500 mb-4">{role.description}</p>
-
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">
-                <span className="font-medium text-gray-700">{role.userCount}</span> 个用户
-              </span>
-              <span className="text-gray-500">
-                <span className="font-medium text-gray-700">{role.permissions.length}</span> 项权限
-              </span>
-            </div>
-
-            {/* 权限预览 */}
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <div className="flex flex-wrap gap-1">
-                {role.permissions.slice(0, 4).map((permKey) => {
-                  const perm = allPermissions.find((p) => p.key === permKey)
-                  return (
-                    <span
-                      key={permKey}
-                      className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs"
-                    >
-                      {perm?.name || permKey}
-                    </span>
-                  )
-                })}
-                {role.permissions.length > 4 && (
-                  <span className="px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-xs">
-                    +{role.permissions.length - 4}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      {/* 权限配置面板 */}
       {selectedRole && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-6">
@@ -271,102 +324,59 @@ export default function RolesPage() {
                 勾选该角色拥有的权限，共 {selectedRole.permissions.length} 项权限
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex gap-2">
               <button
-                onClick={() => {
-                  setRoles((prev) =>
-                    prev.map((r) =>
-                      r.id === selectedRole.id
-                        ? { ...r, permissions: allPermissions.map((p) => p.key) }
-                        : r
-                    )
-                  )
-                  setSelectedRole((prev) =>
-                    prev ? { ...prev, permissions: allPermissions.map((p) => p.key) } : null
-                  )
-                }}
-                className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                onClick={() => setSelectedRole(null)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
               >
-                全选
+                取消
               </button>
               <button
-                onClick={() => {
-                  const defaultPerms = selectedRole.key === 'super_admin'
-                    ? allPermissions.map((p) => p.key)
-                    : selectedRole.key === 'guest'
-                    ? ['project:view', 'knowledge:view']
-                    : []
-                  setRoles((prev) =>
-                    prev.map((r) => (r.id === selectedRole.id ? { ...r, permissions: defaultPerms } : r))
-                  )
-                  setSelectedRole((prev) => (prev ? { ...prev, permissions: defaultPerms } : null))
-                }}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                onClick={handleSavePermissions}
+                disabled={saving}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
               >
-                清空
+                {saving && <RefreshCw className="w-4 h-4 animate-spin" />}
+                保存权限
               </button>
             </div>
           </div>
 
-          {/* 权限分类 */}
           <div className="space-y-4">
             {permissionCategories.map((category) => {
-              const categoryPermissions = allPermissions.filter((p) => p.category === category)
+              const categoryPerms = getPermissionsByCategory(category)
+              if (categoryPerms.length === 0) return null
               const isExpanded = expandedCategories.includes(category)
-              const checkedCount = categoryPermissions.filter((p) =>
-                selectedRole.permissions.includes(p.key)
-              ).length
-
               return (
-                <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
-                  {/* 分类标题 */}
+                <div key={category} className="border border-gray-200 rounded-lg">
                   <button
                     onClick={() => toggleCategory(category)}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors"
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50"
                   >
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium text-gray-800">{category}</span>
-                      <span className="text-sm text-gray-500">
-                        ({checkedCount}/{categoryPermissions.length})
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${categoryColors[category] || 'bg-gray-100 text-gray-700'}`}>
+                        {category}
                       </span>
+                      <span className="text-sm text-gray-500">{getCategoryPermissionCount(category)}</span>
                     </div>
-                    <span className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}>
-                      ▼
-                    </span>
+                    <span className={`transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}>▼</span>
                   </button>
-
-                  {/* 权限列表 */}
                   {isExpanded && (
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {categoryPermissions.map((permission) => {
-                        const isChecked = selectedRole.permissions.includes(permission.key)
-                        return (
-                          <label
-                            key={permission.id}
-                            className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                              isChecked
-                                ? 'border-blue-200 bg-blue-50'
-                                : 'border-gray-200 hover:bg-gray-50'
-                            }`}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => togglePermission(permission.key)}
-                              className="mt-1 w-4 h-4 text-blue-600 rounded"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-800">{permission.name}</p>
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                {permission.description}
-                              </p>
-                              <p className="text-xs text-gray-400 mt-0.5 font-mono">
-                                {permission.key}
-                              </p>
-                            </div>
-                          </label>
-                        )
-                      })}
+                    <div className="px-4 pb-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                      {categoryPerms.map((perm) => (
+                        <label key={perm.id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isPermissionChecked(perm.id)}
+                            onChange={() => togglePermission(perm.id)}
+                            className="w-4 h-4 text-blue-600 rounded"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-700 truncate">{perm.name}</div>
+                            <div className="text-xs text-gray-400 truncate">{perm.code}</div>
+                          </div>
+                        </label>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -376,66 +386,78 @@ export default function RolesPage() {
         </div>
       )}
 
-      {/* 空状态 */}
-      {!selectedRole && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
-          <div className="text-6xl mb-4">🔐</div>
-          <h3 className="text-lg font-medium text-gray-800 mb-2">选择要配置的角色</h3>
-          <p className="text-gray-500">点击上方的角色卡片开始配置权限</p>
-        </div>
-      )}
-
-      {/* 创建角色弹窗 */}
       {showRoleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md">
-            <h3 className="text-lg font-bold text-gray-800 mb-4">新建角色</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  角色名称
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="请输入角色名称"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  角色标识
-                </label>
-                <input
-                  type="text"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  placeholder="请输入角色标识（英文）"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  角色描述
-                </label>
-                <textarea
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
-                  rows={3}
-                  placeholder="请输入角色描述"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setShowRoleModal(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                取消
-              </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                创建
-              </button>
-            </div>
+        <CreateRoleModal onClose={() => setShowRoleModal(false)} onCreate={handleCreateRole} saving={saving} />
+      )}
+    </div>
+  )
+}
+
+interface CreateRoleModalProps {
+  onClose: () => void
+  onCreate: (name: string, code: string, description: string) => Promise<void>
+  saving: boolean
+}
+
+function CreateRoleModal({ onClose, onCreate, saving }: CreateRoleModalProps) {
+  const [name, setName] = useState('')
+  const [code, setCode] = useState('')
+  const [description, setDescription] = useState('')
+
+  const handleSubmit = async () => {
+    if (!name.trim() || !code.trim()) {
+      alert('请填写角色名称和代码')
+      return
+    }
+    await onCreate(name, code, description)
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-xl p-6 w-full max-w-md">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">新建角色</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">角色名称</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="如：运营管理员"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">角色代码</label>
+            <input
+              type="text"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toLowerCase().replace(/\s/g, '_'))}
+              placeholder="如：operator_admin"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">描述</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="角色描述（可选）"
+              rows={3}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+            />
           </div>
         </div>
-      )}
+        <div className="flex justify-end gap-3 mt-6">
+          <button onClick={onClose} disabled={saving} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50">
+            取消
+          </button>
+          <button onClick={handleSubmit} disabled={saving} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2">
+            {saving && <RefreshCw className="w-4 h-4 animate-spin" />}
+            {saving ? '创建中...' : '创建'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

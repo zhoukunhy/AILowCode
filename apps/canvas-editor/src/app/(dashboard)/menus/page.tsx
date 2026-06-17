@@ -8,13 +8,14 @@ interface MenuItem {
   name: string
   icon?: string
   path?: string
-  parentId?: string
+  parentId?: string | null
   sortOrder: number
   status: boolean
   description?: string
   pageId?: string
   createdAt: string
   updatedAt: string
+  children?: MenuItem[]
 }
 
 export default function MenuManagementPage() {
@@ -23,6 +24,7 @@ export default function MenuManagementPage() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingMenu, setEditingMenu] = useState<MenuItem | null>(null)
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [formData, setFormData] = useState({
     name: '',
     icon: '',
@@ -43,8 +45,9 @@ export default function MenuManagementPage() {
         },
       })
       if (response.ok) {
-        const data = await response.json()
-        setMenus(data)
+        const result = await response.json()
+        const menuList = result.data || []
+        setMenus(buildMenuTree(menuList))
       }
     } catch (error) {
       console.error('获取菜单列表失败:', error)
@@ -53,17 +56,56 @@ export default function MenuManagementPage() {
     }
   }
 
+  const buildMenuTree = (menuList: MenuItem[]): MenuItem[] => {
+    const menuMap = new Map<string, MenuItem>()
+    const rootMenus: MenuItem[] = []
+
+    for (const menu of menuList) {
+      menuMap.set(menu.id, { ...menu, children: [] })
+    }
+
+    for (const menu of menuList) {
+      const item = menuMap.get(menu.id)!
+      if (menu.parentId && menuMap.has(menu.parentId)) {
+        const parent = menuMap.get(menu.parentId)!
+        if (!parent.children) parent.children = []
+        parent.children.push(item)
+      } else {
+        rootMenus.push(item)
+      }
+    }
+
+    rootMenus.sort((a, b) => a.sortOrder - b.sortOrder)
+    for (const menu of rootMenus) {
+      menu.children?.sort((a, b) => a.sortOrder - b.sortOrder)
+    }
+
+    return rootMenus
+  }
+
   useEffect(() => {
     fetchMenus()
   }, [])
 
-  const handleAddMenu = () => {
+  const toggleExpand = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleAddMenu = (parentId?: string) => {
     setEditingMenu(null)
     setFormData({
       name: '',
       icon: '',
       path: '',
-      parentId: '',
+      parentId: parentId || '',
       sortOrder: 0,
       status: true,
       description: '',
@@ -87,6 +129,13 @@ export default function MenuManagementPage() {
     setShowModal(true)
   }
 
+  const notifyMenuChange = () => {
+    const channel = new BroadcastChannel('menu-updates')
+    channel.postMessage({ type: 'menu-changed' })
+    channel.close()
+    localStorage.setItem('menu-update-trigger', Date.now().toString())
+  }
+
   const handleSave = async () => {
     try {
       const url = editingMenu ? `http://localhost:3002/api/menus/${editingMenu.id}` : 'http://localhost:3002/api/menus'
@@ -104,6 +153,7 @@ export default function MenuManagementPage() {
       if (response.ok) {
         setShowModal(false)
         fetchMenus()
+        notifyMenuChange()
       }
     } catch (error) {
       console.error('保存菜单失败:', error)
@@ -111,7 +161,7 @@ export default function MenuManagementPage() {
   }
 
   const handleDelete = async (id: string) => {
-    if (confirm('确定要删除这个菜单吗？')) {
+    if (confirm('确定要删除这个菜单吗？删除后其子菜单将变为顶级菜单。')) {
       try {
         const response = await fetch(`http://localhost:3002/api/menus/${id}`, {
           method: 'DELETE',
@@ -121,6 +171,7 @@ export default function MenuManagementPage() {
         })
         if (response.ok) {
           fetchMenus()
+          notifyMenuChange()
         }
       } catch (error) {
         console.error('删除菜单失败:', error)
@@ -136,18 +187,105 @@ export default function MenuManagementPage() {
     }
   }
 
-  const parentMenus = menus.filter(m => !m.parentId)
+  const renderMenuTree = (items: MenuItem[], depth: number = 0) => {
+    return items.map((menu) => {
+      const hasChildren = menu.children && menu.children.length > 0
+      const isExpanded = expandedIds.has(menu.id)
+
+      return (
+        <div key={menu.id}>
+          <div
+            className={`flex items-center gap-2 py-2 px-3 hover:bg-gray-50 rounded-lg transition-colors ${
+              menu.status ? 'text-gray-800' : 'text-gray-400'
+            }`}
+            style={{ paddingLeft: `${depth * 16 + 12}px` }}
+          >
+            {hasChildren && (
+              <button
+                onClick={() => toggleExpand(menu.id)}
+                className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
+              >
+                {isExpanded ? '▼' : '▶'}
+              </button>
+            )}
+            {!hasChildren && <span className="w-4 flex-shrink-0" />}
+            
+            <span className="text-lg flex-shrink-0">{menu.icon || '📄'}</span>
+            
+            <span className={`font-medium flex-1 truncate ${!menu.status ? 'line-through' : ''}`}>
+              {menu.name}
+            </span>
+            
+            <span className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
+              menu.status ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+            }`}>
+              {menu.status ? '启用' : '禁用'}
+            </span>
+
+            <div className="flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity">
+              <button
+                onClick={() => handleNavigateToEditor(menu)}
+                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                title="编辑页面"
+              >
+                📝
+              </button>
+              <button
+                onClick={() => handleAddMenu(menu.id)}
+                className="p-1 text-green-500 hover:text-green-700 hover:bg-green-50 rounded transition-colors"
+                title="添加子菜单"
+              >
+                +
+              </button>
+              <button
+                onClick={() => handleEditMenu(menu)}
+                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded transition-colors"
+                title="编辑菜单"
+              >
+                ✏️
+              </button>
+              <button
+                onClick={() => handleDelete(menu.id)}
+                className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                title="删除菜单"
+              >
+                🗑️
+              </button>
+            </div>
+          </div>
+
+          {hasChildren && isExpanded && (
+            <div>
+              {renderMenuTree(menu.children!, depth + 1)}
+            </div>
+          )}
+        </div>
+      )
+    })
+  }
+
+  const getAllMenus = (items: MenuItem[]): MenuItem[] => {
+    const all: MenuItem[] = []
+    for (const item of items) {
+      if (!item.parentId) all.push(item)
+      if (item.children) {
+        all.push(...getAllMenus(item.children))
+      }
+    }
+    return all
+  }
+
+  const allMenus = getAllMenus(menus)
 
   return (
     <div className="p-6">
-      {/* 页面标题 */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">菜单管理</h1>
-          <p className="text-gray-500 mt-1">管理系统菜单和页面路由</p>
+          <p className="text-gray-500 mt-1">管理系统菜单和页面路由（树形结构）</p>
         </div>
         <button
-          onClick={handleAddMenu}
+          onClick={() => handleAddMenu()}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center gap-2"
         >
           <span>+</span>
@@ -155,103 +293,43 @@ export default function MenuManagementPage() {
         </button>
       </div>
 
-      {/* 菜单列表 */}
       {loading ? (
         <div className="flex items-center justify-center h-32">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow border border-gray-200">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    菜单名称
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    图标
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    路径
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    父菜单
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    关联页面
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    状态
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    操作
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {menus.map((menu) => {
-                  const parentMenu = parentMenus.find(p => p.id === menu.parentId)
-                  return (
-                    <tr key={menu.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {menu.parentId && <span className="w-4"></span>}
-                          <span className="font-medium text-gray-900">{menu.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-xl">{menu.icon}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                        {menu.path || '-'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">
-                        {parentMenu?.name || '顶级菜单'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {menu.pageId ? (
-                          <button
-                            onClick={() => handleNavigateToEditor(menu)}
-                            className="text-blue-500 hover:text-blue-700 text-sm underline"
-                          >
-                            编辑页面
-                          </button>
-                        ) : (
-                          <span className="text-gray-400 text-sm">未关联</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          menu.status ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {menu.status ? '启用' : '禁用'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <button
-                          onClick={() => handleEditMenu(menu)}
-                          className="text-blue-500 hover:text-blue-700 mr-3"
-                        >
-                          编辑
-                        </button>
-                        <button
-                          onClick={() => handleDelete(menu.id)}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          删除
-                        </button>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+          <div className="p-4 border-b border-gray-200 bg-gray-50">
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                <span className="text-gray-600">启用</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3 h-3 bg-gray-300 rounded-full"></span>
+                <span className="text-gray-600">禁用</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span>▶</span>
+                <span className="text-gray-600">点击展开/折叠</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-2">
+            {menus.length > 0 ? (
+              renderMenuTree(menus)
+            ) : (
+              <div className="text-center py-12 text-gray-400">
+                <div className="text-4xl mb-3">🌲</div>
+                <p>暂无菜单数据</p>
+                <p className="text-sm mt-1">点击上方按钮添加菜单</p>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* 弹窗 */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
@@ -307,8 +385,10 @@ export default function MenuManagementPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">顶级菜单</option>
-                  {parentMenus.map((menu) => (
-                    <option key={menu.id} value={menu.id}>{menu.name}</option>
+                  {allMenus.map((menu) => (
+                    <option key={menu.id} value={menu.id}>
+                      {'└─ '.repeat(getMenuDepth(menu))}{menu.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -376,4 +456,14 @@ export default function MenuManagementPage() {
       )}
     </div>
   )
+}
+
+function getMenuDepth(menu: MenuItem): number {
+  let depth = 0
+  let current = menu
+  while (current.parentId) {
+    depth++
+    current = { parentId: null, id: '', name: '', sortOrder: 0, status: true, createdAt: '', updatedAt: '' }
+  }
+  return depth
 }

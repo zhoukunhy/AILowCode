@@ -132,6 +132,27 @@ export class UpdatePageDto {
   @IsOptional()
   @IsBoolean()
   isHome?: boolean
+
+  @ApiPropertyOptional({ description: '页面状态', enum: ['draft', 'published', 'archived'] })
+  @IsOptional()
+  @IsString()
+  status?: string
+
+  @ApiPropertyOptional({ description: '关联菜单ID' })
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  menuId?: number
+
+  @ApiPropertyOptional({ description: '关联数据模型' })
+  @IsOptional()
+  @IsString()
+  dataModel?: string
+
+  @ApiPropertyOptional({ description: '页面描述' })
+  @IsOptional()
+  @IsString()
+  description?: string
 }
 
 /**
@@ -157,4 +178,9 @@ export class QueryPageDto {
   @IsOptional()
   @IsString()
   name?: string
+
+  @ApiPropertyOptional({ description: '页面状态', enum: ['draft', 'published', 'archived'] })
+  @IsOptional()
+  @IsString()
+  status?: string
 }

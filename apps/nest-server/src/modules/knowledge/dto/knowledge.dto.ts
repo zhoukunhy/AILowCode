@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger'
 import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsNumber, IsEnum } from 'class-validator'
+import { Type } from 'class-transformer'
 
 /**
  * 文档类型枚举
@@ -150,4 +151,24 @@ export class DocumentChunkPreviewDto {
   @IsNumber()
   @IsOptional()
   page?: number
+}
+
+/**
+ * 上传文档文件 DTO
+ */
+export class UploadDocumentFileDto {
+  @ApiProperty({ description: '知识库ID', type: 'number' })
+  @Type(() => Number)
+  @IsNumber()
+  @IsNotEmpty()
+  knowledgeBaseId!: number
+
+  @ApiProperty({ description: '文档类型', enum: DocumentType })
+  @IsEnum(DocumentType)
+  @IsNotEmpty()
+  type!: DocumentType
+
+  @ApiProperty({ description: '文档文件', type: 'string', format: 'binary' })
+  @IsOptional()
+  file?: any
 }

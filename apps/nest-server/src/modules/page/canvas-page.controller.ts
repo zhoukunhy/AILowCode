@@ -17,7 +17,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger'
 import { PageService } from './page.service'
-import { CreatePageDto, UpdatePageDto } from './dto/page.dto'
+import { CreatePageDto, UpdatePageDto, QueryPageDto } from './dto/page.dto'
 
 /**
  * 画布页面独立控制器
@@ -40,8 +40,8 @@ export class CanvasPageController {
   @Get()
   @ApiOperation({ summary: '获取所有画布页面' })
   @ApiResponse({ status: 200, description: '查询成功' })
-  findAll(@Query('page') page: number = 1, @Query('pageSize') pageSize: number = 10) {
-    return this.pageService.findAll(0, { page, pageSize })
+  findAll(@Query() query: QueryPageDto) {
+    return this.pageService.findAll(0, query)
   }
 
   @Get(':id')

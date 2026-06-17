@@ -3,12 +3,11 @@
  * 生成 React 组件源码
  */
 import type { PageSchema, ComponentSchema } from '@ai-lowcode/lang-ai-core'
-import { GeneratedFile, ReactComponentConfig, ImportStatement } from './types'
+import { GeneratedFile } from './types'
 
 export class FrontendGenerator {
   private schema: PageSchema
   private imports: Set<string> = new Set()
-  private components: Map<string, string> = new Map()
   private hasRouter: boolean = false
   private hasStore: boolean = false
 
@@ -182,9 +181,6 @@ export default ${componentName}
    * 生成组件模板
    */
   private generateComponentTemplate(component: ComponentSchema, componentName: string): string | null {
-    const props = component.props || {}
-    const style = component.style || {}
-
     switch (component.type) {
       case 'Container':
         return this.generateContainer(component, componentName)
@@ -242,7 +238,6 @@ export default ${componentName}
   }
 
   private generateContainer(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
     const children = component.children || []
     
     return `import React from 'react'
@@ -265,8 +260,7 @@ export default ${name}
   }
 
   private generateButton(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+
     return `import React from 'react'
 
 interface ${name}Props {
@@ -279,10 +273,10 @@ export function ${name}(props: ${name}Props) {
   
   return (
     <button
-      className="${name.toLowerCase()} button-${type}"
+      className="${name.toLowerCase()} button-\${type}"
       onClick={onClick}
     >
-      ${props.text || '按钮'}
+      ${component.props?.text || '按钮'}
     </button>
   )
 }
@@ -291,8 +285,7 @@ export default ${name}
 `
   }
 
-  private generateInput(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
+  private generateInput(_component: ComponentSchema, name: string): string {
     
     return `import React, { useState } from 'react'
 
@@ -329,9 +322,7 @@ export default ${name}
 `
   }
 
-  private generateText(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateText(_component: ComponentSchema, name: string): string {
     return `import React from 'react'
 
 interface ${name}Props {
@@ -344,7 +335,7 @@ export function ${name}(props: ${name}Props) {
   
   return (
     <Tag className="${name.toLowerCase()}">
-      {props.content || '文本内容'}
+      {component.props?.content || '文本内容'}
     </Tag>
   )
 }
@@ -354,7 +345,6 @@ export default ${name}
   }
 
   private generateCard(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
     const children = component.children || []
     
     return `import React from 'react'
@@ -379,25 +369,25 @@ export default ${name}
   }
 
   private generateTable(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    const columns = props.columns || []
-    const data = props.data || []
+    const columns = component.props?.columns || []
+    const data = component.props?.data || []
     
     return `import React from 'react'
 
 interface ${name}Props {
   data?: any[]
+  columns?: any[]
 }
 
 export function ${name}(props: ${name}Props) {
   const tableData = props.data || ${JSON.stringify(data)}
-  const columns = ${JSON.stringify(columns)}
+  const tableColumns = props.columns || ${JSON.stringify(columns)}
   
   return (
     <table className="${name.toLowerCase()}">
       <thead>
         <tr>
-          {columns.map((col: any) => (
+          {tableColumns.map((col: any) => (
             <th key={col.key}>{col.title}</th>
           ))}
         </tr>
@@ -405,7 +395,7 @@ export function ${name}(props: ${name}Props) {
       <tbody>
         {tableData.map((row: any, index: number) => (
           <tr key={index}>
-            {columns.map((col: any) => (
+            {tableColumns.map((col: any) => (
               <td key={col.key}>{row[col.key]}</td>
             ))}
           </tr>
@@ -420,7 +410,6 @@ export default ${name}
   }
 
   private generateForm(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
     const children = component.children || []
     
     return `import React, { useState } from 'react'
@@ -454,8 +443,7 @@ export default ${name}
   }
 
   private generateList(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    const data = props.data || []
+    const data = component.props?.data || []
     
     return `import React from 'react'
 
@@ -482,7 +470,6 @@ export default ${name}
   }
 
   private generateGenericComponent(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
     const children = component.children || []
     
     return `import React from 'react'
@@ -503,9 +490,7 @@ export default ${name}
 `
   }
 
-  private generateLink(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateLink(_component: ComponentSchema, name: string): string {
     return `import React from 'react'
 
 interface ${name}Props {
@@ -528,9 +513,8 @@ export default ${name}
 `
   }
 
-  private generateImage(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateImage(_component: ComponentSchema, name: string): string {
+
     return `import React from 'react'
 
 interface ${name}Props {
@@ -559,8 +543,7 @@ export default ${name}
   }
 
   private generateSelect(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    const options = props.options || []
+    const options = component.props?.options || []
     
     return `import React, { useState } from 'react'
 
@@ -600,9 +583,8 @@ export default ${name}
 `
   }
 
-  private generateCheckbox(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateCheckbox(_component: ComponentSchema, name: string): string {
+
     return `import React, { useState } from 'react'
 
 interface ${name}Props {
@@ -637,8 +619,7 @@ export default ${name}
   }
 
   private generateRadio(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    const options = props.options || []
+    const options = component.props?.options || []
     
     return `import React, { useState } from 'react'
 
@@ -682,9 +663,8 @@ export default ${name}
 `
   }
 
-  private generateDatePicker(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateDatePicker(_component: ComponentSchema, name: string): string {
+
     return `import React, { useState } from 'react'
 
 interface ${name}Props {
@@ -719,7 +699,6 @@ export default ${name}
   }
 
   private generateModal(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
     const children = component.children || []
     
     return `import React, { useState } from 'react'
@@ -767,8 +746,7 @@ export default ${name}
   }
 
   private generateTabs(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    const tabs = props.tabs || []
+    const tabs = component.props?.tabs || []
     
     return `import React, { useState } from 'react'
 
@@ -814,9 +792,8 @@ export default ${name}
 `
   }
 
-  private generateSwitch(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateSwitch(_component: ComponentSchema, name: string): string {
+
     return `import React, { useState } from 'react'
 
 interface ${name}Props {
@@ -850,9 +827,8 @@ export default ${name}
 `
   }
 
-  private generateAvatar(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateAvatar(_component: ComponentSchema, name: string): string {
+
     return `import React from 'react'
 
 interface ${name}Props {
@@ -865,7 +841,7 @@ export function ${name}(props: ${name}Props) {
   const { src, alt = 'Avatar', size = 'medium' } = props
   
   return (
-    <div className="${name.toLowerCase()} ${name.toLowerCase()}-${size}">
+    <div className="${name.toLowerCase()} ${name.toLowerCase()}-\${size}">
       {src ? (
         <img src={src} alt={alt} />
       ) : (
@@ -881,9 +857,8 @@ export default ${name}
 `
   }
 
-  private generateBadge(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateBadge(_component: ComponentSchema, name: string): string {
+
     return `import React from 'react'
 
 interface ${name}Props {
@@ -900,7 +875,7 @@ export function ${name}(props: ${name}Props) {
     <span className="${name.toLowerCase()}">
       {children}
       {(count > 0 || dot) && (
-        <span className="${name.toLowerCase()}-dot ${name.toLowerCase()}-${color}">
+        <span className="${name.toLowerCase()}-dot ${name.toLowerCase()}-\${color}">
           {!dot && count > 0 && count <= 99 ? count : ''}
         </span>
       )}
@@ -912,9 +887,8 @@ export default ${name}
 `
   }
 
-  private generateProgress(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateProgress(_component: ComponentSchema, name: string): string {
+
     return `import React from 'react'
 
 interface ${name}Props {
@@ -944,8 +918,7 @@ export default ${name}
   }
 
   private generateBreadcrumb(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    const items = props.items || []
+    const items = component.props?.items || []
     
     return `import React from 'react'
 
@@ -985,9 +958,8 @@ export default ${name}
 `
   }
 
-  private generatePagination(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generatePagination(_component: ComponentSchema, name: string): string {
+
     return `import React from 'react'
 
 interface ${name}Props {
@@ -1035,7 +1007,6 @@ export default ${name}
   }
 
   private generateDrawer(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
     const children = component.children || []
     
     return `import React, { useState } from 'react'
@@ -1063,7 +1034,7 @@ export function ${name}(props: ${name}Props) {
   return (
     <div className="${name.toLowerCase()}-overlay" onClick={handleClose}>
       <div
-        className="${name.toLowerCase()}-content ${name.toLowerCase()}-${placement}"
+        className="${name.toLowerCase()}-content ${name.toLowerCase()}-\${placement}"
         style={{ width }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1085,9 +1056,8 @@ export default ${name}
 `
   }
 
-  private generateTooltip(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateTooltip(_component: ComponentSchema, name: string): string {
+
     return `import React, { useState } from 'react'
 
 interface ${name}Props {
@@ -1109,7 +1079,7 @@ export function ${name}(props: ${name}Props) {
         {children}
       </span>
       {isVisible && (
-        <span className="${name.toLowerCase()}-tip ${name.toLowerCase()}-${placement}">
+        <span className="${name.toLowerCase()}-tip ${name.toLowerCase()}-\${placement}">
           {title}
         </span>
       )}
@@ -1121,9 +1091,8 @@ export default ${name}
 `
   }
 
-  private generateAlert(component: ComponentSchema, name: string): string {
-    const props = component.props || {}
-    
+  private generateAlert(_component: ComponentSchema, name: string): string {
+
     return `import React from 'react'
 
 interface ${name}Props {
@@ -1138,7 +1107,7 @@ export function ${name}(props: ${name}Props) {
   const { type = 'info', message, description, closable = false, onClose } = props
   
   return (
-    <div className="${name.toLowerCase()} ${name.toLowerCase()}-${type}">
+    <div className="${name.toLowerCase()} ${name.toLowerCase()}-\${type}">
       <span className="${name.toLowerCase()}-icon">
         {type === 'success' && '✓'}
         {type === 'warning' && '⚠'}

@@ -8,7 +8,7 @@ import { v4 as uuidv4 } from 'uuid'
 import JSZip from 'jszip'
 import { CodeGenerationLogEntity } from './entities/code-generation-log.entity'
 import { GenerateCodeDto, GenerateCodeResponseDto } from './dto/codegen.dto'
-import { createCodeGenerator } from '@ai-lowcode/code-generator'
+import { createCodeGenerator, EnhancedGenerateOptions } from '@ai-lowcode/code-generator'
 import { CacheService } from '../../common/redis/cache.service'
 
 @Injectable()
@@ -78,15 +78,25 @@ export class CodegenService {
       log.status = 'running'
       await this.logRepository.save(log)
 
-      // 创建代码生成器
-      const generator = createCodeGenerator(dto.schema, {
+      // 构建生成选项
+      const options: Partial<EnhancedGenerateOptions> = {
         framework: (dto.framework as any) || 'react',
         language: 'typescript',
         style: 'css',
-      })
+        enableRAG: dto.enableRAG ?? false,
+        enableOptimization: dto.enableOptimization ?? false,
+      }
 
-      // 生成代码
-      const project = generator.generate(dto.type)
+      // 创建代码生成器
+      const generator = createCodeGenerator(dto.schema, options)
+
+      // 根据是否启用增强功能选择生成方式
+      let project: any
+      if (options.enableRAG || options.enableOptimization) {
+        project = await generator.generateEnhanced(dto.type)
+      } else {
+        project = generator.generate(dto.type)
+      }
 
       // 更新日志
       log.status = 'completed'
@@ -97,16 +107,23 @@ export class CodegenService {
 
       this.logger.log(
         `代码生成成功: ${log.sessionId}, 文件数: ${project.files.length}, ` +
-        `时长: ${log.duration}ms`
+        `时长: ${log.duration}ms${project.metadata ? `, RAG时间: ${project.metadata.ragRetrievalTime}ms, 优化文件数: ${project.metadata.optimizedFiles}` : ''}`
       )
 
-      return {
+      const response: GenerateCodeResponseDto = {
         sessionId: log.sessionId,
         success: true,
         files: project.files,
         fileCount: project.files.length,
         duration: log.duration,
       }
+
+      if (project.metadata) {
+        response.ragRetrievalTime = project.metadata.ragRetrievalTime
+        response.optimizedFiles = project.metadata.optimizedFiles
+      }
+
+      return response
     } catch (error: any) {
       // 更新日志
       log.status = 'failed'

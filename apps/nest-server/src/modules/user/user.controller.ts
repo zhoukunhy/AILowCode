@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Put,
   Delete,
   Param,
@@ -18,6 +19,12 @@ import {
 import { UserService } from './user.service'
 import { UpdateUserDto } from '../auth/dto/auth.dto'
 
+class CreateUserDto {
+  username!: string
+  password!: string
+  email!: string
+}
+
 /**
  * 用户控制器
  * 提供用户信息的查询和更新接口
@@ -27,6 +34,20 @@ import { UpdateUserDto } from '../auth/dto/auth.dto'
 @Controller('users')
 export class UserController {
   constructor(private readonly userService: UserService) {}
+
+  @Get()
+  @ApiOperation({ summary: '获取所有用户列表' })
+  @ApiResponse({ status: 200, description: '查询成功' })
+  async findAll() {
+    return this.userService.findAll()
+  }
+
+  @Post()
+  @ApiOperation({ summary: '创建用户' })
+  @ApiResponse({ status: 201, description: '创建成功' })
+  async create(@Body() createUserDto: CreateUserDto) {
+    return this.userService.create(createUserDto.username, createUserDto.password, createUserDto.email)
+  }
 
   @Get('profile')
   @ApiOperation({ summary: '获取当前用户信息' })

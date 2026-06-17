@@ -24,11 +24,28 @@ export class MenuService {
 
   async findTree(): Promise<MenuEntity[]> {
     const menus = await this.menuRepository.find({
-      relations: ['children'],
       order: { sortOrder: 'ASC' },
     })
-    
-    return menus.filter((menu) => !menu.parentId)
+
+    const menuMap = new Map<string, MenuEntity>()
+    const rootMenus: MenuEntity[] = []
+
+    for (const menu of menus) {
+      menuMap.set(menu.id, { ...menu, children: [] })
+    }
+
+    for (const menu of menus) {
+      const item = menuMap.get(menu.id)!
+      if (menu.parentId && menuMap.has(menu.parentId)) {
+        const parent = menuMap.get(menu.parentId)!
+        if (!parent.children) parent.children = []
+        parent.children.push(item)
+      } else {
+        rootMenus.push(item)
+      }
+    }
+
+    return rootMenus
   }
 
   async findOne(id: string): Promise<MenuEntity> {

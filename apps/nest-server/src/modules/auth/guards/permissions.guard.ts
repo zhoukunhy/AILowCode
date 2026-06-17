@@ -16,7 +16,13 @@ export class PermissionsGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    // 获取需要的角色和权限
+    const request = context.switchToHttp().getRequest()
+    
+    const path = request.path || request.originalUrl
+    
+    if (path.startsWith('/auth/')) {
+      return true
+    }
     const requiredRoles = this.reflector.getAllAndOverride<string[]>(ROLES_KEY, [
       context.getHandler(),
       context.getClass(),

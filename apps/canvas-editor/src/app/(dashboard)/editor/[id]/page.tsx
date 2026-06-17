@@ -7,8 +7,6 @@ import { Sidebar } from '@/components/Sidebar'
 import { Toolbar } from '@/components/Toolbar'
 import { PropertyPanel } from '@/components/PropertyPanel'
 import { PerformanceMonitor } from '@/components/Canvas/PerformanceMonitor'
-import { componentPool } from '@/utils/ComponentPool'
-import { getDataBindingCacheStats } from '@/hooks/useDataBindingCache'
 
 export default function EditorPage() {
   const params = useParams<{ id: string }>()
@@ -26,57 +24,6 @@ export default function EditorPage() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const [showPerformance, setShowPerformance] = useState(false)
   const canvasRef = useRef<HTMLDivElement>(null)
-  const [performanceMetrics, setPerformanceMetrics] = useState({
-    fps: 60,
-    componentCount: 0,
-    renderTime: 0,
-    cacheStats: { totalEntries: 0, totalSubscribers: 0, totalLoading: 0 },
-    poolStats: { total: 0, active: 0 },
-  })
-
-  // 性能监控定时器
-  useEffect(() => {
-    let stopped = false
-    const frameTimes: number[] = []
-    let lastTime = performance.now()
-    
-    const measurePerformance = () => {
-      if (stopped) return
-      
-      const currentTime = performance.now()
-      const frameTime = currentTime - lastTime
-      lastTime = currentTime
-      
-      frameTimes.push(frameTime)
-      if (frameTimes.length > 60) {
-        frameTimes.shift()
-      }
-      
-      const avgFrameTime = frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length
-      const fps = Math.round(1000 / avgFrameTime)
-      const renderTime = Math.round(avgFrameTime * 100) / 100
-      
-      setPerformanceMetrics(prev => ({
-        ...prev,
-        fps,
-        componentCount: components.length,
-        renderTime,
-        cacheStats: getDataBindingCacheStats(),
-        poolStats: {
-          total: Object.values(componentPool.getStats()).reduce((a, b) => a + b, 0),
-          active: componentPool.getActiveCount(),
-        },
-      }))
-      
-      requestAnimationFrame(measurePerformance)
-    }
-    
-    const animationId = requestAnimationFrame(measurePerformance)
-    return () => {
-      stopped = true
-      cancelAnimationFrame(animationId)
-    }
-  }, [components.length])
 
   // 加载项目
   useEffect(() => {
@@ -188,10 +135,7 @@ export default function EditorPage() {
         
         {/* 性能监控面板 */}
         {showPerformance && (
-          <PerformanceMonitor 
-            metrics={performanceMetrics}
-            onClose={() => setShowPerformance(false)}
-          />
+          <PerformanceMonitor />
         )}
         
         {/* 画布区域 */}

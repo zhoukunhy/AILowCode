@@ -230,7 +230,7 @@ const RenderCard = React.memo(({ component }: { component: ComponentConfig }) =>
 
 // 渲染表格组件
 const RenderTable = React.memo(({ component }: { component: ComponentConfig }) => {
-  const { value, data, isLoading, error } = useComponentDataBinding(component.id, {
+  const { data, isLoading, error } = useComponentDataBinding(component.id, {
     bindingMode: 'table',
     autoFetch: true,
   })
@@ -523,7 +523,7 @@ export const OptimizedComponentRenderer = React.memo(({
   isSelected,
   onSelect,
   onDragMove,
-  onTransform,
+  onTransform: _onTransform,
 }: OptimizedComponentRendererProps) => {
   const [isMounted, setIsMounted] = useState(false)
   
