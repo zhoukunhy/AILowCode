@@ -15,10 +15,18 @@ import {
 import { PagePlanningAgent } from '@ai-lowcode/lang-ai-core'
 import type { ChromaConfig, RAGConfig, LLMConfig } from '@ai-lowcode/shared-types'
 
+interface StreamCallbacks {
+  onStep: (step: { name: string; message: string; progress: number }) => void
+  onProgress: (progress: { current: number; total: number; message: string }) => void
+  onSchema: (schema: any) => void
+  onComplete: (result: GeneratePageResponseDto) => void
+  onError: (error: { message: string }) => void
+}
+
 @Injectable()
 export class AgentService {
   private readonly logger = new Logger(AgentService.name)
-  private agents: Map<string, InstanceType<typeof PagePlanningAgent>> = new Map()
+  private readonly agents = new Map<string, InstanceType<typeof PagePlanningAgent>>()
 
   constructor(
     @InjectRepository(AgentSessionEntity)
@@ -195,6 +203,114 @@ export class AgentService {
     const session = await this.getSession(sessionId)
     await this.sessionRepository.remove(session)
     this.logger.log(`删除会话: ${sessionId}`)
+  }
+
+  /**
+   * 生成页面（流式输出）
+   */
+  async generatePageWithStream(
+    dto: GeneratePageDto,
+    callbacks: StreamCallbacks
+  ): Promise<void> {
+    const sessionId = dto.sessionId || uuidv4()
+    const startTime = Date.now()
+
+    const session = this.sessionRepository.create({
+      sessionId,
+      agentType: 'page_planning',
+      userInput: dto.requirement,
+      status: 'pending',
+      startTime: new Date(startTime),
+      metadata: dto.metadata,
+    })
+    await this.sessionRepository.save(session)
+
+    this.logger.log(`开始生成页面（流式），会话: ${sessionId}`)
+
+    try {
+      session.status = 'running'
+      await this.sessionRepository.save(session)
+
+      callbacks.onStep({ name: 'requirement', message: '正在分析需求...', progress: 10 })
+      
+      const agent = this.getOrCreateAgent(dto.knowledgeBaseIds)
+
+      callbacks.onStep({ name: 'planning', message: '正在规划页面结构...', progress: 20 })
+
+      if (dto.knowledgeBaseIds && dto.knowledgeBaseIds.length > 0) {
+        callbacks.onStep({ name: 'rag', message: '正在检索知识库...', progress: 30 })
+      }
+
+      callbacks.onStep({ name: 'generating', message: '正在生成页面 Schema...', progress: 50 })
+
+      const result = await agent.plan(dto.requirement, sessionId)
+
+      if (result.success && result.schema) {
+        callbacks.onStep({ name: 'schema', message: '页面 Schema 生成完成', progress: 80 })
+        callbacks.onSchema(result.schema)
+
+        const logs: AgentLogEntry[] = result.logs.map((log: any) => ({
+          node: log.node,
+          timestamp: log.timestamp?.toISOString?.() || new Date().toISOString(),
+          input: log.input,
+          output: log.output,
+          error: log.error,
+          duration: log.duration,
+        }))
+
+        const ragResult = result.state.ragResults
+        const schemaResult = result.state.schemaResult
+
+        session.status = 'completed'
+        session.parsedIntent = result.state.requirementAnalysis?.parsedIntent
+        session.ragDocCount = ragResult?.retrievedDocs.length || 0
+        session.ragRelevanceScore = ragResult?.relevanceScore || 0
+        session.componentCount = schemaResult?.pageSchema.children?.length || 0
+        session.generatedSchema = JSON.stringify(schemaResult?.pageSchema)
+        session.finalSchema = JSON.stringify(result.schema)
+        session.executionLogs = logs
+        session.endTime = new Date()
+        session.duration = Date.now() - startTime
+
+        await this.sessionRepository.save(session)
+
+        this.logger.log(
+          `页面生成成功（流式）: ${sessionId}, 组件数: ${session.componentCount}, ` +
+          `RAG召回: ${session.ragDocCount}, 时长: ${session.duration}ms`
+        )
+
+        callbacks.onStep({ name: 'complete', message: '生成完成', progress: 100 })
+        callbacks.onComplete({
+          sessionId,
+          success: true,
+          schema: result.schema,
+          logs,
+          duration: session.duration,
+        })
+      } else {
+        session.status = 'failed'
+        session.errorMessage = result.error
+        session.endTime = new Date()
+        session.duration = Date.now() - startTime
+
+        await this.sessionRepository.save(session)
+
+        this.logger.error(`页面生成失败（流式）: ${sessionId}, 错误: ${result.error}`)
+
+        callbacks.onError({ message: result.error || '生成失败' })
+      }
+    } catch (error: any) {
+      session.status = 'failed'
+      session.errorMessage = error.message
+      session.endTime = new Date()
+      session.duration = Date.now() - startTime
+
+      await this.sessionRepository.save(session)
+
+      this.logger.error(`页面生成异常（流式）: ${sessionId}`, error)
+
+      callbacks.onError({ message: error.message })
+    }
   }
 
   /**

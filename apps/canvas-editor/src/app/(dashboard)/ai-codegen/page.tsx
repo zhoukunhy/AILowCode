@@ -12,8 +12,8 @@ declare global {
   }
 }
 
-import React, { useState, useCallback } from 'react'
-import { codegenApi, type GeneratedFile, type GenerateCodeResponse } from '@/lib/api'
+import React, { useState, useCallback, useEffect } from 'react'
+import { codegenApi, agentApi, knowledgeApi, type GeneratedFile, type GenerateCodeResponse, type KnowledgeBase } from '@/lib/api'
 
 interface FileNode {
   name: string
@@ -28,6 +28,15 @@ interface GenerationTypeOption {
   label: string
   description: string
   icon: string
+}
+
+interface WorkflowStep {
+  id: string
+  title: string
+  description: string
+  status: 'pending' | 'running' | 'completed' | 'error'
+  duration?: number
+  details?: any
 }
 
 const generationTypes: GenerationTypeOption[] = [
@@ -178,29 +187,33 @@ export default function AiCodegenPage() {
   const [selectedFile, setSelectedFile] = useState<{ path: string; content: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState('')
-  const [workflowSteps, setWorkflowSteps] = useState<string[]>([])
-  const [currentStep, setCurrentStep] = useState(0)
+  const [workflowSteps, setWorkflowSteps] = useState<WorkflowStep[]>([])
   const [enableRAG, setEnableRAG] = useState(false)
   const [enableOptimization, setEnableOptimization] = useState(false)
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([])
+  const [selectedKnowledgeBaseIds, setSelectedKnowledgeBaseIds] = useState<number[]>([])
+  const [generatedSchema, setGeneratedSchema] = useState<any>(null)
 
-  const simulateWorkflow = useCallback(async () => {
-    const steps = [
-      '📋 解析需求 Schema...',
-      ...(enableRAG ? ['🔍 检索相关知识库...'] : []),
-      '🧠 生成代码文件...',
-      ...(enableOptimization ? ['✨ 优化代码结构...'] : []),
-      '✅ 格式校验通过...',
-      '📤 生成结果输出...',
-    ]
-    setWorkflowSteps(steps)
-    
-    for (let i = 0; i < steps.length; i++) {
-      setCurrentStep(i)
-      await new Promise((resolve) => setTimeout(resolve, 600))
+  useEffect(() => {
+    fetchKnowledgeBases()
+  }, [])
+
+  const fetchKnowledgeBases = useCallback(async () => {
+    try {
+      const result = await knowledgeApi.getAllKnowledgeBases()
+      const data = result as Record<string, unknown>
+      const basesData = Array.isArray(data) ? data : (data.data as KnowledgeBase[] || [])
+      setKnowledgeBases(basesData)
+    } catch (err) {
+      console.error('获取知识库列表失败:', err)
     }
-    
-    setCurrentStep(steps.length)
-  }, [enableRAG, enableOptimization])
+  }, [])
+
+  const updateWorkflowStep = useCallback((stepId: string, updates: Partial<WorkflowStep>) => {
+    setWorkflowSteps(prev => prev.map(step => 
+      step.id === stepId ? { ...step, ...updates } : step
+    ))
+  }, [])
 
   const executeGeneration = useCallback(async () => {
     if (!inputPrompt.trim() || isGenerating) return
@@ -210,42 +223,51 @@ export default function AiCodegenPage() {
     setGeneratedResult(null)
     setFileTree([])
     setSelectedFile(null)
+    setGeneratedSchema(null)
     
-    await simulateWorkflow()
-    
+    const initialSteps: WorkflowStep[] = [
+      { id: 'intent', title: '需求分析', description: '解析用户需求，提取关键信息', status: 'pending' as const },
+      ...(enableRAG ? [{ id: 'rag', title: '知识库检索', description: '从知识库检索相关编码规范', status: 'pending' as const }] : ([] as WorkflowStep[])),
+      { id: 'schema', title: 'Schema 生成', description: '生成页面 Schema 结构', status: 'pending' as const },
+      { id: 'validate', title: '格式校验', description: '校验 Schema 格式正确性', status: 'pending' as const },
+      { id: 'codegen', title: '代码生成', description: '根据 Schema 生成代码文件', status: 'pending' as const },
+      ...(enableOptimization ? [{ id: 'optimize', title: '代码优化', description: 'AI 优化代码结构和质量', status: 'pending' as const }] : ([] as WorkflowStep[])),
+      { id: 'output', title: '结果输出', description: '整理生成结果', status: 'pending' as const },
+    ]
+    setWorkflowSteps(initialSteps)
+
     try {
-      const mockSchema = {
-        name: inputPrompt.trim(),
-        children: [
-          {
-            id: 'component_1',
-            type: 'Container',
-            props: { title: '主要内容区' },
-            children: [
-              {
-                id: 'component_2',
-                type: 'Card',
-                props: { title: '数据卡片' },
-                children: [
-                  {
-                    id: 'component_3',
-                    type: 'Text',
-                    props: { content: '这是一个自动生成的页面', tag: 'p' },
-                  },
-                ],
-              },
-              {
-                id: 'component_4',
-                type: 'Button',
-                props: { text: '点击按钮', type: 'primary' },
-              },
-            ],
-          },
-        ],
+      updateWorkflowStep('intent', { status: 'running' })
+      const intentStartTime = Date.now()
+      
+      const agentResponse = await agentApi.generatePage(
+        inputPrompt,
+        selectedKnowledgeBaseIds.length > 0 ? selectedKnowledgeBaseIds : undefined
+      )
+      
+      updateWorkflowStep('intent', { status: 'completed', duration: Date.now() - intentStartTime })
+      
+      if (!agentResponse.success || !agentResponse.schema) {
+        throw new Error(agentResponse.error || '页面 Schema 生成失败')
       }
       
-      const response = await codegenApi.generateCode(
-        mockSchema,
+      if (enableRAG) {
+        updateWorkflowStep('rag', { 
+          status: 'completed',
+          details: { docCount: agentResponse.logs?.filter((l: any) => l.node === 'rag_retrieval')?.[0]?.output?.retrievedDocs?.length || 0 }
+        })
+      }
+      
+      updateWorkflowStep('schema', { status: 'completed' })
+      updateWorkflowStep('validate', { status: 'completed' })
+      
+      setGeneratedSchema(agentResponse.schema)
+      
+      updateWorkflowStep('codegen', { status: 'running' })
+      const codegenStartTime = Date.now()
+      
+      const codeResponse = await codegenApi.generateCode(
+        agentResponse.schema,
         generationType,
         'react',
         undefined,
@@ -253,39 +275,47 @@ export default function AiCodegenPage() {
         enableOptimization
       )
       
-      if (response.success) {
-        setGeneratedResult(response)
-        const tree = buildFileTree(response.files)
+      updateWorkflowStep('codegen', { status: 'completed', duration: Date.now() - codegenStartTime })
+      
+      if (enableOptimization) {
+        updateWorkflowStep('optimize', { status: 'completed' })
+      }
+      
+      updateWorkflowStep('output', { status: 'completed' })
+      
+      if (codeResponse.success) {
+        setGeneratedResult(codeResponse)
+        const tree = buildFileTree(codeResponse.files)
         setFileTree(tree)
         
-        if (response.files.length > 0) {
+        if (codeResponse.files.length > 0) {
           setSelectedFile({
-            path: response.files[0].path,
-            content: response.files[0].content,
+            path: codeResponse.files[0].path,
+            content: codeResponse.files[0].content,
           })
         }
       } else {
-        setError(response.error || '代码生成失败')
+        throw new Error(codeResponse.error || '代码生成失败')
       }
     } catch (err: any) {
       console.error('Code generation failed:', err)
       setError(err.message || '代码生成失败，请检查后端服务')
+      setWorkflowSteps(prev => prev.map(step => 
+        step.status === 'pending' || step.status === 'running'
+          ? { ...step, status: 'error' as const }
+          : step
+      ))
     } finally {
       setIsGenerating(false)
     }
-  }, [inputPrompt, generationType, isGenerating, simulateWorkflow])
+  }, [inputPrompt, generationType, isGenerating, enableRAG, enableOptimization, selectedKnowledgeBaseIds, updateWorkflowStep])
 
   const downloadCode = useCallback(async () => {
-    if (!generatedResult) return
+    if (!generatedResult || !generatedSchema) return
     
     try {
-      const mockSchema = {
-        name: inputPrompt.trim(),
-        children: [],
-      }
-      
       const blob = await codegenApi.downloadCode(
-        mockSchema,
+        generatedSchema,
         generationType,
         'react'
       )
@@ -300,7 +330,7 @@ export default function AiCodegenPage() {
       console.error('Download failed:', err)
       setError(err.message || '下载失败')
     }
-  }, [generatedResult, inputPrompt, generationType])
+  }, [generatedResult, generatedSchema, generationType])
 
   const copyCode = useCallback(async () => {
     if (!selectedFile?.content) return
@@ -361,6 +391,21 @@ export default function AiCodegenPage() {
     setSelectedFile({ path, content })
   }
 
+  const toggleKnowledgeBase = (id: number) => {
+    setSelectedKnowledgeBaseIds(prev => 
+      prev.includes(id) ? prev.filter(bid => bid !== id) : [...prev, id]
+    )
+  }
+
+  const getStepIcon = (status: WorkflowStep['status']) => {
+    switch (status) {
+      case 'running': return '⏳'
+      case 'completed': return '✅'
+      case 'error': return '❌'
+      default: return '○'
+    }
+  }
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between mb-6">
@@ -382,7 +427,6 @@ export default function AiCodegenPage() {
       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
         {/* 左侧：输入和配置 */}
         <div className="xl:col-span-1 space-y-6">
-          {/* 生成类型选择 */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">🎯 生成类型</h3>
             <div className="space-y-3">
@@ -406,7 +450,6 @@ export default function AiCodegenPage() {
             </div>
           </div>
 
-          {/* 增强选项 */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">⚡ 增强选项</h3>
             <div className="space-y-4">
@@ -444,7 +487,40 @@ export default function AiCodegenPage() {
             </div>
           </div>
 
-          {/* 预设模板 */}
+          {enableRAG && knowledgeBases.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">📚 选择知识库</h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {knowledgeBases.map((base) => (
+                  <label
+                    key={base.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                      selectedKnowledgeBaseIds.includes(base.id)
+                        ? 'bg-blue-50 border border-blue-200'
+                        : 'bg-gray-50 hover:bg-gray-100'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedKnowledgeBaseIds.includes(base.id)}
+                      onChange={() => toggleKnowledgeBase(base.id)}
+                      className="w-4 h-4 text-blue-600 rounded"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-800 truncate">{base.name}</div>
+                      {base.documentCount !== undefined && (
+                        <div className="text-xs text-gray-500">{base.documentCount} 个文档</div>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {knowledgeBases.length === 0 && (
+                <p className="text-sm text-gray-500 text-center py-4">暂无知识库</p>
+              )}
+            </div>
+          )}
+
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">📋 预设模板</h3>
             <div className="space-y-2">
@@ -461,24 +537,36 @@ export default function AiCodegenPage() {
             </div>
           </div>
 
-          {/* 工作流进度 */}
           {isGenerating && workflowSteps.length > 0 && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">🔄 工作流执行</h3>
               <div className="space-y-2">
-                {workflowSteps.map((step, index) => (
+                {workflowSteps.map((step) => (
                   <div
-                    key={index}
-                    className={`flex items-center gap-3 p-3 rounded-lg ${
-                      index < currentStep
-                        ? 'bg-green-50 text-green-700'
-                        : index === currentStep
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'bg-gray-50 text-gray-400'
+                    key={step.id}
+                    className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                      step.status === 'running'
+                        ? 'bg-blue-50 border-l-4 border-blue-500'
+                        : step.status === 'completed'
+                        ? 'bg-green-50 border-l-4 border-green-500'
+                        : step.status === 'error'
+                        ? 'bg-red-50 border-l-4 border-red-500'
+                        : 'bg-gray-50'
                     }`}
                   >
-                    <span className="text-sm">{step}</span>
-                    {index === currentStep && <span className="animate-spin">⏳</span>}
+                    <span className="text-lg">{getStepIcon(step.status)}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className={`text-sm font-medium ${
+                        step.status === 'error' ? 'text-red-700' : 'text-gray-800'
+                      }`}>
+                        {step.title}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {step.description}
+                        {step.duration && ` · ${step.duration}ms`}
+                        {step.details?.docCount !== undefined && ` · 检索 ${step.details.docCount} 条文档`}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -486,9 +574,7 @@ export default function AiCodegenPage() {
           )}
         </div>
 
-        {/* 中间：输入和结果统计 */}
         <div className="xl:col-span-1 space-y-6">
-          {/* 输入区域 */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4">✍️ 需求描述</h3>
             <textarea
@@ -523,7 +609,6 @@ export default function AiCodegenPage() {
             </button>
           </div>
 
-          {/* 生成结果统计 */}
           {generatedResult && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">📊 生成统计</h3>
@@ -561,12 +646,26 @@ export default function AiCodegenPage() {
             </div>
           )}
 
-          {/* 使用说明 */}
+          {generatedSchema && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">📐 生成的 Schema</h3>
+              <div className="bg-gray-900 rounded-lg p-3 max-h-48 overflow-auto">
+                <pre className="text-xs text-gray-300 font-mono whitespace-pre-wrap">
+                  {JSON.stringify(generatedSchema, null, 2)}
+                </pre>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                组件数量: {generatedSchema.children?.length || 0}
+              </div>
+            </div>
+          )}
+
           <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
             <h3 className="text-lg font-semibold text-blue-800 mb-3">📖 使用说明</h3>
             <ul className="space-y-2 text-sm text-blue-700">
               <li>• 选择生成类型（前端/后端/全栈）</li>
               <li>• 可选启用 RAG 检索和代码优化</li>
+              <li>• 启用 RAG 时可选择关联知识库</li>
               <li>• 输入需求描述或选择预设模板</li>
               <li>• 点击生成代码按钮</li>
               <li>• 在右侧查看生成的文件和代码</li>
@@ -575,7 +674,6 @@ export default function AiCodegenPage() {
           </div>
         </div>
 
-        {/* 右侧：文件树和代码预览 */}
         <div className="xl:col-span-2">
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 h-[calc(100vh-180px)] flex flex-col">
             <div className="flex items-center justify-between mb-4">
@@ -620,7 +718,6 @@ export default function AiCodegenPage() {
             </div>
 
             <div className="flex-1 flex gap-4 overflow-hidden">
-              {/* 文件树 */}
               <div className="w-64 border-r border-gray-200 overflow-auto">
                 {fileTree.length > 0 ? (
                   <FileTree
@@ -638,7 +735,6 @@ export default function AiCodegenPage() {
                 )}
               </div>
 
-              {/* 代码预览 */}
               <div className="flex-1 bg-gray-900 rounded-xl overflow-hidden">
                 <CodePreview
                   content={selectedFile?.content || ''}

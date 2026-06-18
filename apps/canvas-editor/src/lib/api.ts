@@ -115,6 +115,19 @@ export interface GeneratePageResponse {
 }
 
 // 独立画布页面 API（不依赖项目）
+export interface StreamEvent {
+  event: 'step' | 'progress' | 'schema' | 'complete' | 'error'
+  data: {
+    name?: string
+    message?: string
+    progress?: number
+    schema?: any
+    success?: boolean
+    logs?: any[]
+    duration?: number
+  }
+}
+
 // AI Agent API
 export const agentApi = {
   async generatePage(requirement: string, knowledgeBaseIds?: number[], sessionId?: string, metadata?: Record<string, any>): Promise<GeneratePageResponse> {
@@ -123,6 +136,111 @@ export const agentApi = {
       knowledgeBaseIds: knowledgeBaseIds || [],
       sessionId,
       metadata,
+    })
+  },
+
+  async generatePageStream(
+    requirement: string,
+    knowledgeBaseIds?: number[],
+    sessionId?: string,
+    metadata?: Record<string, any>,
+    onEvent?: (event: StreamEvent) => void
+  ): Promise<GeneratePageResponse> {
+    return new Promise((resolve, reject) => {
+      const token = localStorage.getItem('token')
+      const xhr = new XMLHttpRequest()
+      
+      xhr.open('POST', `${BASE_URL}/api/agent/generate-page/stream`)
+      xhr.setRequestHeader('Content-Type', 'application/json')
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+      }
+
+      let buffer = ''
+
+      xhr.onprogress = () => {
+        const newData = xhr.responseText.substring(buffer.length)
+        buffer = xhr.responseText
+
+        const events = newData.split('\n\n')
+        for (const eventStr of events) {
+          if (!eventStr.trim()) continue
+
+          let event: StreamEvent = { event: 'progress', data: {} }
+          let currentEventName = 'progress'
+
+          const lines = eventStr.split('\n')
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              currentEventName = line.substring(7) as StreamEvent['event']
+            } else if (line.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(line.substring(6))
+                event = { event: currentEventName, data }
+              } catch {
+                continue
+              }
+            }
+          }
+
+          if (event.event === 'complete') {
+            resolve({ success: true, schema: event.data.schema })
+          } else if (event.event === 'error') {
+            reject(new Error(event.data.message))
+          } else if (onEvent) {
+            onEvent(event)
+          }
+        }
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const remainingEvents = buffer.split('\n\n').filter(e => e.trim())
+            for (const eventStr of remainingEvents) {
+              let event: StreamEvent = { event: 'progress', data: {} }
+              let currentEventName = 'progress'
+
+              const lines = eventStr.split('\n')
+              for (const line of lines) {
+                if (line.startsWith('event: ')) {
+                  currentEventName = line.substring(7) as StreamEvent['event']
+                } else if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.substring(6))
+                    event = { event: currentEventName, data }
+                  } catch {
+                    continue
+                  }
+                }
+              }
+
+              if (event.event === 'complete') {
+                resolve({ success: true, schema: event.data.schema })
+                return
+              } else if (event.event === 'error') {
+                reject(new Error(event.data.message))
+                return
+              }
+            }
+          } catch (e) {
+            reject(e)
+          }
+        } else {
+          reject(new Error(`HTTP ${xhr.status}`))
+        }
+      }
+
+      xhr.onerror = () => {
+        reject(new Error('Network error'))
+      }
+
+      xhr.send(JSON.stringify({
+        requirement,
+        knowledgeBaseIds: knowledgeBaseIds || [],
+        sessionId,
+        metadata,
+      }))
     })
   },
 
@@ -266,5 +384,159 @@ export const canvasPageApi = {
 
   async importPage(data: { name: string; canvasJson: any }) {
     return apiClient.post('/api/canvas-pages/import', data)
+  },
+}
+
+export interface KnowledgeBase {
+  id: number
+  name: string
+  description?: string
+  embeddingModel?: string
+  dimension?: number
+  isActive?: boolean
+  documentCount?: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface KnowledgeDocument {
+  id: number
+  knowledgeBaseId: number
+  name: string
+  content: string
+  type: 'md' | 'api' | 'requirement'
+  vectorStatus: 'pending' | 'processing' | 'completed' | 'failed'
+  chunkCount?: number
+  size?: number
+  errorMessage?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface SearchResult {
+  id: string
+  content: string
+  metadata: Record<string, unknown>
+  score: number
+}
+
+export interface KnowledgeBaseStats {
+  documentCount: number
+  chunkCount: number
+  pendingCount: number
+  completedCount: number
+  failedCount: number
+}
+
+export const knowledgeApi = {
+  async createKnowledgeBase(data: {
+    name: string
+    description?: string
+    embeddingModel?: string
+    dimension?: number
+    isActive?: boolean
+  }) {
+    return apiClient.post('/api/knowledge/bases', data)
+  },
+
+  async getAllKnowledgeBases() {
+    return apiClient.get('/api/knowledge/bases')
+  },
+
+  async getKnowledgeBaseById(id: number) {
+    return apiClient.get(`/api/knowledge/bases/${id}`)
+  },
+
+  async updateKnowledgeBase(id: number, data: {
+    name?: string
+    description?: string
+    embeddingModel?: string
+    dimension?: number
+    isActive?: boolean
+  }) {
+    return apiClient.put(`/api/knowledge/bases/${id}`, data)
+  },
+
+  async deleteKnowledgeBase(id: number) {
+    return apiClient.delete(`/api/knowledge/bases/${id}`)
+  },
+
+  async uploadDocument(data: {
+    knowledgeBaseId: number
+    name: string
+    content: string
+    type: 'md' | 'api' | 'requirement'
+    metadata?: Record<string, any>
+  }) {
+    return apiClient.post('/api/knowledge/documents/upload', data)
+  },
+
+  async uploadDocumentFile(file: File, knowledgeBaseId: number, type: 'md' | 'api' | 'requirement') {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('knowledgeBaseId', String(knowledgeBaseId))
+    formData.append('type', type)
+
+    const response = await fetch(`${BASE_URL}/api/knowledge/documents/upload-file`, {
+      method: 'POST',
+      headers: {
+        ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
+      },
+      body: formData,
+    })
+    return response.json()
+  },
+
+  async getDocumentsByKnowledgeBase(knowledgeBaseId: number) {
+    return apiClient.get(`/api/knowledge/documents?knowledgeBaseId=${knowledgeBaseId}`)
+  },
+
+  async getDocumentById(id: number) {
+    return apiClient.get(`/api/knowledge/documents/${id}`)
+  },
+
+  async deleteDocument(id: number) {
+    return apiClient.delete(`/api/knowledge/documents/${id}`)
+  },
+
+  async searchKnowledge(data: {
+    knowledgeBaseId: number
+    query: string
+    topK?: number
+    threshold?: number
+  }) {
+    return apiClient.post('/api/knowledge/search', data)
+  },
+
+  async hybridSearchKnowledge(data: {
+    knowledgeBaseId: number
+    query: string
+    topK?: number
+    threshold?: number
+  }) {
+    return apiClient.post('/api/knowledge/hybrid-search', data)
+  },
+
+  async getDocumentChunks(documentId: number, page: number = 1, pageSize: number = 10) {
+    return apiClient.get(`/api/knowledge/chunks/${documentId}?page=${page}&pageSize=${pageSize}`)
+  },
+
+  async clearKnowledgeBaseVectors(id: number) {
+    return apiClient.post(`/api/knowledge/bases/${id}/clear-vectors`, {})
+  },
+
+  async getKnowledgeBaseStats(id: number) {
+    return apiClient.get(`/api/knowledge/bases/${id}/stats`)
+  },
+
+  async revectorizeDocument(id: number) {
+    return apiClient.post(`/api/knowledge/documents/${id}/revectorize`, {})
+  },
+
+  async getVectorizationLogs(documentId?: string) {
+    const url = documentId
+      ? `/api/knowledge/logs?documentId=${documentId}`
+      : '/api/knowledge/logs'
+    return apiClient.get(url)
   },
 }

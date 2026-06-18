@@ -1,17 +1,24 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
-import { Send, Sparkles, Loader2, CheckCircle, XCircle, MessageSquare, AlertCircle } from 'lucide-react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { Send, Sparkles, Loader2, CheckCircle, XCircle, MessageSquare, AlertCircle, ChevronRight } from 'lucide-react'
 import { useCanvasStore } from '@/store/canvasStore'
-import { agentApi } from '@/lib/api'
+import { agentApi, type StreamEvent } from '@/lib/api'
 
 interface Message {
   id: string
-  type: 'user' | 'agent' | 'system' | 'error'
+  type: 'user' | 'agent' | 'system' | 'error' | 'progress'
   content: string
   timestamp: Date
   status?: 'pending' | 'success' | 'error'
+  progress?: number
   details?: any
+}
+
+interface ProgressStep {
+  id: string
+  label: string
+  status: 'pending' | 'active' | 'completed' | 'error'
 }
 
 export function AIAssistantPanel() {
@@ -26,11 +33,23 @@ export function AIAssistantPanel() {
     },
   ])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [currentProgress, setCurrentProgress] = useState<number>(0)
+  const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([])
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   
   const newPage = useCanvasStore((state) => state.newPage)
   const importCanvasSchema = useCanvasStore((state) => state.importCanvasSchema)
 
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
+
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages, scrollToBottom])
 
   const extractPageName = (input: string): string | undefined => {
     const patterns = [
@@ -61,6 +80,14 @@ export function AIAssistantPanel() {
     setMessages(prev => [...prev, userMessage])
     setInputValue('')
     setIsGenerating(true)
+    setCurrentProgress(0)
+    setProgressSteps([
+      { id: 'requirement', label: '分析需求', status: 'pending' },
+      { id: 'planning', label: '规划结构', status: 'pending' },
+      { id: 'rag', label: '检索知识', status: 'pending' },
+      { id: 'generating', label: '生成 Schema', status: 'pending' },
+      { id: 'complete', label: '完成', status: 'pending' },
+    ])
 
     const agentMessage: Message = {
       id: generateId(),
@@ -72,20 +99,54 @@ export function AIAssistantPanel() {
     setMessages(prev => [...prev, agentMessage])
 
     try {
-      // 调用后端 AI 生成页面 API
-      const response = await agentApi.generatePage(inputValue)
+      const response = await agentApi.generatePageStream(
+        inputValue,
+        undefined,
+        undefined,
+        undefined,
+        (event: StreamEvent) => {
+          if (event.event === 'step') {
+            const { name, message, progress } = event.data
+            setCurrentProgress(progress || 0)
+            
+            setProgressSteps(prev => prev.map(step => {
+              if (step.id === name) {
+                return { ...step, status: 'active' as const }
+              } else if (prev.find(s => s.id === name)?.status === 'active') {
+                return { ...step, status: step.id === name ? 'active' : 'completed' as const }
+              }
+              return step
+            }))
+
+            setMessages(prev => prev.map(msg => 
+              msg.id === agentMessage.id 
+                ? { ...msg, content: message || '', status: 'pending' }
+                : msg
+            ))
+          } else if (event.event === 'schema') {
+            const { schema } = event.data
+            if (schema) {
+              setMessages(prev => prev.map(msg => 
+                msg.id === agentMessage.id 
+                  ? { ...msg, content: `页面 Schema 已生成，包含 ${schema.children?.length || 0} 个组件`, status: 'success' }
+                  : msg
+              ))
+            }
+          }
+        }
+      )
       
       if (response.success && response.schema) {
-        // 创建新页面并导入 Schema
         newPage()
         
-        // 提取页面名称
         const pageName = extractPageName(inputValue) || 'AI生成页面'
         
-        // 导入生成的 Schema 到画布
         importCanvasSchema(response.schema)
 
-        // 更新消息状态
+        setProgressSteps(prev => prev.map(step => 
+          step.id === 'complete' ? { ...step, status: 'completed' } : step
+        ))
+
         setMessages(prev => prev.map(msg => 
           msg.id === agentMessage.id 
             ? { ...msg, content: `已成功创建页面 "${pageName}"！\n\n生成了 ${response.schema.children?.length || 0} 个组件`, status: 'success' }
@@ -103,6 +164,13 @@ export function AIAssistantPanel() {
       }
     } catch (error: any) {
       console.error('AI 生成页面失败:', error)
+      
+      setProgressSteps(prev => prev.map(step => 
+        step.status === 'pending' || step.status === 'active'
+          ? { ...step, status: 'error' as const }
+          : step
+      ))
+
       setMessages(prev => prev.map(msg => 
         msg.id === agentMessage.id 
           ? { ...msg, content: `生成失败: ${error.message || '未知错误'}`, status: 'error' }
@@ -117,6 +185,7 @@ export function AIAssistantPanel() {
       }])
     } finally {
       setIsGenerating(false)
+      setCurrentProgress(0)
     }
   }, [inputValue, isGenerating, newPage, importCanvasSchema])
 
@@ -135,8 +204,23 @@ export function AIAssistantPanel() {
         return 'bg-gray-100 text-sm text-gray-600 italic'
       case 'error':
         return 'bg-red-50 border-l-4 border-red-500 text-red-700'
+      case 'progress':
+        return 'bg-blue-50 border-l-4 border-blue-500'
       default:
         return 'bg-white border border-gray-200'
+    }
+  }
+
+  const getStepIcon = (status: ProgressStep['status']) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="w-4 h-4 text-green-500" />
+      case 'active':
+        return <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
+      case 'error':
+        return <XCircle className="w-4 h-4 text-red-500" />
+      default:
+        return <div className="w-4 h-4 rounded-full border-2 border-gray-300" />
     }
   }
 
@@ -203,6 +287,47 @@ export function AIAssistantPanel() {
                 </div>
               </div>
             ))}
+            
+            {isGenerating && (
+              <div className="bg-white rounded-lg p-3 border border-gray-200">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-xs flex-shrink-0">
+                    AI
+                  </div>
+                  <span className="text-sm text-gray-700">生成进度</span>
+                </div>
+                
+                <div className="mb-3">
+                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
+                      style={{ width: `${currentProgress}%` }}
+                    />
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1 text-right">{currentProgress}%</div>
+                </div>
+                
+                <div className="space-y-2">
+                  {progressSteps.map((step) => (
+                    <div key={step.id} className="flex items-center gap-2">
+                      {getStepIcon(step.status)}
+                      <span className={`text-xs ${
+                        step.status === 'completed' ? 'text-green-600' :
+                        step.status === 'active' ? 'text-blue-600 font-medium' :
+                        step.status === 'error' ? 'text-red-600' : 'text-gray-400'
+                      }`}>
+                        {step.label}
+                      </span>
+                      {step.status === 'active' && (
+                        <ChevronRight className="w-3 h-3 text-blue-500" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="p-3 bg-white border-t border-gray-200">
