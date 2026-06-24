@@ -1,9 +1,11 @@
 'use client'
 
 import React from 'react'
-import { useCanvasStore } from '@/store/canvasStore'
+import { useCanvasStore, DEFAULT_BREAKPOINTS } from '@/store/canvasStore'
 import { PropertyForm } from './PropertyForm'
 import { DataSourceBinding } from './DataSourceBinding'
+import { EventBinding } from './EventBinding'
+import { RenderLogic } from './RenderLogic'
 import { DataPreviewPanel } from '../DataPreviewPanel'
 
 export function PropertyPanel() {
@@ -117,6 +119,57 @@ export function PropertyPanel() {
               onChange={(e) => handlePageSettingChange('backgroundColor', e.target.value)}
               className="w-full h-10 border border-gray-300 rounded-md cursor-pointer"
             />
+          </div>
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              响应式布局
+            </label>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-500">启用响应式断点</span>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={currentPage.responsiveLayout?.enabled || false}
+                  onChange={(e) => {
+                    const enabled = e.target.checked
+                    handlePageSettingChange('responsiveLayout', {
+                      enabled,
+                      breakpoints: DEFAULT_BREAKPOINTS,
+                      currentBreakpoint: 'lg',
+                    })
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+            {(currentPage.responsiveLayout?.enabled || false) && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {DEFAULT_BREAKPOINTS.map((bp) => (
+                  <button
+                    key={bp.name}
+                    onClick={() => {
+                      const config = currentPage.responsiveLayout || {
+                        enabled: true,
+                        breakpoints: DEFAULT_BREAKPOINTS,
+                        currentBreakpoint: 'lg',
+                      }
+                      handlePageSettingChange('responsiveLayout', {
+                        ...config,
+                        currentBreakpoint: bp.name,
+                      })
+                    }}
+                    className={`px-3 py-1.5 text-sm rounded-full border transition-all ${
+                      currentPage.responsiveLayout?.currentBreakpoint === bp.name
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-blue-400'
+                    }`}
+                  >
+                    {bp.icon} {bp.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -247,6 +300,12 @@ export function PropertyPanel() {
         
         {/* 数据源绑定 */}
         <DataSourceBinding />
+        
+        {/* 渲染逻辑 */}
+        <RenderLogic />
+        
+        {/* 事件绑定 */}
+        <EventBinding />
         
         {/* 数据预览 */}
         <DataPreviewPanel />

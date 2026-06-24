@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useCallback } from 'react'
 import { Group, Rect, Text } from 'react-konva'
-import type { CustomComponentInstance } from '@ai-lowcode/shared-types'
+import type { CustomComponentInstance, CustomEventDefinition } from '@ai-lowcode/shared-types'
 import { customComponentRegistry } from '@/services/CustomComponentRegistry'
 import { ComponentRenderer } from './ComponentRenderer'
 
@@ -16,6 +16,7 @@ interface CustomComponentRendererProps {
   y: number
   width: number
   height: number
+  onEvent?: (eventName: string, data: any) => void
 }
 
 /**
@@ -31,11 +32,31 @@ export function CustomComponentRenderer({
   y,
   width,
   height,
+  onEvent,
 }: CustomComponentRendererProps) {
   // 获取组件定义
   const definition = useMemo(() => {
     return customComponentRegistry.getDefinition(instance.customComponentId)
   }, [instance.customComponentId])
+
+  const handleChildEvent = useCallback((childEventName: string, data: Record<string, any>) => {
+    if (!definition || !definition.events) return
+
+    const matchingEvent: CustomEventDefinition | undefined = definition.events.find(
+      (event: CustomEventDefinition) => event.childComponentId === data.componentId && event.childEventName === childEventName
+    )
+
+    if (matchingEvent) {
+      onEvent?.(matchingEvent.name, {
+        ...data,
+        eventName: matchingEvent.name,
+        params: matchingEvent.params?.reduce((acc, param) => {
+          acc[param.name] = data.props[param.name]
+          return acc
+        }, {} as Record<string, any>),
+      })
+    }
+  }, [definition, onEvent])
 
   // 渲染可视化模板组件
   const renderVisualTemplate = () => {
@@ -81,6 +102,7 @@ export function CustomComponentRenderer({
               onSelect={() => {}}
               onDragMove={() => {}}
               onTransform={() => {}}
+              onEvent={handleChildEvent}
             />
           )
         })}

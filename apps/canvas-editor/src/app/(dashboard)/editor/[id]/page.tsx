@@ -78,6 +78,29 @@ export default function EditorPage() {
     setDraggingId(null)
   }, [])
 
+  // 渲染树形数据
+  const renderTreeData = (treeData: any[], level = 0) => {
+    if (!treeData || treeData.length === 0) {
+      return <div className="text-gray-400">暂无数据</div>
+    }
+
+    return (
+      <div>
+        {treeData.map((node, index) => (
+          <div key={node.key || index} style={{ marginLeft: level * 16 }}>
+            <div className="flex items-start py-1">
+              <span className="mr-1">{node.children ? '📁' : '📄'}</span>
+              <span className={node.children ? 'text-blue-600' : 'text-gray-700'}>
+                {node.title || '未命名节点'}
+              </span>
+            </div>
+            {node.children && renderTreeData(node.children, level + 1)}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
   // 处理拖放
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -120,7 +143,7 @@ export default function EditorPage() {
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* 工具栏 */}
         <div className="h-14 border-b border-gray-200 bg-white px-4 flex items-center justify-between">
-          <Toolbar />
+          <Toolbar projectId={projectId} />
           <button
             onClick={() => setShowPerformance(!showPerformance)}
             className={`px-3 py-1 rounded text-sm ${
@@ -543,25 +566,25 @@ export default function EditorPage() {
                       </div>
                     )}
                     {component.type === 'tree' && (
-                      <div className="w-full h-full bg-white border border-gray-200 rounded p-3">
+                      <div className="w-full h-full bg-white border border-gray-200 rounded p-3 overflow-auto">
                         <div className="text-sm font-medium mb-2">{component.props.title || '树形控件'}</div>
                         <div className="text-xs">
-                          <div className="flex items-start">
-                            <span className="mr-1">📁</span>
-                            <div>
-                              <div className="text-blue-600">根节点</div>
-                              <div className="ml-4">
-                                <div className="flex items-start"><span className="mr-1">📁</span><span>子节点1</span></div>
-                                <div className="flex items-start"><span className="mr-1">📁</span><span>子节点2</span></div>
-                              </div>
-                            </div>
-                          </div>
+                          {renderTreeData(component.props.treeData || [])}
                         </div>
                       </div>
                     )}
                     {component.type === 'carousel' && (
                       <div className="w-full h-full bg-gray-100 rounded overflow-hidden relative">
-                        <div className="absolute inset-0 flex items-center justify-center text-4xl">🎠</div>
+                        {component.props.images && component.props.images.length > 0 ? (
+                          <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                            <div className="text-center">
+                              <div className="text-4xl mb-2">🎠</div>
+                              <div className="text-sm text-gray-600">{component.props.images.length} 张图片</div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-4xl">🎠</div>
+                        )}
                         <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1">
                           <div className="w-2 h-2 rounded-full bg-blue-500" />
                           <div className="w-2 h-2 rounded-full bg-gray-300" />

@@ -11,6 +11,7 @@ interface ComponentRendererProps {
   onSelect: (e: any) => void
   onDragMove: (newX: number, newY: number) => void
   onTransform: (attrs: any) => void
+  onEvent?: (eventName: string, data: any) => void
 }
 
 export function ComponentRenderer({
@@ -19,6 +20,7 @@ export function ComponentRenderer({
   onSelect,
   onDragMove,
   onTransform: _onTransform,
+  onEvent,
 }: ComponentRendererProps) {
   // 根据组件类型确定绑定模式
   const getBindingMode = (): BindingMode => {
@@ -630,24 +632,83 @@ export function ComponentRenderer({
     }
   }
 
-  return (
+  const handleClick = (e: any) => {
+    onSelect(e)
+    onEvent?.('onClick', { componentId: component.id, props: component.props })
+  }
+
+  const handleDblClick = () => {
+    onEvent?.('onDoubleClick', { componentId: component.id, props: component.props })
+  }
+
+  const evaluateCondition = (): boolean => {
+    if (!component.conditionalRender?.enabled) return true
+
+    const { operator, leftValue, rightValue } = component.conditionalRender
+
+    let left = leftValue
+    let right = rightValue
+
+    if (left.startsWith('{{') && left.endsWith('}}')) {
+      const propName = left.slice(2, -2).trim()
+      left = component.props[propName] ?? ''
+    }
+
+    if (right.startsWith('{{') && right.endsWith('}}')) {
+      const propName = right.slice(2, -2).trim()
+      right = component.props[propName] ?? ''
+    }
+
+    const numLeft = Number(left)
+    const numRight = Number(right)
+    const isNumeric = !isNaN(numLeft) && !isNaN(numRight)
+
+    switch (operator) {
+      case '==':
+        return String(left) === String(right)
+      case '!=':
+        return String(left) !== String(right)
+      case '>':
+        return isNumeric ? numLeft > numRight : false
+      case '<':
+        return isNumeric ? numLeft < numRight : false
+      case '>=':
+        return isNumeric ? numLeft >= numRight : false
+      case '<=':
+        return isNumeric ? numLeft <= numRight : false
+      case 'contains':
+        return String(left).includes(String(right))
+      case 'isEmpty':
+        return String(left).trim() === ''
+      case 'isNotEmpty':
+        return String(left).trim() !== ''
+      default:
+        return true
+    }
+  }
+
+  const shouldRender = evaluateCondition()
+  const finalVisible = component.conditionalRender?.enabled
+    ? component.conditionalRender.showIfTrue === shouldRender
+    : component.visible
+
+  const renderContent = () => (
     <Group
-      x={component.x}
-      y={component.y}
+      x={0}
+      y={0}
       width={component.width}
       height={component.height}
-      zIndex={component.zIndex}
-      onClick={onSelect}
-      onTap={onSelect}
+      onClick={handleClick}
+      onTap={handleClick}
+      onDblClick={handleDblClick}
       draggable={!component.locked}
-      onDragMove={(e) => onDragMove(e.target.x(), e.target.y())}
+      onDragMove={(e) => onDragMove(component.x + e.target.x(), component.y + e.target.y())}
       opacity={component.opacity}
       rotation={component.rotation}
-      visible={component.visible}
+      visible={finalVisible}
     >
       {renderComponent()}
       
-      {/* 选中状态 - 蓝色边框 */}
       {isSelected && (
         <Rect
           x={-2}
@@ -660,6 +721,27 @@ export function ComponentRenderer({
           fill="transparent"
         />
       )}
+    </Group>
+  )
+
+  if (component.loopRender?.enabled) {
+    return (
+      <Group x={component.x} y={component.y}>
+        {renderContent()}
+        <Text
+          x={0}
+          y={-16}
+          text="🔄 循环渲染"
+          fontSize={11}
+          fill="#1890ff"
+        />
+      </Group>
+    )
+  }
+
+  return (
+    <Group x={component.x} y={component.y}>
+      {renderContent()}
     </Group>
   )
 }

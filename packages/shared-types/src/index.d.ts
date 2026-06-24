@@ -106,6 +106,8 @@ export interface CustomEventDefinition {
         type: string;
         description?: string;
     }>;
+    childComponentId?: string;
+    childEventName?: string;
 }
 export interface CustomDataSourceConfig {
     types: Array<'api' | 'database' | 'static' | 'websocket'>;

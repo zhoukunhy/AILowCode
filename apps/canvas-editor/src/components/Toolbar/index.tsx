@@ -2,12 +2,16 @@
 
 import React, { useState, useEffect } from 'react'
 import { useCanvasStore } from '@/store/canvasStore'
+import { PreviewMode } from '@/components/PreviewMode'
+import { ThemeSettings } from '@/components/ThemeSettings'
+import { MobileAdaptation } from '@/components/MobileAdaptation'
 
 interface ToolbarProps {
   isViewMode?: boolean
+  projectId?: string
 }
 
-export function Toolbar({ isViewMode = false }: ToolbarProps) {
+export function Toolbar({ isViewMode = false, projectId = 'new' }: ToolbarProps) {
   const project = useCanvasStore((state) => state.project)
   const components = useCanvasStore((state) => state.components)
   const saveProject = useCanvasStore((state) => state.saveProject)
@@ -23,6 +27,9 @@ export function Toolbar({ isViewMode = false }: ToolbarProps) {
   const [mounted, setMounted] = useState(false)
   const [exportModalOpen, setExportModalOpen] = useState(false)
   const [jsonContent, setJsonContent] = useState('')
+  const [showPreview, setShowPreview] = useState(false)
+  const [showThemeSettings, setShowThemeSettings] = useState(false)
+  const [showMobileAdaptation, setShowMobileAdaptation] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -149,10 +156,58 @@ export function Toolbar({ isViewMode = false }: ToolbarProps) {
                 <span>🗑️</span>
                 <span>清除画布</span>
               </button>
+              
+              <div className="w-px h-6 bg-gray-200 mx-2"></div>
+              
+              <button
+                onClick={() => setShowPreview(true)}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors flex items-center gap-2"
+              >
+                <span>👁️</span>
+                <span>预览</span>
+              </button>
+              
+              <div className="w-px h-6 bg-gray-200 mx-2"></div>
+              
+              <button
+                onClick={() => setShowThemeSettings(true)}
+                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition-colors flex items-center gap-2"
+              >
+                <span>🎨</span>
+                <span>主题</span>
+              </button>
+              
+              <div className="w-px h-6 bg-gray-200 mx-2"></div>
+              
+              <button
+                onClick={() => setShowMobileAdaptation(true)}
+                className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors flex items-center gap-2"
+              >
+                <span>📱</span>
+                <span>移动端</span>
+              </button>
             </>
           )}
         </div>
       </div>
+
+      {/* 预览模式 */}
+      {showPreview && (
+        <PreviewMode 
+          onClose={() => setShowPreview(false)} 
+          projectId={projectId}
+        />
+      )}
+
+      {/* 主题设置 */}
+      {showThemeSettings && (
+        <ThemeSettings onClose={() => setShowThemeSettings(false)} />
+      )}
+
+      {/* 移动端适配 */}
+      {showMobileAdaptation && (
+        <MobileAdaptation onClose={() => setShowMobileAdaptation(false)} />
+      )}
 
       {/* 另存为弹窗 */}
       {saveAsModalOpen && (

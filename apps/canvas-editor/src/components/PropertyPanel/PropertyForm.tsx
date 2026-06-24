@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 
 interface SchemaFieldProps {
   name: string
@@ -81,9 +81,93 @@ function SchemaField({ name, schema, value, onChange }: SchemaFieldProps) {
         </div>
       )
 
+    case 'array':
+      return (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            {schema.title || name}
+          </label>
+          <ArrayEditor
+            value={value || []}
+            onChange={(newValue) => onChange(name, newValue)}
+          />
+        </div>
+      )
+
     default:
       return null
   }
+}
+
+interface ArrayEditorProps {
+  value: any[]
+  onChange: (value: any[]) => void
+}
+
+function ArrayEditor({ value, onChange }: ArrayEditorProps) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [jsonText, setJsonText] = useState(JSON.stringify(value, null, 2))
+
+  const handleSave = () => {
+    try {
+      const parsed = JSON.parse(jsonText)
+      onChange(parsed)
+      setIsExpanded(false)
+    } catch (error) {
+      alert('JSON 格式错误，请检查输入')
+    }
+  }
+
+  const handleCancel = () => {
+    setJsonText(JSON.stringify(value, null, 2))
+    setIsExpanded(false)
+  }
+
+  if (isExpanded) {
+    return (
+      <div className="border border-gray-300 rounded-md p-2">
+        <textarea
+          value={jsonText}
+          onChange={(e) => setJsonText(e.target.value)}
+          className="w-full h-32 px-2 py-1 text-sm font-mono border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="输入 JSON 数组"
+        />
+        <div className="flex gap-2 mt-2">
+          <button
+            onClick={handleSave}
+            className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+          >
+            保存
+          </button>
+          <button
+            onClick={handleCancel}
+            className="px-3 py-1 bg-gray-300 text-gray-700 text-sm rounded hover:bg-gray-400"
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm text-gray-600">{value.length} 项</span>
+        <button
+          onClick={() => setIsExpanded(true)}
+          className="text-blue-500 text-sm hover:underline"
+        >
+          编辑
+        </button>
+      </div>
+      <div className="border border-gray-200 rounded-md p-2 bg-gray-50 max-h-32 overflow-y-auto">
+        <pre className="text-xs text-gray-700 whitespace-pre-wrap">
+          {JSON.stringify(value, null, 2)}
+        </pre>
+      </div>
+    </div>
+  )
 }
 
 interface PropertyFormProps {

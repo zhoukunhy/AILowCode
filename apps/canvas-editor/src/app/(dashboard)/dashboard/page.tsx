@@ -52,44 +52,49 @@ export default function DashboardPage() {
   const [recentCanvases, setRecentCanvases] = useState<RecentCanvas[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 获取最近创建的画布
+  // 获取最近创建的画布 - 延迟加载避免阻塞页面渲染
   useEffect(() => {
-    const fetchRecentCanvases = async () => {
-      try {
-        const response = await fetch('http://localhost:3002/api/menus?sort=createdAt&order=desc&limit=5', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-        })
-        if (response.ok) {
-          const data = await response.json()
-          // 将菜单数据映射为画布数据
-          const canvases: RecentCanvas[] = (data.data || []).slice(0, 5).map((menu: any, index: number) => ({
-            id: menu.pageId || `canvas-${index}`,
-            name: menu.name,
-            updatedAt: new Date(menu.createdAt).toLocaleString('zh-CN'),
-            status: menu.status ? '进行中' : '草稿',
-            components: 0,
-            menuName: menu.name,
-          }))
-          setRecentCanvases(canvases)
-        }
-      } catch (error) {
-        console.error('获取画布列表失败:', error)
-        // 使用默认数据
-        setRecentCanvases([
-          { id: '1', name: '首页画布', updatedAt: '2024-01-15 10:30', status: '进行中', components: 45, menuName: '首页' },
-          { id: '2', name: '用户管理画布', updatedAt: '2024-01-14 16:20', status: '已完成', components: 128, menuName: '用户管理' },
-          { id: '3', name: '仪表盘画布', updatedAt: '2024-01-13 09:15', status: '草稿', components: 12, menuName: '仪表盘' },
-          { id: '4', name: '订单管理画布', updatedAt: '2024-01-12 14:45', status: '进行中', components: 67, menuName: '订单管理' },
-          { id: '5', name: '数据统计画布', updatedAt: '2024-01-11 11:00', status: '已完成', components: 89, menuName: '数据统计' },
-        ])
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchRecentCanvases()
+    const timer = setTimeout(() => {
+      fetchRecentCanvases()
+    }, 200) // 延迟200ms加载，让页面先渲染
+    
+    return () => clearTimeout(timer)
   }, [])
+
+  const fetchRecentCanvases = async () => {
+    try {
+      const response = await fetch('http://localhost:3002/api/menus?sort=createdAt&order=desc&limit=5', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        // 将菜单数据映射为画布数据
+        const canvases: RecentCanvas[] = (data.data || []).slice(0, 5).map((menu: any, index: number) => ({
+          id: menu.pageId || `canvas-${index}`,
+          name: menu.name,
+          updatedAt: new Date(menu.createdAt).toLocaleString('zh-CN'),
+          status: menu.status ? '进行中' : '草稿',
+          components: 0,
+          menuName: menu.name,
+        }))
+        setRecentCanvases(canvases)
+      }
+    } catch (error) {
+      console.error('获取画布列表失败:', error)
+      // 使用默认数据
+      setRecentCanvases([
+        { id: '1', name: '首页画布', updatedAt: '2024-01-15 10:30', status: '进行中', components: 45, menuName: '首页' },
+        { id: '2', name: '用户管理画布', updatedAt: '2024-01-14 16:20', status: '已完成', components: 128, menuName: '用户管理' },
+        { id: '3', name: '仪表盘画布', updatedAt: '2024-01-13 09:15', status: '草稿', components: 12, menuName: '仪表盘' },
+        { id: '4', name: '订单管理画布', updatedAt: '2024-01-12 14:45', status: '进行中', components: 67, menuName: '订单管理' },
+        { id: '5', name: '数据统计画布', updatedAt: '2024-01-11 11:00', status: '已完成', components: 89, menuName: '数据统计' },
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {

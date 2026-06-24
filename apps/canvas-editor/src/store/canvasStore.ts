@@ -2,6 +2,22 @@ import { createStore } from 'zustand/vanilla'
 import { generateId } from '@ai-lowcode/common-util'
 import { canvasPageApi } from '../lib/api'
 
+export interface ConditionalRenderConfig {
+  enabled: boolean
+  condition: string
+  operator: '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'isEmpty' | 'isNotEmpty'
+  leftValue: string
+  rightValue: string
+  showIfTrue: boolean
+}
+
+export interface LoopRenderConfig {
+  enabled: boolean
+  dataSource: string
+  itemKey: string
+  itemName: string
+}
+
 // 组件配置类型
 export interface ComponentConfig {
   id: string
@@ -19,6 +35,8 @@ export interface ComponentConfig {
   locked: boolean
   hasAnimation?: boolean
   hasInteractiveState?: boolean
+  conditionalRender?: ConditionalRenderConfig
+  loopRender?: LoopRenderConfig
 }
 
 // 组件元数据类型
@@ -32,6 +50,27 @@ export interface ComponentMeta {
   schema: any // JSON Schema配置
 }
 
+export interface BreakpointConfig {
+  name: string
+  minWidth: number
+  maxWidth: number
+  icon: string
+}
+
+export interface ResponsiveLayoutConfig {
+  enabled: boolean
+  breakpoints: BreakpointConfig[]
+  currentBreakpoint: string
+}
+
+export const DEFAULT_BREAKPOINTS: BreakpointConfig[] = [
+  { name: 'xs', minWidth: 0, maxWidth: 576, icon: '📱' },
+  { name: 'sm', minWidth: 576, maxWidth: 768, icon: '📲' },
+  { name: 'md', minWidth: 768, maxWidth: 992, icon: '💻' },
+  { name: 'lg', minWidth: 992, maxWidth: 1200, icon: '🖥️' },
+  { name: 'xl', minWidth: 1200, maxWidth: Infinity, icon: '🖼️' },
+]
+
 // 页面配置类型
 export interface PageConfig {
   id: string
@@ -43,6 +82,7 @@ export interface PageConfig {
   showGrid: boolean
   showRulers: boolean
   backgroundColor: string
+  responsiveLayout?: ResponsiveLayoutConfig
 }
 
 // 项目配置类型
@@ -774,6 +814,16 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
       title: '树形结构',
       checkable: true,
       showLine: true,
+      treeData: [
+        {
+          key: '1',
+          title: '根节点',
+          children: [
+            { key: '1-1', title: '子节点1' },
+            { key: '1-2', title: '子节点2' },
+          ],
+        },
+      ],
     },
     schema: {
       type: 'object',
@@ -781,6 +831,7 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
         title: { type: 'string', title: '标题' },
         checkable: { type: 'boolean', title: '可选中' },
         showLine: { type: 'boolean', title: '显示连接线' },
+        treeData: { type: 'array', title: '树形数据' },
       },
     },
   },
@@ -794,6 +845,11 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
       autoplay: true,
       dotPosition: 'bottom',
       effect: 'scrollx',
+      images: [
+        { url: 'https://via.placeholder.com/600x300?text=Slide+1', title: '轮播图1' },
+        { url: 'https://via.placeholder.com/600x300?text=Slide+2', title: '轮播图2' },
+        { url: 'https://via.placeholder.com/600x300?text=Slide+3', title: '轮播图3' },
+      ],
     },
     schema: {
       type: 'object',
@@ -809,6 +865,7 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
           title: '切换效果',
           enum: ['scrollx', 'fade']
         },
+        images: { type: 'array', title: '图片列表' },
       },
     },
   },

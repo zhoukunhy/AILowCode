@@ -1,5 +1,25 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
 
+// 简单的内存缓存
+const cache = new Map<string, { data: any; timestamp: number }>()
+const CACHE_DURATION = 5 * 60 * 1000 // 5分钟缓存
+
+function getCacheKey(url: string, method: string = 'GET', body?: any): string {
+  return `${method}:${url}:${body ? JSON.stringify(body) : ''}`
+}
+
+function getCachedData<T>(key: string): T | null {
+  const cached = cache.get(key)
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data as T
+  }
+  return null
+}
+
+function setCachedData<T>(key: string, data: T): void {
+  cache.set(key, { data, timestamp: Date.now() })
+}
+
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('token')
@@ -10,13 +30,32 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 export const apiClient = {
-  async get<T>(url: string, options?: RequestInit): Promise<T> {
+  async get<T>(url: string, options?: RequestInit & { useCache?: boolean }): Promise<T> {
+    const cacheKey = getCacheKey(url, 'GET')
+    
+    // 检查缓存
+    if (options?.useCache !== false) {
+      const cached = getCachedData<T>(cacheKey)
+      if (cached) {
+        console.log(`[API Cache] Using cached data for ${url}`)
+        return cached
+      }
+    }
+
     const response = await fetch(`${BASE_URL}${url}`, {
       method: 'GET',
       headers: getAuthHeaders(),
       ...options,
     })
-    return response.json()
+    
+    const data = await response.json()
+    
+    // 缓存成功响应
+    if (response.ok && options?.useCache !== false) {
+      setCachedData(cacheKey, data)
+    }
+    
+    return data
   },
 
   async post<T>(url: string, body: any, options?: RequestInit): Promise<T> {

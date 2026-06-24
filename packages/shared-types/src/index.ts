@@ -136,6 +136,10 @@ export interface CustomEventDefinition {
     type: string
     description?: string
   }>
+  // 关联的子组件ID（用于可视化模板）
+  childComponentId?: string
+  // 子组件上触发的原始事件（如 onClick、onChange）
+  childEventName?: string
 }
 
 export interface CustomDataSourceConfig {

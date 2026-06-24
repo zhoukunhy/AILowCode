@@ -1,53 +1,35 @@
 'use client'
 
 import React, { useState } from 'react'
+import { Button, Select, Table, Space } from 'antd'
+import { PlusOutlined, DeleteOutlined, RestOutlined } from '@ant-design/icons'
 import { useCanvasStore } from '@/store/canvasStore'
 import { useDataPreviewStore } from '@/store/dataPreviewStore'
+
+export interface FieldMapping {
+  componentProp: string
+  dataSourceField: string
+}
 
 export function DataSourceBinding() {
   const selectedId = useCanvasStore((state) => state.selectedId)
   const components = useCanvasStore((state) => state.components)
   const updateComponentProps = useCanvasStore((state) => state.updateComponentProps)
   
-  const { dataSources, getFieldsByDataSource } = useDataPreviewStore()
+  const { dataSources, getFieldsByDataSource, fetchPreviewData, getMockData } = useDataPreviewStore()
   
   const [selectedDataSource, setSelectedDataSource] = useState<string>('')
-  const [selectedField, setSelectedField] = useState<string>('')
+  const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([])
+  const [previewData, setPreviewData] = useState<any[]>([])
   
   const selectedComponent = components.find((c) => c.id === selectedId)
   const boundDataSource = selectedComponent?.props.dataSourceId || ''
-  const boundField = selectedComponent?.props.dataField || ''
   
   const fields = selectedDataSource ? getFieldsByDataSource(selectedDataSource) : []
-  
-  const handleDataSourceChange = (dataSourceId: string) => {
-    setSelectedDataSource(dataSourceId)
-    setSelectedField('')
-    if (selectedId) {
-      updateComponentProps(selectedId, { 
-        dataSourceId,
-        dataField: '' 
-      })
-    }
-  }
-  
-  const handleFieldChange = (fieldName: string) => {
-    setSelectedField(fieldName)
-    if (selectedId) {
-      updateComponentProps(selectedId, { dataField: fieldName })
-    }
-  }
-  
-  const handleClearBinding = () => {
-    setSelectedDataSource('')
-    setSelectedField('')
-    if (selectedId) {
-      updateComponentProps(selectedId, { 
-        dataSourceId: '',
-        dataField: '' 
-      })
-    }
-  }
+
+  const componentProps = Object.keys(selectedComponent?.props || {}).filter(
+    (key) => !['dataSourceId', 'dataField', 'eventBindings'].includes(key)
+  )
   
   React.useEffect(() => {
     if (boundDataSource) {
@@ -55,93 +37,192 @@ export function DataSourceBinding() {
     } else {
       setSelectedDataSource('')
     }
-    if (boundField) {
-      setSelectedField(boundField)
-    } else {
-      setSelectedField('')
+    
+    const savedMappings = selectedComponent?.props.fieldMappings as FieldMapping[] || []
+    setFieldMappings(savedMappings)
+  }, [selectedId, boundDataSource, selectedComponent])
+
+  const handleDataSourceChange = (dataSourceId: string) => {
+    setSelectedDataSource(dataSourceId)
+    setFieldMappings([])
+    if (selectedId) {
+      updateComponentProps(selectedId, { 
+        dataSourceId,
+        fieldMappings: [],
+        dataField: '' 
+      })
     }
-  }, [selectedId, boundDataSource, boundField])
-  
+  }
+
+  const handleAddMapping = () => {
+    setFieldMappings([...fieldMappings, { componentProp: '', dataSourceField: '' }])
+  }
+
+  const handleRemoveMapping = (index: number) => {
+    const newMappings = fieldMappings.filter((_, i) => i !== index)
+    setFieldMappings(newMappings)
+    if (selectedId) {
+      updateComponentProps(selectedId, { fieldMappings: newMappings })
+    }
+  }
+
+  const handleMappingChange = (index: number, key: 'componentProp' | 'dataSourceField', value: string) => {
+    const newMappings = [...fieldMappings]
+    newMappings[index] = { ...newMappings[index], [key]: value }
+    setFieldMappings(newMappings)
+  }
+
+  const handleSaveMappings = () => {
+    if (selectedId) {
+      updateComponentProps(selectedId, { fieldMappings })
+    }
+  }
+
+  const handlePreviewData = async () => {
+    if (selectedDataSource && selectedId) {
+      await fetchPreviewData(selectedId, selectedDataSource, { type: 'table' })
+      const mockData = getMockData(selectedDataSource) || []
+      const tableData = Array.isArray(mockData) ? mockData : mockData.data || []
+      setPreviewData(tableData.slice(0, 10))
+    }
+  }
+
   return (
     <div className="border-b border-gray-200">
-      <div className="p-3 bg-gray-50 text-sm font-medium text-gray-700">
-        数据源绑定
+      <div className="p-3 bg-gray-50 text-sm font-medium text-gray-700 flex items-center justify-between">
+        <span>数据源绑定</span>
+        {selectedDataSource && (
+          <Button type="text" icon={<RestOutlined />} onClick={handlePreviewData} size="small">
+            预览数据
+          </Button>
+        )}
       </div>
       <div className="p-4">
         {/* 选择数据源 */}
         <div className="mb-4">
-          <label className="block text-xs text-gray-600 mb-2">选择数据源</label>
-          <select
+          <Select
             value={selectedDataSource}
-            onChange={(e) => handleDataSourceChange(e.target.value)}
-            className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="">请选择数据源</option>
-            {dataSources.map((ds) => (
-              <option key={ds.id} value={ds.id}>
-                {ds.name} ({ds.type})
-              </option>
-            ))}
-          </select>
+            onChange={handleDataSourceChange}
+            placeholder="选择数据源"
+            style={{ width: '100%' }}
+            options={dataSources.map((ds) => ({
+              value: ds.id,
+              label: `${ds.name} (${ds.type})`,
+            }))}
+          />
         </div>
         
-        {/* 选择字段 */}
+        {/* 字段映射 */}
         {selectedDataSource && (
           <div className="mb-4">
-            <label className="block text-xs text-gray-600 mb-2">选择字段</label>
-            <div className="grid grid-cols-2 gap-2">
-              {fields.map((field) => (
-                <button
-                  key={field.name}
-                  onClick={() => handleFieldChange(field.name)}
-                  className={`px-3 py-2 text-xs border rounded transition-colors ${
-                    selectedField === field.name
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-300 hover:border-gray-400'
-                  }`}
-                >
-                  <div className="font-medium">{field.name}</div>
-                  <div className="text-gray-400">{field.type}</div>
-                </button>
-              ))}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-600 font-medium">字段映射</span>
+              <Button type="text" icon={<PlusOutlined />} onClick={handleAddMapping} size="small">
+                添加映射
+              </Button>
+            </div>
+            
+            <div className="space-y-2">
+              {fieldMappings.length === 0 ? (
+                <div className="text-sm text-gray-400 text-center py-4">
+                  暂无字段映射，点击上方按钮添加
+                </div>
+              ) : (
+                fieldMappings.map((mapping, index) => (
+                  <Space key={index} style={{ width: '100%' }}>
+                    <Select
+                      value={mapping.componentProp}
+                      onChange={(value) => handleMappingChange(index, 'componentProp', value)}
+                      placeholder="组件属性"
+                      style={{ flex: 1 }}
+                      options={componentProps.map((prop) => ({
+                        value: prop,
+                        label: prop,
+                      }))}
+                    />
+                    <span className="text-gray-400">→</span>
+                    <Select
+                      value={mapping.dataSourceField}
+                      onChange={(value) => handleMappingChange(index, 'dataSourceField', value)}
+                      placeholder="数据源字段"
+                      style={{ flex: 1 }}
+                      options={fields.map((field) => ({
+                        value: field.name,
+                        label: `${field.name} (${field.type})`,
+                      }))}
+                    />
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={() => handleRemoveMapping(index)}
+                      size="small"
+                    />
+                  </Space>
+                ))
+              )}
+            </div>
+            
+            {fieldMappings.length > 0 && (
+              <Button
+                type="primary"
+                size="small"
+                onClick={handleSaveMappings}
+                style={{ marginTop: 8 }}
+                block
+              >
+                保存映射
+              </Button>
+            )}
+          </div>
+        )}
+        
+        {/* 数据预览 */}
+        {selectedDataSource && previewData.length > 0 && (
+          <div className="mb-4">
+            <div className="text-xs text-gray-600 font-medium mb-2">数据预览</div>
+            <div className="border border-gray-200 rounded overflow-hidden">
+              <Table
+                dataSource={previewData.slice(0, 5)}
+                columns={fields.map((field) => ({
+                  title: field.name,
+                  dataIndex: field.name,
+                  key: field.name,
+                  width: 120,
+                  render: (value: any) => (
+                    <span className="text-xs truncate" style={{ maxWidth: 100 }}>
+                      {String(value)}
+                    </span>
+                  ),
+                }))}
+                pagination={false}
+                size="small"
+              />
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              显示前 5 条记录，共 {previewData.length} 条
             </div>
           </div>
         )}
         
         {/* 当前绑定状态 */}
-        {(boundDataSource || boundField) && (
-          <div className="mb-4 p-3 bg-green-50 rounded border border-green-200">
+        {boundDataSource && (
+          <div className="p-3 bg-green-50 rounded border border-green-200">
             <div className="flex items-center justify-between">
               <div className="text-sm">
                 <span className="text-green-700 font-medium">已绑定:</span>
-                {boundDataSource && (
-                  <span className="ml-2 text-gray-600">
-                    {dataSources.find((ds) => ds.id === boundDataSource)?.name}
+                <span className="ml-2 text-gray-600">
+                  {dataSources.find((ds) => ds.id === boundDataSource)?.name}
+                </span>
+                {fieldMappings.length > 0 && (
+                  <span className="ml-2 text-gray-500">
+                    ({fieldMappings.length} 个字段映射)
                   </span>
                 )}
-                {boundField && (
-                  <span className="ml-2 text-gray-600">/ {boundField}</span>
-                )}
               </div>
-              <button
-                onClick={handleClearBinding}
-                className="text-xs text-red-600 hover:text-red-700"
-              >
-                清除绑定
-              </button>
             </div>
           </div>
         )}
-        
-        {/* 绑定说明 */}
-        <div className="text-xs text-gray-500 p-3 bg-gray-50 rounded">
-          <div className="font-medium mb-1">绑定说明:</div>
-          <ul className="list-disc list-inside space-y-1">
-            <li>输入框可绑定文本字段</li>
-            <li>表格可绑定数据源进行数据展示</li>
-            <li>按钮可绑定接口进行触发</li>
-          </ul>
-        </div>
       </div>
     </div>
   )

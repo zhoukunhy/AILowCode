@@ -193,12 +193,21 @@ export default function AiCodegenPage() {
   const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([])
   const [selectedKnowledgeBaseIds, setSelectedKnowledgeBaseIds] = useState<number[]>([])
   const [generatedSchema, setGeneratedSchema] = useState<any>(null)
+  const [isKnowledgeBasesLoading, setIsKnowledgeBasesLoading] = useState(false)
 
+  // 延迟加载知识库数据，避免阻塞页面渲染
   useEffect(() => {
-    fetchKnowledgeBases()
+    const timer = setTimeout(() => {
+      fetchKnowledgeBases()
+    }, 100) // 延迟100ms加载，让页面先渲染
+    
+    return () => clearTimeout(timer)
   }, [])
 
   const fetchKnowledgeBases = useCallback(async () => {
+    if (isKnowledgeBasesLoading) return // 防止重复加载
+    
+    setIsKnowledgeBasesLoading(true)
     try {
       const result = await knowledgeApi.getAllKnowledgeBases()
       const data = result as Record<string, unknown>
@@ -206,8 +215,10 @@ export default function AiCodegenPage() {
       setKnowledgeBases(basesData)
     } catch (err) {
       console.error('获取知识库列表失败:', err)
+    } finally {
+      setIsKnowledgeBasesLoading(false)
     }
-  }, [])
+  }, [isKnowledgeBasesLoading])
 
   const updateWorkflowStep = useCallback((stepId: string, updates: Partial<WorkflowStep>) => {
     setWorkflowSteps(prev => prev.map(step => 
@@ -487,35 +498,41 @@ export default function AiCodegenPage() {
             </div>
           </div>
 
-          {enableRAG && knowledgeBases.length > 0 && (
+          {enableRAG && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">📚 选择知识库</h3>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {knowledgeBases.map((base) => (
-                  <label
-                    key={base.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                      selectedKnowledgeBaseIds.includes(base.id)
-                        ? 'bg-blue-50 border border-blue-200'
-                        : 'bg-gray-50 hover:bg-gray-100'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedKnowledgeBaseIds.includes(base.id)}
-                      onChange={() => toggleKnowledgeBase(base.id)}
-                      className="w-4 h-4 text-blue-600 rounded"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-gray-800 truncate">{base.name}</div>
-                      {base.documentCount !== undefined && (
-                        <div className="text-xs text-gray-500">{base.documentCount} 个文档</div>
-                      )}
-                    </div>
-                  </label>
-                ))}
-              </div>
-              {knowledgeBases.length === 0 && (
+              {isKnowledgeBasesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+                  <span className="ml-2 text-sm text-gray-500">加载中...</span>
+                </div>
+              ) : knowledgeBases.length > 0 ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {knowledgeBases.map((base) => (
+                    <label
+                      key={base.id}
+                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                        selectedKnowledgeBaseIds.includes(base.id)
+                          ? 'bg-blue-50 border border-blue-200'
+                          : 'bg-gray-50 hover:bg-gray-100'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedKnowledgeBaseIds.includes(base.id)}
+                        onChange={() => toggleKnowledgeBase(base.id)}
+                        className="w-4 h-4 text-blue-600 rounded"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-gray-800 truncate">{base.name}</div>
+                        {base.documentCount !== undefined && (
+                          <div className="text-xs text-gray-500">{base.documentCount} 个文档</div>
+                        )}
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              ) : (
                 <p className="text-sm text-gray-500 text-center py-4">暂无知识库</p>
               )}
             </div>

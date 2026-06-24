@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState, useCallback } from 'react'
-import { Button, Input, Select, Tabs, Card, Space, Tag, Switch, InputNumber, ColorPicker, message } from 'antd'
-import { PlusOutlined, DeleteOutlined, SaveOutlined, EyeOutlined, AppstoreOutlined } from '@ant-design/icons'
+import { Button, Input, Select, Tabs, Card, Space, Tag, Switch, InputNumber, ColorPicker, message, Modal, List } from 'antd'
+import { PlusOutlined, DeleteOutlined, SaveOutlined, EyeOutlined, AppstoreOutlined, UpOutlined, DownOutlined, SettingOutlined } from '@ant-design/icons'
 import type {
   CustomComponentDefinition,
   CustomPropDefinition,
@@ -10,11 +10,41 @@ import type {
   CustomEventDefinition,
   VisualTemplateConfig,
   CodeTemplateConfig,
+  CanvasComponent,
 } from '@ai-lowcode/shared-types'
 import { customComponentRegistry } from '@/services/CustomComponentRegistry'
 import { generateId } from '@ai-lowcode/common-util'
 
 const { TextArea } = Input
+
+interface ComponentMeta {
+  type: string
+  name: string
+  icon: string
+  defaultWidth: number
+  defaultHeight: number
+  defaultProps: Record<string, any>
+}
+
+const AVAILABLE_COMPONENTS: ComponentMeta[] = [
+  { type: 'text', name: '文本', icon: '🔤', defaultWidth: 200, defaultHeight: 30, defaultProps: { content: '文本内容', fontSize: 14, fontWeight: 'normal', color: '#333' } },
+  { type: 'button', name: '按钮', icon: '🔘', defaultWidth: 120, defaultHeight: 40, defaultProps: { text: '按钮', type: 'primary' } },
+  { type: 'input', name: '输入框', icon: '📝', defaultWidth: 240, defaultHeight: 40, defaultProps: { label: '标签', placeholder: '请输入内容', value: '' } },
+  { type: 'select', name: '下拉选择', icon: '📋', defaultWidth: 240, defaultHeight: 40, defaultProps: { label: '标签', placeholder: '请选择', options: [] } },
+  { type: 'checkbox', name: '复选框', icon: '☑️', defaultWidth: 200, defaultHeight: 32, defaultProps: { label: '选项', checked: false } },
+  { type: 'radio', name: '单选框', icon: '⚫', defaultWidth: 200, defaultHeight: 32, defaultProps: { label: '选项', checked: false } },
+  { type: 'switch', name: '开关', icon: '🔌', defaultWidth: 80, defaultHeight: 32, defaultProps: { checked: false } },
+  { type: 'datepicker', name: '日期选择', icon: '📅', defaultWidth: 200, defaultHeight: 40, defaultProps: { label: '日期', value: '' } },
+  { type: 'textarea', name: '多行文本', icon: '📄', defaultWidth: 300, defaultHeight: 100, defaultProps: { label: '标签', placeholder: '请输入内容', value: '' } },
+  { type: 'numberinput', name: '数字输入', icon: '🔢', defaultWidth: 150, defaultHeight: 40, defaultProps: { label: '数字', value: 0 } },
+  { type: 'slider', name: '滑块', icon: '🎚️', defaultWidth: 300, defaultHeight: 40, defaultProps: { label: '滑块', min: 0, max: 100, value: 50 } },
+  { type: 'rate', name: '评分', icon: '⭐', defaultWidth: 200, defaultHeight: 40, defaultProps: { count: 5, value: 0 } },
+  { type: 'avatar', name: '头像', icon: '👤', defaultWidth: 48, defaultHeight: 48, defaultProps: { src: '', size: 'default', shape: 'circle' } },
+  { type: 'tag', name: '标签', icon: '🏷️', defaultWidth: 80, defaultHeight: 28, defaultProps: { label: '标签', color: 'blue' } },
+  { type: 'badge', name: '徽标', icon: '🔴', defaultWidth: 80, defaultHeight: 32, defaultProps: { count: 0, dot: false } },
+  { type: 'divider', name: '分割线', icon: '➖', defaultWidth: 200, defaultHeight: 16, defaultProps: { orientation: 'horizontal' } },
+  { type: 'space', name: '间距', icon: '〰️', defaultWidth: 200, defaultHeight: 40, defaultProps: { direction: 'horizontal', size: 'middle' } },
+]
 
 interface CustomComponentEditorProps {
   initialDefinition?: CustomComponentDefinition
@@ -60,6 +90,12 @@ export function CustomComponentEditor({ initialDefinition, onSave, onCancel }: C
 
   // 预览状态
   const [showPreview, setShowPreview] = useState(false)
+
+  // 组件选择弹窗状态
+  const [showComponentPicker, setShowComponentPicker] = useState(false)
+
+  // 选中的子组件索引（用于编辑属性）
+  const [selectedChildIndex, setSelectedChildIndex] = useState<number | null>(null)
 
   // 添加属性
   const addProperty = useCallback(() => {
@@ -139,6 +175,90 @@ export function CustomComponentEditor({ initialDefinition, onSave, onCancel }: C
   // 删除事件
   const deleteEvent = useCallback((index: number) => {
     setEvents(prev => prev.filter((_, i) => i !== index))
+  }, [])
+
+  // 添加子组件
+  const addChildComponent = useCallback((componentType: string) => {
+    const componentMeta = AVAILABLE_COMPONENTS.find(c => c.type === componentType)
+    if (!componentMeta) return
+
+    const newChild: CanvasComponent = {
+      id: `child_${generateId()}`,
+      type: componentType,
+      props: { ...componentMeta.defaultProps },
+      schema: {
+        width: componentMeta.defaultWidth,
+        height: componentMeta.defaultHeight,
+        x: 0,
+        y: 0,
+      },
+    }
+
+    setVisualConfig(prev => ({
+      ...prev,
+      children: [...prev.children, newChild],
+    }))
+
+    setShowComponentPicker(false)
+    message.success(`已添加 ${componentMeta.name} 组件`)
+  }, [])
+
+  // 删除子组件
+  const deleteChildComponent = useCallback((index: number) => {
+    setVisualConfig(prev => ({
+      ...prev,
+      children: prev.children.filter((_, i) => i !== index),
+    }))
+    if (selectedChildIndex === index) {
+      setSelectedChildIndex(null)
+    }
+  }, [selectedChildIndex])
+
+  // 更新子组件属性
+  const updateChildComponent = useCallback((index: number, updates: Partial<CanvasComponent>) => {
+    setVisualConfig(prev => {
+      const newChildren = [...prev.children]
+      newChildren[index] = { ...newChildren[index], ...updates }
+      return {
+        ...prev,
+        children: newChildren,
+      }
+    })
+  }, [])
+
+  // 移动子组件顺序
+  const moveChildComponent = useCallback((index: number, direction: 'up' | 'down') => {
+    setVisualConfig(prev => {
+      const newChildren = [...prev.children]
+      const newIndex = direction === 'up' ? index - 1 : index + 1
+
+      if (newIndex >= 0 && newIndex < newChildren.length) {
+        ;[newChildren[index], newChildren[newIndex]] = [newChildren[newIndex], newChildren[index]]
+        if (selectedChildIndex === index) {
+          setSelectedChildIndex(newIndex)
+        } else if (selectedChildIndex === newIndex) {
+          setSelectedChildIndex(index)
+        }
+      }
+
+      return {
+        ...prev,
+        children: newChildren,
+      }
+    })
+  }, [selectedChildIndex])
+
+  // 获取子组件的显示名称和图标
+  const getChildComponentInfo = useCallback((type: string): ComponentMeta => {
+    const componentMeta = AVAILABLE_COMPONENTS.find(c => c.type === type)
+    return componentMeta || {
+      type,
+      name: type,
+      icon: '📦',
+      defaultWidth: 100,
+      defaultHeight: 40,
+      defaultProps: {},
+    }
   }, [])
 
   // 保存组件定义
@@ -288,6 +408,17 @@ export function CustomComponentEditor({ initialDefinition, onSave, onCancel }: C
     </div>
   )
 
+  const CHILD_EVENTS = [
+    { value: 'onClick', label: '点击' },
+    { value: 'onChange', label: '值变化' },
+    { value: 'onBlur', label: '失焦' },
+    { value: 'onFocus', label: '聚焦' },
+    { value: 'onMouseEnter', label: '鼠标进入' },
+    { value: 'onMouseLeave', label: '鼠标离开' },
+    { value: 'onDoubleClick', label: '双击' },
+    { value: 'onKeyDown', label: '键盘按下' },
+  ]
+
   // 渲染事件编辑器
   const renderEventsEditor = () => (
     <div className="events-editor">
@@ -326,12 +457,182 @@ export function CustomComponentEditor({ initialDefinition, onSave, onCancel }: C
                 placeholder="事件描述"
                 rows={2}
               />
+
+              {(templateType === 'visual' && visualConfig.children.length > 0) && (
+                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f0f0f0' }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: '#666', marginBottom: 8 }}>
+                    子组件事件绑定
+                  </div>
+                  <Space style={{ width: '100%' }}>
+                    <Select
+                      value={event.childComponentId}
+                      onChange={value => updateEvent(index, { childComponentId: value || undefined })}
+                      placeholder="选择子组件"
+                      style={{ flex: 1 }}
+                      options={visualConfig.children.map(child => ({
+                        value: child.id,
+                        label: `${getChildComponentInfo(child.type).icon} ${getChildComponentInfo(child.type).name}`,
+                      }))}
+                    />
+                    <Select
+                      value={event.childEventName}
+                      onChange={value => updateEvent(index, { childEventName: value || undefined })}
+                      placeholder="选择事件"
+                      style={{ flex: 1 }}
+                      options={CHILD_EVENTS}
+                      disabled={!event.childComponentId}
+                    />
+                  </Space>
+                </div>
+              )}
+
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: '#666', marginBottom: 8 }}>
+                  事件参数
+                </div>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  {(event.params || []).map((param, paramIndex) => (
+                    <Space key={paramIndex} style={{ width: '100%' }}>
+                      <Input
+                        value={param.name}
+                        onChange={e => {
+                          const newParams = [...(event.params || [])]
+                          newParams[paramIndex] = { ...newParams[paramIndex], name: e.target.value }
+                          updateEvent(index, { params: newParams })
+                        }}
+                        placeholder="参数名"
+                        style={{ width: 100 }}
+                      />
+                      <Select
+                        value={param.type}
+                        onChange={value => {
+                          const newParams = [...(event.params || [])]
+                          newParams[paramIndex] = { ...newParams[paramIndex], type: value }
+                          updateEvent(index, { params: newParams })
+                        }}
+                        style={{ width: 100 }}
+                        options={[
+                          { value: 'string', label: '字符串' },
+                          { value: 'number', label: '数字' },
+                          { value: 'boolean', label: '布尔' },
+                          { value: 'object', label: '对象' },
+                          { value: 'any', label: '任意' },
+                        ]}
+                      />
+                      <Input
+                        value={param.description}
+                        onChange={e => {
+                          const newParams = [...(event.params || [])]
+                          newParams[paramIndex] = { ...newParams[paramIndex], description: e.target.value }
+                          updateEvent(index, { params: newParams })
+                        }}
+                        placeholder="参数描述"
+                        style={{ flex: 1 }}
+                      />
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteOutlined />}
+                        onClick={() => {
+                          const newParams = (event.params || []).filter((_, i) => i !== paramIndex)
+                          updateEvent(index, { params: newParams })
+                        }}
+                      />
+                    </Space>
+                  ))}
+                  <Button
+                    type="text"
+                    icon={<PlusOutlined />}
+                    onClick={() => {
+                      const newParams = [
+                        ...(event.params || []),
+                        { name: `param${(event.params || []).length + 1}`, type: 'string' },
+                      ]
+                      updateEvent(index, { params: newParams })
+                    }}
+                  >
+                    添加参数
+                  </Button>
+                </Space>
+              </div>
             </Space>
           </Card>
         ))}
       </div>
     </div>
   )
+
+  // 渲染子组件属性编辑器
+  const renderChildPropsEditor = () => {
+    if (selectedChildIndex === null) return null
+
+    const child = visualConfig.children[selectedChildIndex]
+    if (!child) return null
+
+    const componentMeta = getChildComponentInfo(child.type)
+
+    return (
+      <Card title={`${componentMeta.icon} ${componentMeta.name} 属性配置`} size="small" style={{ marginTop: 16 }}>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          {Object.entries(child.props).map(([propKey, propValue]) => (
+            <div key={propKey}>
+              <span style={{ marginRight: 8, fontWeight: 500 }}>{propKey}:</span>
+              {typeof propValue === 'boolean' ? (
+                <Switch
+                  checked={propValue}
+                  onChange={checked =>
+                    updateChildComponent(selectedChildIndex!, {
+                      props: { ...child.props, [propKey]: checked },
+                    })
+                  }
+                />
+              ) : (
+                <Input
+                  value={String(propValue)}
+                  onChange={e =>
+                    updateChildComponent(selectedChildIndex!, {
+                      props: { ...child.props, [propKey]: e.target.value },
+                    })
+                  }
+                  style={{ width: 200 }}
+                  placeholder={propKey}
+                />
+              )}
+            </div>
+          ))}
+
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f0f0f0' }}>
+            <span style={{ marginRight: 8, fontWeight: 500 }}>组件尺寸:</span>
+            <InputNumber
+              value={child.schema.width}
+              onChange={value =>
+                updateChildComponent(selectedChildIndex!, {
+                  schema: { ...child.schema, width: value || componentMeta.defaultWidth },
+                })
+              }
+              min={10}
+              max={1000}
+              placeholder="宽度"
+              style={{ width: 100 }}
+            />
+            <span style={{ margin: '0 8px' }}>×</span>
+            <InputNumber
+              value={child.schema.height}
+              onChange={value =>
+                updateChildComponent(selectedChildIndex!, {
+                  schema: { ...child.schema, height: value || componentMeta.defaultHeight },
+                })
+              }
+              min={10}
+              max={1000}
+              placeholder="高度"
+              style={{ width: 100 }}
+            />
+          </div>
+        </Space>
+      </Card>
+    )
+  }
 
   // 渲染可视化模板编辑器
   const renderVisualTemplateEditor = () => (
@@ -419,11 +720,90 @@ export function CustomComponentEditor({ initialDefinition, onSave, onCancel }: C
         </Space>
       </Card>
 
-      <div style={{ marginTop: 16 }}>
-        <Button type="primary" icon={<AppstoreOutlined />}>
-          添加子组件（从画布选择）
-        </Button>
-      </div>
+      <Card title="子组件列表" size="small" style={{ marginTop: 16 }}>
+        <div style={{ marginBottom: 12 }}>
+          <Button type="primary" icon={<AppstoreOutlined />} onClick={() => setShowComponentPicker(true)}>
+            添加子组件
+          </Button>
+        </div>
+
+        {visualConfig.children.length === 0 ? (
+          <div className="empty-state" style={{ padding: 40, textAlign: 'center', color: '#999' }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📦</div>
+            <div>暂无子组件，点击上方按钮添加</div>
+          </div>
+        ) : (
+          <List
+            dataSource={visualConfig.children}
+            renderItem={(child, index) => {
+              const componentInfo = getChildComponentInfo(child.type)
+              const isSelected = selectedChildIndex === index
+
+              return (
+                <List.Item
+                  key={child.id}
+                  className={`cursor-pointer transition-colors ${isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+                  onClick={() => setSelectedChildIndex(isSelected ? null : index)}
+                  actions={[
+                    <Button
+                      key="up"
+                      type="text"
+                      icon={<UpOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        moveChildComponent(index, 'up')
+                      }}
+                      disabled={index === 0}
+                    />,
+                    <Button
+                      key="down"
+                      type="text"
+                      icon={<DownOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        moveChildComponent(index, 'down')
+                      }}
+                      disabled={index === visualConfig.children.length - 1}
+                    />,
+                    <Button
+                      key="settings"
+                      type="text"
+                      icon={<SettingOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedChildIndex(index)
+                      }}
+                    />,
+                    <Button
+                      key="delete"
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        deleteChildComponent(index)
+                      }}
+                    />,
+                  ]}
+                >
+                  <List.Item.Meta
+                    avatar={<span style={{ fontSize: 20 }}>{componentInfo.icon}</span>}
+                    title={
+                      <span>
+                        {componentInfo.name}
+                        {isSelected && <Tag color="blue" style={{ marginLeft: 8 }}>已选中</Tag>}
+                      </span>
+                    }
+                    description={`类型: ${child.type} | ID: ${child.id.slice(-8)}`}
+                  />
+                </List.Item>
+              )
+            }}
+          />
+        )}
+      </Card>
+
+      {renderChildPropsEditor()}
     </div>
   )
 
@@ -588,6 +968,33 @@ export function CustomComponentEditor({ initialDefinition, onSave, onCancel }: C
           },
         ]}
       />
+
+      <Modal
+        title="选择子组件"
+        open={showComponentPicker}
+        onCancel={() => setShowComponentPicker(false)}
+        footer={null}
+        width={600}
+      >
+        <div className="component-picker">
+          <div style={{ marginBottom: 16 }}>
+            <span style={{ color: '#666', fontSize: 14 }}>从组件库中选择要添加到可视化模板的子组件：</span>
+          </div>
+          <div className="component-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            {AVAILABLE_COMPONENTS.map((component) => (
+              <div
+                key={component.type}
+                className="component-item cursor-pointer border rounded-lg p-4 hover:border-blue-500 hover:bg-blue-50 transition-colors text-center"
+                onClick={() => addChildComponent(component.type)}
+              >
+                <div style={{ fontSize: 32, marginBottom: 8 }}>{component.icon}</div>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{component.name}</div>
+                <div style={{ fontSize: 12, color: '#999', marginTop: 4 }}>{component.type}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
