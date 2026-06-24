@@ -260,125 +260,197 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      <aside
-        className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-200 transition-all duration-300 ${
-          isCollapsed ? 'w-16' : 'w-64'
-        } ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
-        suppressHydrationWarning
-      >
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200">
-          {!isCollapsed && (
-            <div
-              onClick={() => router.push('/dashboard')}
-              className="flex items-center gap-2 cursor-pointer"
-            >
-              <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
-                🎨
-              </div>
-              <span className="font-bold text-gray-800">CanvasCode</span>
-            </div>
-          )}
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+    <div className="flex h-screen bg-gray-50 flex-col">
+      {/* 顶部导航栏 - 一级菜单 */}
+      <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6">
+        <div className="flex items-center gap-4 flex-1">
+          <div
+            onClick={() => router.push('/dashboard')}
+            className="flex items-center gap-2 cursor-pointer"
           >
-            {isCollapsed ? '→' : '←'}
-          </button>
-        </div>
+            <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold">
+              🎨
+            </div>
+            <span className="font-bold text-gray-800">CanvasCode</span>
+          </div>
 
-        <div className="p-3 bg-gray-50 border-b border-gray-200">
-          <div className="flex gap-1 overflow-x-auto pb-1">
+          {/* 一级菜单 */}
+          <nav className="flex gap-1 ml-8">
             {menus.map((menu) => {
               const isSelected = selectedMainMenu === menu.id
               return (
                 <button
                   key={menu.id}
                   onClick={() => handleMainMenuClick(menu)}
-                  className={`flex-shrink-0 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex-shrink-0 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isSelected
                       ? 'bg-blue-500 text-white'
-                      : 'text-gray-600 hover:bg-gray-200'
+                      : 'text-gray-600 hover:bg-gray-100'
                   }`}
                   title={menu.name}
                 >
                   <span className="flex items-center gap-2">
                     <span>{menu.icon}</span>
-                    {!isCollapsed && <span>{menu.name}</span>}
+                    <span>{menu.name}</span>
                   </span>
                 </button>
               )
             })}
-          </div>
+          </nav>
         </div>
 
-        <nav className="p-3 space-y-1">
-          {(() => {
-            const mainMenu = getSelectedMainMenuData()
-            if (!mainMenu) return null
-
-            if (mainMenu.children && mainMenu.children.length > 0) {
-              return mainMenu.children
-                .filter(m => m.status)
-                .map((item) => (
-                  <div
-                    key={item.id}
-                    onClick={() => handleSubMenuClick(item)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer ${
-                      isActive(item.path)
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    <span className="text-lg">{item.icon || '📄'}</span>
-                    {!isCollapsed && <span className="font-medium">{item.name}</span>}
-                  </div>
-                ))
-            }
-
-            return (
-              <div className="text-center py-8 text-gray-400">
-                <div className="text-3xl mb-2">📋</div>
-                <p className="text-sm">暂无子菜单</p>
-              </div>
-            )
-          })()}
-        </nav>
-
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold">
-              {user?.username?.[0]?.toUpperCase() || 'U'}
+        <div className="flex items-center gap-4">
+          <div className="hidden md:flex items-center">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="搜索..."
+                className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                🔍
+              </span>
             </div>
-            {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-800 truncate">{user?.username || '用户'}</p>
-                <p className="text-xs text-gray-500 truncate">{user?.role || '角色'}</p>
+          </div>
+
+          <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+            <span>🔔</span>
+            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+          </button>
+
+          <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+            <span>❓</span>
+          </button>
+
+          <div className="relative">
+            <button
+              onClick={() => setShowUserMenu(!showUserMenu)}
+              className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
+                {user?.username?.[0]?.toUpperCase() || 'U'}
               </div>
-            )}
-            {!isCollapsed && (
-              <button
-                onClick={handleLogout}
-                className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                title="退出登录"
-              >
-                🚪
-              </button>
+              <span className="hidden md:block text-sm font-medium text-gray-700">
+                {user?.username || '用户'}
+              </span>
+            </button>
+
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                <div className="px-4 py-2 border-b border-gray-100">
+                  <p className="font-medium text-gray-800">{user?.username}</p>
+                  <p className="text-xs text-gray-500">{user?.email}</p>
+                </div>
+                <div
+                  onClick={() => {
+                    setShowUserMenu(false)
+                    router.push('/settings')
+                  }}
+                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
+                >
+                  ⚙️ 个人设置
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  🚪 退出登录
+                </button>
+              </div>
             )}
           </div>
         </div>
-      </aside>
+      </header>
 
-      {isMobileMenuOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
+      <div className="flex flex-1 overflow-hidden">
+        {/* 左侧边栏 - 二级菜单 */}
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 bg-white border-r border-gray-200 transition-all duration-300 ${
+            isCollapsed ? 'w-16' : 'w-64'
+          } ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
+          style={{ top: '64px' }}
+          suppressHydrationWarning
+        >
+          <div className="h-12 flex items-center justify-between px-4 border-b border-gray-200">
+            <span className="text-sm font-medium text-gray-600">
+              {getSelectedMainMenuData()?.name || '菜单'}
+            </span>
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+            >
+              {isCollapsed ? '→' : '←'}
+            </button>
+          </div>
 
-      <div className={`flex-1 transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`} suppressHydrationWarning>
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 lg:px-6">
-          <div className="flex items-center gap-4">
+          <nav className="p-3 space-y-1">
+            {(() => {
+              const mainMenu = getSelectedMainMenuData()
+              if (!mainMenu) return null
+
+              if (mainMenu.children && mainMenu.children.length > 0) {
+                return mainMenu.children
+                  .filter(m => m.status)
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => handleSubMenuClick(item)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer ${
+                        isActive(item.path)
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="text-lg">{item.icon || '📄'}</span>
+                      {!isCollapsed && <span className="font-medium">{item.name}</span>}
+                    </div>
+                  ))
+              }
+
+              return (
+                <div className="text-center py-8 text-gray-400">
+                  <div className="text-3xl mb-2">📋</div>
+                  <p className="text-sm">暂无子菜单</p>
+                </div>
+              )
+            })()}
+          </nav>
+
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+            <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'}`}>
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold">
+                {user?.username?.[0]?.toUpperCase() || 'U'}
+              </div>
+              {!isCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-gray-800 truncate">{user?.username || '用户'}</p>
+                  <p className="text-xs text-gray-500 truncate">{user?.role || '角色'}</p>
+                </div>
+              )}
+              {!isCollapsed && (
+                <button
+                  onClick={handleLogout}
+                  className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  title="退出登录"
+                >
+                  🚪
+                </button>
+              )}
+            </div>
+          </div>
+        </aside>
+
+        {isMobileMenuOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            style={{ top: '64px' }}
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+        )}
+
+        {/* 主内容区 */}
+        <div className={`flex-1 transition-all duration-300 ${isCollapsed ? 'lg:ml-16' : 'lg:ml-64'}`} suppressHydrationWarning>
+          <div className="h-12 bg-white border-b border-gray-200 flex items-center px-4 lg:px-6">
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors lg:hidden"
@@ -390,72 +462,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center">
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="搜索..."
-                  className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
-                />
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  🔍
-                </span>
-              </div>
-            </div>
-
-            <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-              <span>🔔</span>
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
-
-            <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-              <span>❓</span>
-            </button>
-
-            <div className="relative">
-              <button
-                onClick={() => setShowUserMenu(!showUserMenu)}
-                className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-bold text-sm">
-                  {user?.username?.[0]?.toUpperCase() || 'U'}
-                </div>
-                <span className="hidden md:block text-sm font-medium text-gray-700">
-                  {user?.username || '用户'}
-                </span>
-              </button>
-
-              {showUserMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
-                  <div className="px-4 py-2 border-b border-gray-100">
-                    <p className="font-medium text-gray-800">{user?.username}</p>
-                    <p className="text-xs text-gray-500">{user?.email}</p>
-                  </div>
-                  <div
-                    onClick={() => {
-                      setShowUserMenu(false)
-                      router.push('/settings')
-                    }}
-                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
-                  >
-                    ⚙️ 个人设置
-                  </div>
-                  <button
-                    onClick={handleLogout}
-                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                  >
-                    🚪 退出登录
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-
-        <main className="h-[calc(100vh-64px)] overflow-hidden" suppressHydrationWarning>
-          {children}
-        </main>
+          <main className="h-[calc(100vh-64px-48px)] overflow-auto" suppressHydrationWarning>
+            {children}
+          </main>
+        </div>
       </div>
 
       <AiAssistantFloatingButton />

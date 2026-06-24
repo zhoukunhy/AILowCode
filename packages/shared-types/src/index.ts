@@ -1,4 +1,3 @@
-// 组件类型定义
 export interface ComponentType {
   id: string
   type: string
@@ -32,7 +31,155 @@ export interface ComponentSchema {
   locked?: boolean
 }
 
-// 项目类型定义
+// 自定义组件相关类型
+export interface CustomComponentDefinition {
+  id: string
+  name: string
+  displayName: string
+  description: string
+  category: string
+  icon: string
+  version: string
+  author: string
+  createdAt: Date
+  updatedAt: Date
+  status: 'draft' | 'published' | 'deprecated'
+  // 组件模板配置
+  template: CustomComponentTemplate
+  // 属性定义
+  propsSchema: CustomPropSchema
+  // 事件定义
+  events?: CustomEventDefinition[]
+  // 数据源配置
+  dataSource?: CustomDataSourceConfig
+  // 依赖的其他组件
+  dependencies?: string[]
+  // 标签
+  tags?: string[]
+}
+
+export interface CustomComponentTemplate {
+  // 模板类型：visual（可视化组合）、code（代码定义）
+  type: 'visual' | 'code'
+  // 可视化模板：子组件配置
+  visualConfig?: VisualTemplateConfig
+  // 代码模板：渲染函数代码
+  codeConfig?: CodeTemplateConfig
+}
+
+export interface VisualTemplateConfig {
+  // 子组件列表
+  children: CanvasComponent[]
+  // 布局配置
+  layout: {
+    type: 'flex' | 'grid' | 'absolute'
+    direction?: 'row' | 'column'
+    gap?: number
+    alignItems?: string
+    justifyContent?: string
+  }
+  // 容器样式
+  containerStyle?: Record<string, any>
+}
+
+export interface CodeTemplateConfig {
+  // 渲染函数代码（JavaScript/TypeScript）
+  renderCode: string
+  // 样式代码（CSS）
+  styleCode?: string
+  // 逻辑代码
+  logicCode?: string
+  // 入口文件
+  entryFile?: string
+}
+
+export interface CustomPropSchema {
+  // 属性定义列表
+  properties: Record<string, CustomPropDefinition>
+  // 必填属性
+  required?: string[]
+}
+
+export interface CustomPropDefinition {
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'color' | 'select' | 'date'
+  title: string
+  description?: string
+  default?: any
+  // 对于 select 类型
+  enum?: Array<{ label: string; value: any }>
+  // 对于 object/array 类型
+  properties?: Record<string, CustomPropDefinition>
+  items?: CustomPropDefinition
+  // 验证规则
+  validation?: {
+    min?: number
+    max?: number
+    minLength?: number
+    maxLength?: number
+    pattern?: string
+  }
+  // 是否支持数据绑定
+  bindable?: boolean
+  // 是否在属性面板显示
+  visible?: boolean
+  // 属性分组
+  group?: string
+}
+
+export interface CustomEventDefinition {
+  name: string
+  title: string
+  description?: string
+  // 事件参数
+  params?: Array<{
+    name: string
+    type: string
+    description?: string
+  }>
+}
+
+export interface CustomDataSourceConfig {
+  // 支持的数据源类型
+  types: Array<'api' | 'database' | 'static' | 'websocket'>
+  // 默认数据源配置
+  defaultConfig?: {
+    type: string
+    url?: string
+    method?: string
+    params?: Record<string, any>
+  }
+  // 数据映射配置
+  mapping?: Record<string, string>
+}
+
+// 自定义组件实例（在画布中使用）
+export interface CustomComponentInstance {
+  id: string
+  customComponentId: string
+  version: string
+  props: Record<string, any>
+  eventBindings?: Record<string, string>
+  dataSourceBinding?: {
+    type: string
+    sourceId: string
+    fieldMapping?: Record<string, string>
+  }
+}
+
+// 自定义组件模板库
+export interface CustomComponentTemplateLibrary {
+  id: string
+  name: string
+  description: string
+  category: string
+  template: CustomComponentDefinition
+  usageCount: number
+  rating: number
+  tags: string[]
+  author: string
+  createdAt: Date
+}
+
 export interface Project {
   id: string
   name: string
@@ -85,7 +232,6 @@ export interface ThemeConfig {
   textColor?: string
 }
 
-// 用户类型定义
 export interface User {
   id: string
   username: string
@@ -96,7 +242,6 @@ export interface User {
   updatedAt: Date
 }
 
-// 模板类型定义
 export interface Template {
   id: string
   name: string
@@ -109,14 +254,12 @@ export interface Template {
   updatedAt: Date
 }
 
-// API响应类型
 export interface ApiResponse<T = any> {
   code: number
   msg: string
   data: T
 }
 
-// 分页类型
 export interface PaginationParams {
   page: number
   pageSize: number
@@ -130,16 +273,8 @@ export interface PaginatedResponse<T> {
   totalPages: number
 }
 
-// ==================== AI 相关类型定义 ====================
-
-/**
- * LLM 提供商类型
- */
 export type LLMProvider = 'deepseek' | 'qwen' | 'openai'
 
-/**
- * LLM 配置
- */
 export interface LLMConfig {
   provider: LLMProvider
   model?: string
@@ -150,18 +285,12 @@ export interface LLMConfig {
   topP?: number
 }
 
-/**
- * Chroma 向量库配置
- */
 export interface ChromaConfig {
   url: string
   apiKey?: string
   collectionName?: string
 }
 
-/**
- * RAG 文档类型
- */
 export interface RAGDocument {
   id: string
   content: string
@@ -169,9 +298,6 @@ export interface RAGDocument {
   metadata?: Record<string, any>
 }
 
-/**
- * RAG 配置
- */
 export interface RAGConfig {
   embeddingApiKey: string
   embeddingModel?: string
@@ -180,9 +306,6 @@ export interface RAGConfig {
   chunkOverlap?: number
 }
 
-/**
- * Agent 输入参数
- */
 export interface AgentInput {
   query: string
   context?: Record<string, any>
@@ -190,27 +313,18 @@ export interface AgentInput {
   conversationId?: string
 }
 
-/**
- * Agent 输出结果
- */
 export interface AgentOutput {
   response: string
   toolCalls?: ToolCallResult[]
   metadata?: Record<string, any>
 }
 
-/**
- * 工具描述
- */
 export interface ToolDescription {
   name: string
   description: string
   parameters: ToolParameter[]
 }
 
-/**
- * 工具参数
- */
 export interface ToolParameter {
   name: string
   type: 'string' | 'number' | 'boolean' | 'object' | 'array'
@@ -219,9 +333,6 @@ export interface ToolParameter {
   default?: any
 }
 
-/**
- * 工具调用结果
- */
 export interface ToolCallResult {
   toolName: string
   input: Record<string, any>
@@ -230,9 +341,6 @@ export interface ToolCallResult {
   error?: string
 }
 
-/**
- * 知识库文档
- */
 export interface KnowledgeDocument {
   id: number
   name: string
@@ -246,9 +354,6 @@ export interface KnowledgeDocument {
   updatedAt: Date
 }
 
-/**
- * Agent 会话记录
- */
 export interface AgentConversation {
   id: number
   agentId: string
@@ -259,9 +364,6 @@ export interface AgentConversation {
   updatedAt: Date
 }
 
-/**
- * 会话消息
- */
 export interface ConversationMessage {
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
@@ -269,9 +371,6 @@ export interface ConversationMessage {
   timestamp: Date
 }
 
-/**
- * 工具调用日志
- */
 export interface ToolCallLog {
   id: number
   conversationId: number
@@ -284,84 +383,13 @@ export interface ToolCallLog {
   createdAt: Date
 }
 
-/**
- * AI 配置
- */
 export interface AIConfig {
   llm: LLMConfig
   chroma: ChromaConfig
   rag: RAGConfig
 }
 
-// ==================== 流程编排类型定义 ====================
-
 export type ProcessStatus = 'draft' | 'active' | 'inactive'
-
-// ==================== RBAC 类型定义 ====================
-import {
-  DEFAULT_ROLES,
-  DEFAULT_PERMISSIONS,
-  DEFAULT_MENUS,
-  PermissionService,
-  createPermissionService,
-} from './rbac'
-import type {
-  Role,
-  Permission,
-  MenuItem,
-  UserRole,
-  RolePermission,
-} from './rbac'
-
-export {
-  DEFAULT_ROLES,
-  DEFAULT_PERMISSIONS,
-  DEFAULT_MENUS,
-  PermissionService,
-  createPermissionService,
-}
-export type {
-  Role,
-  Permission,
-  MenuItem,
-  UserRole,
-  RolePermission,
-}
-
-// ==================== Webhook 类型定义 ====================
-import {
-  WebhookEventType,
-  WebhookStatus,
-  WebhookTriggerType,
-  WebhookSignatureAlgorithm,
-  DEFAULT_RETRY_CONFIG,
-  WebhookLogStatus,
-  WEBHOOK_EVENT_GROUPS,
-  getEventGroupName,
-} from './webhook'
-import type {
-  WebhookRetryConfig,
-  WebhookConfig,
-  WebhookEventPayload,
-  WebhookLog,
-} from './webhook'
-
-export {
-  WebhookEventType,
-  WebhookStatus,
-  WebhookTriggerType,
-  WebhookSignatureAlgorithm,
-  DEFAULT_RETRY_CONFIG,
-  WebhookLogStatus,
-  WEBHOOK_EVENT_GROUPS,
-  getEventGroupName,
-}
-export type {
-  WebhookRetryConfig,
-  WebhookConfig,
-  WebhookEventPayload,
-  WebhookLog,
-}
 
 export type NodeType = 'start' | 'approve' | 'condition' | 'fork' | 'join' | 'end' | 'action'
 
@@ -422,3 +450,388 @@ export interface SaveProcessDto {
   transitions: ProcessTransition[]
 }
 
+export interface Role {
+  id: string
+  name: string
+  code: string
+  description?: string
+  permissions: string[]
+  isSystem?: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface Permission {
+  id: string
+  name: string
+  code: string
+  type: 'menu' | 'button' | 'api'
+  parentId?: number
+  path?: string
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  description?: string
+}
+
+export interface MenuItem {
+  id: string
+  name: string
+  path?: string
+  icon?: string
+  parentId?: string
+  order: number
+  permissions: string[]
+  children?: MenuItem[]
+}
+
+export interface UserRole {
+  userId: string
+  roleId: string
+  assignedAt: Date
+  assignedBy?: string
+}
+
+export interface RolePermission {
+  roleId: string
+  permissionId: string
+  grantedAt: Date
+  grantedBy?: string
+}
+
+export const DEFAULT_ROLES: Omit<Role, 'id' | 'createdAt' | 'updatedAt'>[] = [
+  {
+    name: '超级管理员',
+    code: 'super_admin',
+    description: '拥有系统所有权限',
+    permissions: ['*'],
+    isSystem: true,
+  },
+  {
+    name: '管理员',
+    code: 'admin',
+    description: '拥有大部分管理权限',
+    permissions: [
+      'user:read', 'user:write', 'user:delete',
+      'role:read', 'role:write',
+      'project:read', 'project:write', 'project:delete',
+      'page:read', 'page:write', 'page:delete',
+      'knowledge:read', 'knowledge:write',
+      'ai:config',
+    ],
+    isSystem: true,
+  },
+  {
+    name: '普通用户',
+    code: 'user',
+    description: '基础用户权限',
+    permissions: [
+      'project:read', 'project:write',
+      'page:read', 'page:write',
+      'knowledge:read',
+    ],
+    isSystem: true,
+  },
+  {
+    name: '访客',
+    code: 'guest',
+    description: '只读权限',
+    permissions: [
+      'project:read',
+      'page:read',
+    ],
+    isSystem: true,
+  },
+]
+
+export const DEFAULT_PERMISSIONS: Omit<Permission, 'id'>[] = [
+  { name: '查看用户', code: 'user:read', type: 'button' },
+  { name: '编辑用户', code: 'user:write', type: 'button' },
+  { name: '删除用户', code: 'user:delete', type: 'button' },
+  { name: '查看角色', code: 'role:read', type: 'button' },
+  { name: '编辑角色', code: 'role:write', type: 'button' },
+  { name: '查看项目', code: 'project:read', type: 'button' },
+  { name: '编辑项目', code: 'project:write', type: 'button' },
+  { name: '删除项目', code: 'project:delete', type: 'button' },
+  { name: '查看页面', code: 'page:read', type: 'button' },
+  { name: '编辑页面', code: 'page:write', type: 'button' },
+  { name: '删除页面', code: 'page:delete', type: 'button' },
+  { name: '查看知识库', code: 'knowledge:read', type: 'button' },
+  { name: '编辑知识库', code: 'knowledge:write', type: 'button' },
+  { name: 'AI 配置', code: 'ai:config', type: 'button' },
+]
+
+export const DEFAULT_MENUS: Omit<MenuItem, 'id'>[] = [
+  {
+    name: '仪表盘',
+    path: '/dashboard',
+    icon: 'dashboard',
+    order: 1,
+    permissions: ['project:read'],
+  },
+  {
+    name: '项目管理',
+    path: '/projects',
+    icon: 'folder',
+    order: 2,
+    permissions: ['project:read', 'project:write'],
+    children: [
+      { id: 'project-list', name: '项目列表', path: '/projects/list', order: 1, permissions: ['project:read'] },
+      { id: 'project-create', name: '创建项目', path: '/projects/create', order: 2, permissions: ['project:write'] },
+    ] as MenuItem[],
+  },
+  {
+    name: '画布编辑',
+    path: '/canvas',
+    icon: 'edit',
+    order: 3,
+    permissions: ['page:read', 'page:write'],
+  },
+  {
+    name: '知识库',
+    path: '/knowledge',
+    icon: 'book',
+    order: 4,
+    permissions: ['knowledge:read', 'knowledge:write'],
+  },
+  {
+    name: 'AI 助手',
+    path: '/ai-assistant',
+    icon: 'robot',
+    order: 5,
+    permissions: ['*'],
+  },
+  {
+    name: '系统管理',
+    path: '/admin',
+    icon: 'settings',
+    order: 6,
+    permissions: ['user:read', 'role:read'],
+    children: [
+      { id: 'admin-users', name: '用户管理', path: '/admin/users', order: 1, permissions: ['user:read', 'user:write'] },
+      { id: 'admin-roles', name: '角色管理', path: '/admin/roles', order: 2, permissions: ['role:read', 'role:write'] },
+      { id: 'admin-ai-config', name: 'AI 配置', path: '/admin/ai-config', order: 3, permissions: ['ai:config'] },
+    ] as MenuItem[],
+  },
+]
+
+export class PermissionService {
+  hasPermission(userPermissions: string[], requiredPermission: string): boolean {
+    if (userPermissions.includes('*')) {
+      return true
+    }
+    return userPermissions.includes(requiredPermission)
+  }
+
+  hasAllPermissions(userPermissions: string[], requiredPermissions: string[]): boolean {
+    return requiredPermissions.every(p => this.hasPermission(userPermissions, p))
+  }
+
+  hasAnyPermission(userPermissions: string[], requiredPermissions: string[]): boolean {
+    return requiredPermissions.some(p => this.hasPermission(userPermissions, p))
+  }
+
+  getAccessibleMenus(menus: MenuItem[], userPermissions: string[]): MenuItem[] {
+    const result: MenuItem[] = []
+
+    for (const menu of menus) {
+      const accessibleChildren = menu.children
+        ? this.getAccessibleMenus(menu.children, userPermissions)
+        : []
+
+      if (menu.children) {
+        if (accessibleChildren.length > 0) {
+          result.push({
+            ...menu,
+            children: accessibleChildren,
+          })
+        }
+      } else {
+        if (this.hasAnyPermission(userPermissions, menu.permissions)) {
+          result.push(menu)
+        }
+      }
+    }
+
+    return result
+  }
+
+  filterMenuPermissions(menus: MenuItem[], userPermissions: string[]): string[] {
+    const accessibleMenus = this.getAccessibleMenus(menus, userPermissions)
+    const permissions: string[] = []
+
+    const extractPermissions = (items: MenuItem[]) => {
+      for (const item of items) {
+        permissions.push(...item.permissions)
+        if (item.children) {
+          extractPermissions(item.children)
+        }
+      }
+    }
+
+    extractPermissions(accessibleMenus)
+    return [...new Set(permissions)]
+  }
+}
+
+export function createPermissionService(): PermissionService {
+  return new PermissionService()
+}
+
+export enum WebhookEventType {
+  PROJECT_CREATED = 'project.created',
+  PROJECT_UPDATED = 'project.updated',
+  PROJECT_DELETED = 'project.deleted',
+  PAGE_CREATED = 'page.created',
+  PAGE_UPDATED = 'page.updated',
+  PAGE_DELETED = 'page.deleted',
+  PAGE_PUBLISHED = 'page.published',
+  PAGE_VERSION_CREATED = 'page.version.created',
+  WORKFLOW_STARTED = 'workflow.started',
+  WORKFLOW_COMPLETED = 'workflow.completed',
+  WORKFLOW_FAILED = 'workflow.failed',
+  WORKFLOW_NODE_COMPLETED = 'workflow.node.completed',
+  USER_CREATED = 'user.created',
+  USER_UPDATED = 'user.updated',
+  USER_DELETED = 'user.deleted',
+  USER_LOGGED_IN = 'user.logged_in',
+  DATASOURCE_CONNECTED = 'datasource.connected',
+  DATASOURCE_DISCONNECTED = 'datasource.disconnected',
+  DATASOURCE_QUERIED = 'datasource.queried',
+  AI_GENERATION_COMPLETED = 'ai.generation.completed',
+  AI_GENERATION_FAILED = 'ai.generation.failed',
+  CODE_GENERATED = 'code.generated',
+  CODE_DEPLOYED = 'code.deployed',
+  KNOWLEDGE_ADDED = 'knowledge.added',
+  KNOWLEDGE_DELETED = 'knowledge.deleted',
+  KNOWLEDGE_VECTORIZED = 'knowledge.vectorized',
+}
+
+export enum WebhookStatus {
+  ACTIVE = 'active',
+  INACTIVE = 'inactive',
+  DISABLED = 'disabled',
+}
+
+export enum WebhookTriggerType {
+  SYNC = 'sync',
+  ASYNC = 'async',
+}
+
+export enum WebhookSignatureAlgorithm {
+  HMAC_SHA256 = 'hmac_sha256',
+  HMAC_SHA512 = 'hmac_sha512',
+}
+
+export interface WebhookRetryConfig {
+  maxRetries: number
+  delayMs: number
+  backoffMultiplier: number
+}
+
+export const DEFAULT_RETRY_CONFIG: WebhookRetryConfig = {
+  maxRetries: 3,
+  delayMs: 1000,
+  backoffMultiplier: 2,
+}
+
+export interface WebhookConfig {
+  id: string
+  name: string
+  url: string
+  events: WebhookEventType[]
+  status: WebhookStatus
+  triggerType: WebhookTriggerType
+  signatureAlgorithm?: WebhookSignatureAlgorithm
+  secret?: string
+  headers?: Record<string, string>
+  retryConfig?: WebhookRetryConfig
+  projectId?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface WebhookEventPayload {
+  eventId: string
+  eventType: WebhookEventType
+  timestamp: number
+  data: Record<string, unknown>
+  metadata: {
+    projectId?: string
+    userId?: string
+    source: string
+  }
+}
+
+export enum WebhookLogStatus {
+  PENDING = 'pending',
+  SUCCESS = 'success',
+  FAILED = 'failed',
+  RETRYING = 'retrying',
+}
+
+export interface WebhookLog {
+  id: string
+  webhookId: string
+  eventType: WebhookEventType
+  payload: WebhookEventPayload
+  responseStatus?: number
+  responseBody?: string
+  status: WebhookLogStatus
+  retryCount: number
+  errorMessage?: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+export const WEBHOOK_EVENT_GROUPS: Record<string, WebhookEventType[]> = {
+  project: [
+    WebhookEventType.PROJECT_CREATED,
+    WebhookEventType.PROJECT_UPDATED,
+    WebhookEventType.PROJECT_DELETED,
+  ],
+  page: [
+    WebhookEventType.PAGE_CREATED,
+    WebhookEventType.PAGE_UPDATED,
+    WebhookEventType.PAGE_DELETED,
+    WebhookEventType.PAGE_PUBLISHED,
+    WebhookEventType.PAGE_VERSION_CREATED,
+  ],
+  workflow: [
+    WebhookEventType.WORKFLOW_STARTED,
+    WebhookEventType.WORKFLOW_COMPLETED,
+    WebhookEventType.WORKFLOW_FAILED,
+    WebhookEventType.WORKFLOW_NODE_COMPLETED,
+  ],
+  user: [
+    WebhookEventType.USER_CREATED,
+    WebhookEventType.USER_UPDATED,
+    WebhookEventType.USER_DELETED,
+    WebhookEventType.USER_LOGGED_IN,
+  ],
+  datasource: [
+    WebhookEventType.DATASOURCE_CONNECTED,
+    WebhookEventType.DATASOURCE_DISCONNECTED,
+    WebhookEventType.DATASOURCE_QUERIED,
+  ],
+  ai: [
+    WebhookEventType.AI_GENERATION_COMPLETED,
+    WebhookEventType.AI_GENERATION_FAILED,
+  ],
+  codegen: [
+    WebhookEventType.CODE_GENERATED,
+    WebhookEventType.CODE_DEPLOYED,
+  ],
+  knowledge: [
+    WebhookEventType.KNOWLEDGE_ADDED,
+    WebhookEventType.KNOWLEDGE_DELETED,
+    WebhookEventType.KNOWLEDGE_VECTORIZED,
+  ],
+}
+
+export function getEventGroupName(eventType: WebhookEventType): string {
+  for (const [groupName, events] of Object.entries(WEBHOOK_EVENT_GROUPS)) {
+    if (events.includes(eventType)) {
+      return groupName
+    }
+  }
+  return 'other'
+}

@@ -108,10 +108,13 @@ export const pageApi = {
 
 // AI Agent API 响应类型
 export interface GeneratePageResponse {
+  sessionId?: string
   success: boolean
   schema?: any
   error?: string
   message?: string
+  logs?: any[]
+  duration?: number
 }
 
 // 独立画布页面 API（不依赖项目）
@@ -167,7 +170,7 @@ export const agentApi = {
           if (!eventStr.trim()) continue
 
           let event: StreamEvent = { event: 'progress', data: {} }
-          let currentEventName = 'progress'
+          let currentEventName: StreamEvent['event'] = 'progress'
 
           const lines = eventStr.split('\n')
           for (const line of lines) {
@@ -199,7 +202,7 @@ export const agentApi = {
             const remainingEvents = buffer.split('\n\n').filter(e => e.trim())
             for (const eventStr of remainingEvents) {
               let event: StreamEvent = { event: 'progress', data: {} }
-              let currentEventName = 'progress'
+              let currentEventName: StreamEvent['event'] = 'progress'
 
               const lines = eventStr.split('\n')
               for (const line of lines) {

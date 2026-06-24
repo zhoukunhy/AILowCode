@@ -12,7 +12,7 @@ if (!fs.existsSync(distDir)) {
 
 // 使用 tsc 编译，生成 JS 和 .d.ts 文件，排除测试文件
   try {
-    execSync(`npx tsc --outDir ${distDir} --declaration --declarationMap --sourceMap --skipLibCheck --module commonjs --target ES2022 --moduleResolution node --exclude src/__tests__/**/*`, {
+    execSync(`npx tsc --outDir ${distDir} --declaration --declarationMap --sourceMap --skipLibCheck --module commonjs --target ES2022 --moduleResolution node`, {
       cwd: pkgDir,
       stdio: 'inherit'
     });

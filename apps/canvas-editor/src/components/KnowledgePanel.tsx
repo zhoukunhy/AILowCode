@@ -118,8 +118,7 @@ export function KnowledgePanel() {
     setStatsLoading(true)
     try {
       const result = await knowledgeApi.getKnowledgeBaseStats(baseId)
-      const data = result as Record<string, unknown>
-      const statsData = data as KnowledgeBaseStats
+      const statsData = result as unknown as KnowledgeBaseStats
       setBaseStats(statsData)
     } catch (err) {
       console.error('获取知识库统计失败:', err)

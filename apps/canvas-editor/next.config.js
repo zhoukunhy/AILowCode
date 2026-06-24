@@ -37,7 +37,7 @@ const nextConfig = {
   poweredByHeader: false,
   
   // webpack 配置优化
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
     // 禁用所有与 canvas 相关的模块，因为它们无法在 Node.js 环境中运行
     config.resolve.fallback = {
       ...config.resolve.fallback,
@@ -51,6 +51,14 @@ const nextConfig = {
       test: /node_modules\/konva\/.*\.js$/,
       use: 'null-loader',
     })
+    
+    // 修复 Ant Design HMR 问题
+    if (dev && !isServer) {
+      config.module.rules.push({
+        test: /node_modules\/@ant-design\/cssinjs\/es\/hooks\/useHMR\.js$/,
+        use: 'null-loader',
+      })
+    }
     
     return config
   },

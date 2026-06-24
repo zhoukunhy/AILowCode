@@ -4,7 +4,7 @@
  */
 
 import { AgentState, AgentNodeName } from './types'
-import { GraphNode, GraphEdge, StateUpdate } from './LangGraphState'
+import { GraphNode, GraphEdge } from './LangGraphState'
 
 export class LangGraphExecutor {
   private nodes: Map<AgentNodeName, GraphNode>

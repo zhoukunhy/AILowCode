@@ -8,7 +8,6 @@ import type {
   DataSourceConfig,
   GeneratedPageConfig,
   GeneratedComponent,
-  ComponentBinding,
 } from './OpenAPITypes'
 import { OpenAPIParser } from './OpenAPIParser'
 

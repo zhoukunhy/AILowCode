@@ -1,7 +1,7 @@
 /**
  * LangGraph 状态定义
  */
-import { AgentState, AgentNodeName, PageSchema } from './types'
+import { AgentState, AgentNodeName } from './types'
 
 /**
  * 状态更新函数类型

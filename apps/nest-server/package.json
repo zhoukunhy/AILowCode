@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@ai-lowcode/code-generator": "workspace:*",
-    "@ai-lowcode/common-util": "workspace:*",
     "@ai-lowcode/datasource-core": "workspace:*",
     "@ai-lowcode/lang-ai-core": "workspace:*",
     "@ai-lowcode/shared-types": "workspace:*",

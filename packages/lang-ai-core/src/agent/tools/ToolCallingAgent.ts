@@ -250,7 +250,7 @@ export class ToolCallingAgent {
 
     // 2. 根据工具类型准备输入
     let toolInput: any
-    let toolName = decision.toolName
+    const toolName = decision.toolName
 
     if (toolName === 'SQL_DDL' && entities.length > 0) {
       toolInput = this.prepareDDLInput(entities[0])

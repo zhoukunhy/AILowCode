@@ -21,6 +21,7 @@ import { RedisModule } from './common/redis/redis.module'
 import { CanvasModule } from './modules/canvas/canvas.module'
 import { WebhookModule } from './modules/webhook/webhook.module'
 import { SchemaModule } from './modules/schema/schema.module'
+import { CustomComponentModule } from './modules/custom-component/custom-component.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { PermissionsGuard } from './modules/auth/guards/permissions.guard'
 
@@ -67,6 +68,7 @@ import { PermissionsGuard } from './modules/auth/guards/permissions.guard'
     CanvasModule,
     WebhookModule,
     SchemaModule,
+    CustomComponentModule,
   ],
   providers: [
     {

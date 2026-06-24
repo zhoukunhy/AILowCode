@@ -14,10 +14,6 @@ import {
   WebhookLogStatus,
 } from '@ai-lowcode/shared-types'
 
-/**
- * Webhook 服务
- * 提供Webhook注册、触发、重试等功能
- */
 @Injectable()
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name)
@@ -30,15 +26,12 @@ export class WebhookService {
     private webhookLogRepository: Repository<WebhookLog>,
   ) {}
 
-  /**
-   * 创建Webhook
-   */
   async createWebhook(createWebhookDto: CreateWebhookDto): Promise<Webhook> {
     const existing = await this.webhookRepository.findOne({
       where: { url: createWebhookDto.url, projectId: createWebhookDto.projectId },
     })
     if (existing) {
-      throw new ConflictException('该URL已在同一项目下注册')
+      throw new ConflictException('URL already registered for this project')
     }
 
     const webhook = this.webhookRepository.create({
@@ -49,9 +42,6 @@ export class WebhookService {
     return this.webhookRepository.save(webhook)
   }
 
-  /**
-   * 获取所有Webhook
-   */
   async getAllWebhooks(projectId?: number): Promise<Webhook[]> {
     const query = this.webhookRepository.createQueryBuilder('webhook')
 
@@ -62,57 +52,42 @@ export class WebhookService {
     return query.getMany()
   }
 
-  /**
-   * 获取单个Webhook
-   */
   async getWebhookById(id: number): Promise<Webhook> {
     const webhook = await this.webhookRepository.findOne({ where: { id } })
     if (!webhook) {
-      throw new NotFoundException('Webhook不存在')
+      throw new NotFoundException('Webhook not found')
     }
     return webhook
   }
 
-  /**
-   * 更新Webhook
-   */
   async updateWebhook(id: number, updateWebhookDto: UpdateWebhookDto): Promise<Webhook> {
     const webhook = await this.getWebhookById(id)
 
     if (webhook.isSystem && updateWebhookDto.name) {
-      throw new ConflictException('系统Webhook名称不可修改')
+      throw new ConflictException('System webhook name cannot be modified')
     }
 
     Object.assign(webhook, updateWebhookDto)
     return this.webhookRepository.save(webhook)
   }
 
-  /**
-   * 删除Webhook
-   */
   async deleteWebhook(id: number): Promise<{ message: string }> {
     const webhook = await this.getWebhookById(id)
 
     if (webhook.isSystem) {
-      throw new ConflictException('系统Webhook不可删除')
+      throw new ConflictException('System webhook cannot be deleted')
     }
 
     await this.webhookRepository.remove(webhook)
-    return { message: '删除成功' }
+    return { message: 'Webhook deleted successfully' }
   }
 
-  /**
-   * 启用/禁用Webhook
-   */
   async toggleWebhook(id: number, enabled: boolean): Promise<Webhook> {
     const webhook = await this.getWebhookById(id)
     webhook.status = enabled ? WebhookStatus.ACTIVE : WebhookStatus.INACTIVE
     return this.webhookRepository.save(webhook)
   }
 
-  /**
-   * 触发Webhook事件
-   */
   async triggerEvent(triggerDto: TriggerWebhookDto): Promise<void> {
     const { eventType, data, projectId, userId } = triggerDto
 
@@ -147,9 +122,6 @@ export class WebhookService {
     }
   }
 
-  /**
-   * 创建事件负载
-   */
   private createEventPayload(
     eventType: WebhookEventType,
     data: object,
@@ -169,9 +141,6 @@ export class WebhookService {
     }
   }
 
-  /**
-   * 发送Webhook请求
-   */
   private async sendWebhook(webhook: Webhook, payload: Record<string, unknown>): Promise<void> {
     const log = await this.createLog(webhook.id, payload as any)
     const abortController = new AbortController()
@@ -203,9 +172,6 @@ export class WebhookService {
     }
   }
 
-  /**
-   * 构建请求选项
-   */
   private async buildRequestOptions(
     webhook: Webhook,
     payload: Record<string, unknown>,
@@ -230,9 +196,6 @@ export class WebhookService {
     }
   }
 
-  /**
-   * 生成签名
-   */
   private generateSignature(
     payload: string,
     secret: string,
@@ -245,9 +208,6 @@ export class WebhookService {
     return `${algorithm}=${hmac.update(payload).digest('hex')}`
   }
 
-  /**
-   * 创建日志
-   */
   private async createLog(webhookId: number, payload: { eventType: WebhookEventType }): Promise<WebhookLog> {
     const log = this.webhookLogRepository.create({
       webhookId,
@@ -259,9 +219,6 @@ export class WebhookService {
     return this.webhookLogRepository.save(log)
   }
 
-  /**
-   * 更新日志
-   */
   private async updateLog(
     logId: number,
     updates: {
@@ -276,9 +233,6 @@ export class WebhookService {
     await this.webhookLogRepository.update(logId, updates)
   }
 
-  /**
-   * 处理Webhook失败
-   */
   private async handleWebhookFailure(logId: number, webhook: Webhook, error: Error): Promise<void> {
     const log = await this.webhookLogRepository.findOne({ where: { id: logId } })
     if (!log) return
@@ -313,9 +267,6 @@ export class WebhookService {
     }
   }
 
-  /**
-   * 重试Webhook
-   */
   private async retryWebhook(logId: number): Promise<void> {
     const log = await this.webhookLogRepository.findOne({
       where: { id: logId },
@@ -362,9 +313,6 @@ export class WebhookService {
     }
   }
 
-  /**
-   * 获取Webhook日志
-   */
   async getWebhookLogs(webhookId?: number, status?: WebhookLogStatus): Promise<WebhookLog[]> {
     const query = this.webhookLogRepository.createQueryBuilder('log')
 
@@ -381,23 +329,17 @@ export class WebhookService {
     return query.getMany()
   }
 
-  /**
-   * 获取单个日志详情
-   */
   async getLogById(id: number): Promise<WebhookLog> {
     const log = await this.webhookLogRepository.findOne({
       where: { id },
       relations: ['webhook'],
     })
     if (!log) {
-      throw new NotFoundException('日志不存在')
+      throw new NotFoundException('Log not found')
     }
     return log
   }
 
-  /**
-   * 测试Webhook
-   */
   async testWebhook(id: number, testData?: Record<string, unknown>): Promise<{ success: boolean; response?: any }> {
     const webhook = await this.getWebhookById(id)
     const abortController = new AbortController()
@@ -434,49 +376,43 @@ export class WebhookService {
     }
   }
 
-  /**
-   * 获取事件类型列表
-   */
   getEventTypes(): { type: WebhookEventType; label: string; group: string }[] {
     const eventLabels: Record<WebhookEventType, string> = {
-      [WebhookEventType.PROJECT_CREATED]: '项目创建',
-      [WebhookEventType.PROJECT_UPDATED]: '项目更新',
-      [WebhookEventType.PROJECT_DELETED]: '项目删除',
-      [WebhookEventType.PAGE_CREATED]: '页面创建',
-      [WebhookEventType.PAGE_UPDATED]: '页面更新',
-      [WebhookEventType.PAGE_DELETED]: '页面删除',
-      [WebhookEventType.PAGE_PUBLISHED]: '页面发布',
-      [WebhookEventType.PAGE_VERSION_CREATED]: '页面版本创建',
-      [WebhookEventType.WORKFLOW_STARTED]: '工作流启动',
-      [WebhookEventType.WORKFLOW_COMPLETED]: '工作流完成',
-      [WebhookEventType.WORKFLOW_FAILED]: '工作流失败',
-      [WebhookEventType.WORKFLOW_NODE_COMPLETED]: '工作流节点完成',
-      [WebhookEventType.USER_CREATED]: '用户创建',
-      [WebhookEventType.USER_UPDATED]: '用户更新',
-      [WebhookEventType.USER_DELETED]: '用户删除',
-      [WebhookEventType.USER_LOGGED_IN]: '用户登录',
-      [WebhookEventType.DATASOURCE_CONNECTED]: '数据源连接',
-      [WebhookEventType.DATASOURCE_DISCONNECTED]: '数据源断开',
-      [WebhookEventType.DATASOURCE_QUERIED]: '数据源查询',
-      [WebhookEventType.AI_GENERATION_COMPLETED]: 'AI生成完成',
-      [WebhookEventType.AI_GENERATION_FAILED]: 'AI生成失败',
-      [WebhookEventType.CODE_GENERATED]: '代码生成',
-      [WebhookEventType.CODE_DEPLOYED]: '代码部署',
-      [WebhookEventType.KNOWLEDGE_ADDED]: '知识库添加',
-      [WebhookEventType.KNOWLEDGE_DELETED]: '知识库删除',
-      [WebhookEventType.KNOWLEDGE_VECTORIZED]: '知识库向量化',
+      [WebhookEventType.PROJECT_CREATED]: 'Project Created',
+      [WebhookEventType.PROJECT_UPDATED]: 'Project Updated',
+      [WebhookEventType.PROJECT_DELETED]: 'Project Deleted',
+      [WebhookEventType.PAGE_CREATED]: 'Page Created',
+      [WebhookEventType.PAGE_UPDATED]: 'Page Updated',
+      [WebhookEventType.PAGE_DELETED]: 'Page Deleted',
+      [WebhookEventType.PAGE_PUBLISHED]: 'Page Published',
+      [WebhookEventType.PAGE_VERSION_CREATED]: 'Page Version Created',
+      [WebhookEventType.WORKFLOW_STARTED]: 'Workflow Started',
+      [WebhookEventType.WORKFLOW_COMPLETED]: 'Workflow Completed',
+      [WebhookEventType.WORKFLOW_FAILED]: 'Workflow Failed',
+      [WebhookEventType.WORKFLOW_NODE_COMPLETED]: 'Workflow Node Completed',
+      [WebhookEventType.USER_CREATED]: 'User Created',
+      [WebhookEventType.USER_UPDATED]: 'User Updated',
+      [WebhookEventType.USER_DELETED]: 'User Deleted',
+      [WebhookEventType.USER_LOGGED_IN]: 'User Logged In',
+      [WebhookEventType.DATASOURCE_CONNECTED]: 'Datasource Connected',
+      [WebhookEventType.DATASOURCE_DISCONNECTED]: 'Datasource Disconnected',
+      [WebhookEventType.DATASOURCE_QUERIED]: 'Datasource Queried',
+      [WebhookEventType.AI_GENERATION_COMPLETED]: 'AI Generation Completed',
+      [WebhookEventType.AI_GENERATION_FAILED]: 'AI Generation Failed',
+      [WebhookEventType.CODE_GENERATED]: 'Code Generated',
+      [WebhookEventType.CODE_DEPLOYED]: 'Code Deployed',
+      [WebhookEventType.KNOWLEDGE_ADDED]: 'Knowledge Added',
+      [WebhookEventType.KNOWLEDGE_DELETED]: 'Knowledge Deleted',
+      [WebhookEventType.KNOWLEDGE_VECTORIZED]: 'Knowledge Vectorized',
     }
 
     return Object.values(WebhookEventType).map((type) => ({
       type,
-      label: eventLabels[type],
+      label: eventLabels[type] || type,
       group: this.getEventGroup(type),
     }))
   }
 
-  /**
-   * 获取事件分组名称
-   */
   private getEventGroup(eventType: WebhookEventType): string {
     if (eventType.startsWith('project.')) return 'project'
     if (eventType.startsWith('page.')) return 'page'
@@ -489,9 +425,6 @@ export class WebhookService {
     return 'other'
   }
 
-  /**
-   * 清理过期重试任务
-   */
   cleanupExpiredRetries(): void {
     for (const [logId, timer] of this.retryQueue.entries()) {
       clearTimeout(timer)

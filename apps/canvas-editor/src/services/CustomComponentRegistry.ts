@@ -1,0 +1,362 @@
+import React from 'react'
+import type {
+  CustomComponentInstance,
+  CustomPropSchema,
+} from '@ai-lowcode/shared-types'
+
+export interface RegisteredComponent {
+  definition: any
+  renderFunction?: (props: any) => React.ReactNode
+  compiledCode?: (props: any) => React.ReactNode
+}
+
+class CustomComponentRegistry {
+  private components: Map<string, RegisteredComponent> = new Map()
+  private listeners: Set<() => void> = new Set()
+
+  /**
+   * 注册自定义组件
+   */
+  register(definition: any, renderFunction?: (props: any) => React.ReactNode): void {
+    const existing = this.components.get(definition.id)
+    
+    // 如果已存在且版本相同，跳过
+    if (existing && existing.definition.version === definition.version) {
+      return
+    }
+
+    // 注册组件
+    this.components.set(definition.id, {
+      definition,
+      renderFunction,
+    })
+
+    // 通知监听器
+    this.notifyListeners()
+  }
+
+  /**
+   * 批量注册组件
+   */
+  registerBatch(definitions: any[]): void {
+    definitions.forEach(def => this.register(def))
+    this.notifyListeners()
+  }
+
+  /**
+   * 取消注册组件
+   */
+  unregister(componentId: string): void {
+    this.components.delete(componentId)
+    this.notifyListeners()
+  }
+
+  /**
+   * 获取组件定义
+   */
+  getDefinition(componentId: string): any | undefined {
+    return this.components.get(componentId)?.definition
+  }
+
+  /**
+   * 获取所有已注册组件
+   */
+  getAllDefinitions(): any[] {
+    return Array.from(this.components.values()).map(c => c.definition)
+  }
+
+  /**
+   * 获取指定分类的组件
+   */
+  getDefinitionsByCategory(category: string): any[] {
+    return this.getAllDefinitions().filter(c => c.category === category)
+  }
+
+  /**
+   * 搜索组件
+   */
+  searchDefinitions(query: string): any[] {
+    const lowerQuery = query.toLowerCase()
+    return this.getAllDefinitions().filter(c =>
+      c.name.toLowerCase().includes(lowerQuery) ||
+      c.displayName.toLowerCase().includes(lowerQuery) ||
+      c.description.toLowerCase().includes(lowerQuery) ||
+      c.tags?.some((tag: string) => tag.toLowerCase().includes(lowerQuery))
+    )
+  }
+
+  /**
+   * 检查组件是否存在
+   */
+  exists(componentId: string): boolean {
+    return this.components.has(componentId)
+  }
+
+  /**
+   * 获取组件渲染函数
+   */
+  getRenderFunction(componentId: string): ((props: any) => React.ReactNode) | undefined {
+    const registered = this.components.get(componentId)
+    return registered?.renderFunction || registered?.compiledCode
+  }
+
+  /**
+   * 编译代码模板组件
+   */
+  compileCodeTemplate(componentId: string): boolean {
+    const registered = this.components.get(componentId)
+    if (!registered || registered.definition.template.type !== 'code') {
+      return false
+    }
+
+    const codeConfig = registered.definition.template.codeConfig
+    if (!codeConfig?.renderCode) {
+      return false
+    }
+
+    try {
+      // 编译代码
+      const compiledFunction = new Function(
+        'React',
+        'props',
+        'state',
+        'setState',
+        codeConfig.renderCode
+      )
+
+      registered.compiledCode = (props: any) => {
+        return compiledFunction(React, props, {}, () => {})
+      }
+
+      return true
+    } catch (error) {
+      console.error(`Failed to compile custom component ${componentId}:`, error)
+      return false
+    }
+  }
+
+  /**
+   * 创建组件实例
+   */
+  createInstance(
+    componentId: string,
+    instanceId: string,
+    props?: Record<string, any>
+  ): CustomComponentInstance | null {
+    const definition = this.getDefinition(componentId)
+    if (!definition) {
+      return null
+    }
+
+    // 合合默认属性
+    const defaultProps = this.getDefaultProps(definition.propsSchema)
+    const finalProps = { ...defaultProps, ...props }
+
+    return {
+      id: instanceId,
+      customComponentId: componentId,
+      version: definition.version,
+      props: finalProps,
+    }
+  }
+
+  /**
+   * 获取默认属性值
+   */
+  getDefaultProps(schema: CustomPropSchema): Record<string, any> {
+    const props: Record<string, any> = {}
+
+    for (const [key, propDef] of Object.entries(schema.properties)) {
+      if (propDef.default !== undefined) {
+        props[key] = propDef.default
+      } else {
+        // 根据类型设置默认值
+        switch (propDef.type) {
+          case 'string':
+            props[key] = ''
+            break
+          case 'number':
+            props[key] = 0
+            break
+          case 'boolean':
+            props[key] = false
+            break
+          case 'array':
+            props[key] = []
+            break
+          case 'object':
+            props[key] = {}
+            break
+          default:
+            props[key] = null
+        }
+      }
+    }
+
+    return props
+  }
+
+  /**
+   * 验证属性值
+   */
+  validateProps(
+    componentId: string,
+    props: Record<string, any>
+  ): { valid: boolean; errors: string[] } {
+    const definition = this.getDefinition(componentId)
+    if (!definition) {
+      return { valid: false, errors: ['组件不存在'] }
+    }
+
+    const errors: string[] = []
+    const schema = definition.propsSchema
+
+    // 检查必填属性
+    if (schema.required) {
+      for (const requiredKey of schema.required) {
+        if (props[requiredKey] === undefined || props[requiredKey] === null) {
+          errors.push(`属性 ${requiredKey} 是必填的`)
+        }
+      }
+    }
+
+    // 验证属性值
+    for (const [key, value] of Object.entries(props)) {
+      const propDef = schema.properties[key]
+      if (!propDef) {
+        continue
+      }
+
+      // 类型验证
+      if (!this.validatePropType(value, propDef.type)) {
+        errors.push(`属性 ${key} 类型不正确，期望 ${propDef.type}`)
+        continue
+      }
+
+      // 验证规则
+      if (propDef.validation) {
+        const validationErrors = this.validatePropRules(key, value, propDef.validation)
+        errors.push(...validationErrors)
+      }
+    }
+
+    return { valid: errors.length === 0, errors }
+  }
+
+  /**
+   * 验证属性类型
+   */
+  private validatePropType(value: any, type: string): boolean {
+    switch (type) {
+      case 'string':
+        return typeof value === 'string'
+      case 'number':
+        return typeof value === 'number'
+      case 'boolean':
+        return typeof value === 'boolean'
+      case 'array':
+        return Array.isArray(value)
+      case 'object':
+        return typeof value === 'object' && value !== null && !Array.isArray(value)
+      case 'color':
+        return typeof value === 'string' && /^#[0-9A-Fa-f]{6}$/.test(value) || /^rgb/.test(value)
+      case 'date':
+        return value instanceof Date || typeof value === 'string'
+      default:
+        return true
+    }
+  }
+
+  /**
+   * 验证属性规则
+   */
+  private validatePropRules(key: string, value: any, validation: any): string[] {
+    const errors: string[] = []
+
+    if (validation.min !== undefined && typeof value === 'number' && value < validation.min) {
+      errors.push(`属性 ${key} 最小值为 ${validation.min}`)
+    }
+
+    if (validation.max !== undefined && typeof value === 'number' && value > validation.max) {
+      errors.push(`属性 ${key} 最大值为 ${validation.max}`)
+    }
+
+    if (validation.minLength !== undefined && typeof value === 'string' && value.length < validation.minLength) {
+      errors.push(`属性 ${key} 最小长度为 ${validation.minLength}`)
+    }
+
+    if (validation.maxLength !== undefined && typeof value === 'string' && value.length > validation.maxLength) {
+      errors.push(`属性 ${key} 最大长度为 ${validation.maxLength}`)
+    }
+
+    if (validation.pattern && typeof value === 'string') {
+      const regex = new RegExp(validation.pattern)
+      if (!regex.test(value)) {
+        errors.push(`属性 ${key} 格式不正确`)
+      }
+    }
+
+    return errors
+  }
+
+  /**
+   * 添加监听器
+   */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => this.listeners.delete(listener)
+  }
+
+  /**
+   * 通知所有监听器
+   */
+  private notifyListeners(): void {
+    this.listeners.forEach(listener => listener())
+  }
+
+  /**
+   * 清空所有组件
+   */
+  clear(): void {
+    this.components.clear()
+    this.notifyListeners()
+  }
+
+  /**
+   * 导出组件定义
+   */
+  exportDefinitions(): any[] {
+    return this.getAllDefinitions()
+  }
+
+  /**
+   * 导入组件定义
+   */
+  importDefinitions(definitions: any[]): void {
+    this.registerBatch(definitions)
+  }
+}
+
+// 创建全局实例
+export const customComponentRegistry = new CustomComponentRegistry()
+
+// React Hook for using custom components
+export function useCustomComponentRegistry() {
+  const [, forceUpdate] = React.useReducer(x => x + 1, 0)
+
+  React.useEffect(() => {
+    const unsubscribe = customComponentRegistry.subscribe(() => forceUpdate())
+    return unsubscribe
+  }, [])
+
+  return {
+    register: customComponentRegistry.register.bind(customComponentRegistry),
+    unregister: customComponentRegistry.unregister.bind(customComponentRegistry),
+    getDefinition: customComponentRegistry.getDefinition.bind(customComponentRegistry),
+    getAllDefinitions: customComponentRegistry.getAllDefinitions.bind(customComponentRegistry),
+    getDefinitionsByCategory: customComponentRegistry.getDefinitionsByCategory.bind(customComponentRegistry),
+    searchDefinitions: customComponentRegistry.searchDefinitions.bind(customComponentRegistry),
+    createInstance: customComponentRegistry.createInstance.bind(customComponentRegistry),
+    validateProps: customComponentRegistry.validateProps.bind(customComponentRegistry),
+  }
+}

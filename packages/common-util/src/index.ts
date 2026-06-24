@@ -1,24 +1,21 @@
-// 工具函数集合
+/**
+ * 生成唯一ID
+ */
+export function generateId(prefix?: string): string {
+  const timestamp = Date.now().toString(36)
+  const randomStr = Math.random().toString(36).substring(2, 8)
+  return prefix ? `${prefix}_${timestamp}${randomStr}` : `${timestamp}${randomStr}`
+}
 
 /**
- * 深拷贝
+ * 生成UUID v4
  */
-export function deepClone<T>(obj: T): T {
-  if (obj === null || typeof obj !== 'object') {
-    return obj
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map((item) => deepClone(item)) as any
-  }
-
-  const cloned = {} as T
-  for (const key in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, key)) {
-      cloned[key] = deepClone(obj[key])
-    }
-  }
-  return cloned
+export function generateUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
 }
 
 /**
@@ -28,16 +25,10 @@ export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
-  let timeoutId: NodeJS.Timeout | null = null
-
-  return function (...args: Parameters<T>) {
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-    }
-
-    timeoutId = setTimeout(() => {
-      func(...args)
-    }, wait)
+  let timeout: NodeJS.Timeout | null = null
+  return function (this: any, ...args: Parameters<T>) {
+    if (timeout) clearTimeout(timeout)
+    timeout = setTimeout(() => func.apply(this, args), wait)
   }
 }
 
@@ -46,24 +37,53 @@ export function debounce<T extends (...args: any[]) => any>(
  */
 export function throttle<T extends (...args: any[]) => any>(
   func: T,
-  limit: number
+  wait: number
 ): (...args: Parameters<T>) => void {
-  let inThrottle: boolean = false
-
-  return function (...args: Parameters<T>) {
-    if (!inThrottle) {
-      func(...args)
-      inThrottle = true
-      setTimeout(() => (inThrottle = false), limit)
+  let lastTime: number | null = null
+  return function (this: any, ...args: Parameters<T>) {
+    const now = Date.now()
+    if (!lastTime || now - lastTime >= wait) {
+      lastTime = now
+      func.apply(this, args)
     }
   }
 }
 
 /**
- * 生成唯一ID
+ * 深拷贝
  */
-export function generateId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+export function deepClone<T>(obj: T): T {
+  if (obj === null || typeof obj !== 'object') return obj
+  if (obj instanceof Date) return new Date(obj.getTime()) as any
+  if (obj instanceof Array) return obj.map((item) => deepClone(item)) as any
+  if (obj instanceof Object) {
+    const cloned: any = {}
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        cloned[key] = deepClone(obj[key])
+      }
+    }
+    return cloned
+  }
+  return obj
+}
+
+/**
+ * 判断是否为空 (null, undefined, 空字符串, 空数组, 空对象)
+ */
+export function isEmpty(value: any): boolean {
+  if (value === null || value === undefined) return true
+  if (typeof value === 'string') return value.trim() === ''
+  if (Array.isArray(value)) return value.length === 0
+  if (typeof value === 'object') return Object.keys(value).length === 0
+  return false
+}
+
+/**
+ * 延迟执行
+ */
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 /**
@@ -85,77 +105,4 @@ export function formatDate(date: Date | string | number, format: string = 'YYYY-
     .replace('HH', hours)
     .replace('mm', minutes)
     .replace('ss', seconds)
-}
-
-/**
- * 判断是否为空
- */
-export function isEmpty(value: any): boolean {
-  if (value === null || value === undefined) {
-    return true
-  }
-
-  if (typeof value === 'string') {
-    return value.trim() === ''
-  }
-
-  if (Array.isArray(value)) {
-    return value.length === 0
-  }
-
-  if (typeof value === 'object') {
-    return Object.keys(value).length === 0
-  }
-
-  return false
-}
-
-/**
- * 延迟执行
- */
-export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-/**
- * 重试函数
- */
-export async function retry<T>(
-  fn: () => Promise<T>,
-  retries: number = 3,
-  delay: number = 1000
-): Promise<T> {
-  for (let i = 0; i < retries; i++) {
-    try {
-      return await fn()
-    } catch (error) {
-      if (i === retries - 1) {
-        throw error
-      }
-      await sleep(delay)
-    }
-  }
-  throw new Error('重试失败')
-}
-
-/**
- * 对象转查询字符串
- */
-export function objectToQueryString(obj: Record<string, any>): string {
-  return Object.entries(obj)
-    .filter(([_, value]) => value !== undefined && value !== null)
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join('&')
-}
-
-/**
- * 查询字符串转对象
- */
-export function queryStringToObject(queryString: string): Record<string, string> {
-  const params = new URLSearchParams(queryString)
-  const result: Record<string, string> = {}
-  params.forEach((value, key) => {
-    result[key] = value
-  })
-  return result
 }
