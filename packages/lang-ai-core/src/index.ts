@@ -208,3 +208,24 @@ export type {
   ToolCallingAgentState,
   ToolCallingAgentConfig,
 } from './agent/tools'
+
+// MCP 相关
+export { MCPAgent } from './mcp'
+export { ToolManager } from './mcp'
+export { PromptStore } from './mcp'
+export { ContextStore } from './mcp'
+export { SSETransport, getSSETransport, resetSSETransport } from './mcp'
+export type { SSEClient, SSEConnectionState, SSEMessage, SSETransportConfig } from './mcp'
+
+export type {
+  MCPRequest,
+  MCPResponse,
+  MCPError,
+  MCPMethod,
+  ToolRegistration,
+  PromptTemplate,
+  PromptVariable,
+  ChatMessage,
+  ConversationContext,
+  MCPAgentConfig,
+} from './mcp'

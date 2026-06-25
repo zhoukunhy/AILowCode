@@ -582,3 +582,63 @@ export const knowledgeApi = {
     return apiClient.get(url)
   },
 }
+
+// MCP API
+export const mcpApi = {
+  async listTools() {
+    return apiClient.get('/api/mcp/tools')
+  },
+
+  async describeTool(name: string) {
+    return apiClient.get(`/api/mcp/tools/${name}`)
+  },
+
+  async callTool(name: string, input: any) {
+    return apiClient.post(`/api/mcp/tools/${name}/call`, input)
+  },
+
+  async listPrompts(category?: string) {
+    const url = category ? `/api/mcp/prompts?category=${category}` : '/api/mcp/prompts'
+    return apiClient.get(url)
+  },
+
+  async getPrompt(id: string) {
+    return apiClient.get(`/api/mcp/prompts/${id}`)
+  },
+
+  async createPrompt(prompt: Omit<any, 'id' | 'createdAt' | 'updatedAt'>) {
+    return apiClient.post('/api/mcp/prompts', prompt)
+  },
+
+  async updatePrompt(id: string, updates: Partial<Omit<any, 'id' | 'createdAt' | 'updatedAt'>>) {
+    return apiClient.put(`/api/mcp/prompts/${id}`, updates)
+  },
+
+  async deletePrompt(id: string) {
+    return apiClient.delete(`/api/mcp/prompts/${id}`)
+  },
+
+  async renderPrompt(id: string, variables: Record<string, any>) {
+    return apiClient.post(`/api/mcp/prompts/${id}/render`, { variables })
+  },
+
+  async getContext(sessionId: string) {
+    return apiClient.get(`/api/mcp/context/${sessionId}`)
+  },
+
+  async setContext(sessionId: string, message?: any, metadata?: Record<string, any>) {
+    return apiClient.post(`/api/mcp/context/${sessionId}`, { message, metadata })
+  },
+
+  async clearContext(sessionId: string) {
+    return apiClient.delete(`/api/mcp/context/${sessionId}`)
+  },
+
+  async createContext(sessionId: string) {
+    return apiClient.post('/api/mcp/context', { sessionId })
+  },
+
+  async executeRPC(request: { jsonrpc: string; id: string; method: string; params?: Record<string, unknown> }) {
+    return apiClient.post('/api/mcp', request)
+  },
+}

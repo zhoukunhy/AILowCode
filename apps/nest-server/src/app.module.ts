@@ -22,6 +22,7 @@ import { CanvasModule } from './modules/canvas/canvas.module'
 import { WebhookModule } from './modules/webhook/webhook.module'
 import { SchemaModule } from './modules/schema/schema.module'
 import { CustomComponentModule } from './modules/custom-component/custom-component.module'
+import { MCPModule } from './mcp/mcp.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { PermissionsGuard } from './modules/auth/guards/permissions.guard'
 
@@ -69,6 +70,7 @@ import { PermissionsGuard } from './modules/auth/guards/permissions.guard'
     WebhookModule,
     SchemaModule,
     CustomComponentModule,
+    MCPModule,
   ],
   providers: [
     {

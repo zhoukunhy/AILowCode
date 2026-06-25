@@ -1,0 +1,40 @@
+{
+  "$schema": "https://modelcontextprotocol.io/specification/2024_11_05/schema",
+  "mcp_version": "1.0.0",
+  "name": "ai-lowcode-mcp-server",
+  "description": "AI LowCode Platform MCP Server - 提供低代码平台的工具调用、提示词管理和上下文存储能力",
+  "transport": {
+    "type": "sse",
+    "url": "http://localhost:3000/api/mcp/sse",
+    "fallback": {
+      "type": "http",
+      "url": "http://localhost:3000/api/mcp/rpc"
+    }
+  },
+  "capabilities": {
+    "tools": {
+      "enabled": true,
+      "list_changed": true
+    },
+    "prompts": {
+      "enabled": true,
+      "list_changed": true
+    },
+    "resources": {
+      "enabled": false
+    }
+  },
+  "authentication": {
+    "type": "bearer",
+    "token_env": "MCP_SERVER_TOKEN"
+  },
+  "sse": {
+    "heartbeat_interval": 30000,
+    "reconnect_attempts": 5,
+    "reconnect_delay": 1000
+  },
+  "logging": {
+    "level": "info",
+    "format": "json"
+  }
+}

@@ -81,6 +81,18 @@ const defaultMenus: MenuItem[] = [
       { id: 'settings', name: '系统设置', icon: '⚙️', path: '/settings', parentId: 'system-group', sortOrder: 4, status: true },
     ],
   },
+  {
+    id: 'mcp-group',
+    name: 'MCP 管理',
+    icon: '🤖',
+    parentId: null,
+    sortOrder: 6,
+    status: true,
+    children: [
+      { id: 'mcp-tools', name: '工具管理', icon: '🔧', path: '/mcp-tools', parentId: 'mcp-group', sortOrder: 1, status: true },
+      { id: 'mcp-prompts', name: '提示词管理', icon: '📝', path: '/mcp-prompts', parentId: 'mcp-group', sortOrder: 2, status: true },
+    ],
+  },
 ]
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {

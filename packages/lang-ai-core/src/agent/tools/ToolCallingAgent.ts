@@ -18,6 +18,13 @@ import type {
 import { SQLDDLTool, createSQLDDLTool } from './SQLDDLTool'
 import { NestCrudTool, createNestCrudTool } from './NestCrudTool'
 import { HttpTestTool, createHttpTestTool } from './HttpTestTool'
+import { AddComponentTool, createAddComponentTool } from './CanvasTools'
+import { BindDataSourceTool, createBindDataSourceTool } from './CanvasTools'
+import { SetStyleTool, createSetStyleTool } from './CanvasTools'
+import { DeployToVercelTool, createDeployToVercelTool } from './DeploymentTools'
+import { GenerateDockerfileTool, createGenerateDockerfileTool } from './DeploymentTools'
+import { AnalyzePerformanceTool, createAnalyzePerformanceTool } from './DiagnosticTools'
+import { CheckAccessibilityTool, createCheckAccessibilityTool } from './DiagnosticTools'
 
 /**
  * 工具调用 Agent 状态
@@ -122,6 +129,22 @@ export class ToolCallingAgent {
     this.tools.set(sqlTool.name, sqlTool)
     this.tools.set(crudTool.name, crudTool)
     this.tools.set(httpTool.name, httpTool)
+
+    const addComponentTool = createAddComponentTool()
+    const bindDataSourceTool = createBindDataSourceTool()
+    const setStyleTool = createSetStyleTool()
+    const deployToVercelTool = createDeployToVercelTool()
+    const generateDockerfileTool = createGenerateDockerfileTool()
+    const analyzePerformanceTool = createAnalyzePerformanceTool()
+    const checkAccessibilityTool = createCheckAccessibilityTool()
+
+    this.tools.set(addComponentTool.name, addComponentTool)
+    this.tools.set(bindDataSourceTool.name, bindDataSourceTool)
+    this.tools.set(setStyleTool.name, setStyleTool)
+    this.tools.set(deployToVercelTool.name, deployToVercelTool)
+    this.tools.set(generateDockerfileTool.name, generateDockerfileTool)
+    this.tools.set(analyzePerformanceTool.name, analyzePerformanceTool)
+    this.tools.set(checkAccessibilityTool.name, checkAccessibilityTool)
   }
 
   /**
@@ -186,6 +209,72 @@ export class ToolCallingAgent {
         toolName: 'Nest_Crud',
         reasoning: '根据实体定义生成 CRUD 代码',
         confidence: 0.8,
+      }
+    }
+
+    // 画布操作工具决策
+    if (input.includes('添加组件') || input.includes('addComponent') || input.includes('插入组件')) {
+      return {
+        shouldCallTool: true,
+        toolName: 'addComponent',
+        reasoning: '用户请求向画布添加组件',
+        confidence: 0.9,
+      }
+    }
+
+    if (input.includes('绑定数据源') || input.includes('bindDataSource') || input.includes('数据源')) {
+      return {
+        shouldCallTool: true,
+        toolName: 'bindDataSource',
+        reasoning: '用户请求为组件绑定数据源',
+        confidence: 0.9,
+      }
+    }
+
+    if (input.includes('设置样式') || input.includes('setStyle') || input.includes('样式') || input.includes('css') || input.includes('flex') || input.includes('grid')) {
+      return {
+        shouldCallTool: true,
+        toolName: 'setStyle',
+        reasoning: '用户请求为组件设置样式',
+        confidence: 0.85,
+      }
+    }
+
+    // 部署工具决策
+    if (input.includes('部署') || input.includes('deploy') || input.includes('vercel')) {
+      return {
+        shouldCallTool: true,
+        toolName: 'deployToVercel',
+        reasoning: '用户请求部署项目到 Vercel',
+        confidence: 0.9,
+      }
+    }
+
+    if (input.includes('docker') || input.includes('Dockerfile') || input.includes('容器化')) {
+      return {
+        shouldCallTool: true,
+        toolName: 'generateDockerfile',
+        reasoning: '用户请求生成 Dockerfile',
+        confidence: 0.9,
+      }
+    }
+
+    // 诊断工具决策
+    if (input.includes('性能') || input.includes('performance') || input.includes('lcp') || input.includes('fid') || input.includes('cls')) {
+      return {
+        shouldCallTool: true,
+        toolName: 'analyzePerformance',
+        reasoning: '用户请求分析页面性能',
+        confidence: 0.9,
+      }
+    }
+
+    if (input.includes('无障碍') || input.includes('accessibility') || input.includes('a11y') || input.includes('wcag')) {
+      return {
+        shouldCallTool: true,
+        toolName: 'checkAccessibility',
+        reasoning: '用户请求检查页面无障碍合规性',
+        confidence: 0.9,
       }
     }
 
