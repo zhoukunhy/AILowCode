@@ -27,6 +27,9 @@ const CACHE_CONFIG = {
   CLEANUP_INTERVAL: 10000, // 清理间隔（毫秒）
 }
 
+// API 基础地址
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
+
 // 清理过期缓存
 const cleanupExpiredCache = () => {
   const now = Date.now()
@@ -245,17 +248,36 @@ export function useDataBindingCache(
         // 通知所有订阅者
         notifySubscribers(key, entry!)
 
-        // 模拟数据获取（实际应调用API）
-        await new Promise((resolve) => setTimeout(resolve, 100))
+        // 调用后端 API 获取数据
+        const token = localStorage.getItem('token')
+        
+        const response = await fetch(`${API_BASE}/data-source/preview`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            dataSourceId: parseInt(dataSourceId),
+            queryConfig: {
+              type: bindingMode === 'table' ? 'table' : bindingMode === 'list' ? 'query' : 'endpoint',
+              pagination: bindingMode === 'table' ? { page: 1, pageSize: 10 } : undefined,
+            },
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('获取数据失败')
+        }
+
+        const result = await response.json()
+        const apiData = result.rows || []
 
         // 检查是否是最新的请求
         if (fetchRef.current !== currentFetchRef) return
 
-        // 模拟数据
-        const mockData = generateMockData(bindingMode)
-        
-        entry!.data = mockData
-        entry!.value = bindingMode === 'single' ? mockData[0]?.[dataField || ''] : undefined
+        entry!.data = apiData
+        entry!.value = bindingMode === 'single' ? apiData[0]?.[dataField || ''] : undefined
         entry!.isLoading = false
         entry!.timestamp = Date.now()
         entry!.fetchAttempts = 0
@@ -281,9 +303,44 @@ export function useDataBindingCache(
         if (entry!.fetchAttempts < CACHE_CONFIG.MAX_RETRIES) {
           await new Promise((resolve) => setTimeout(resolve, CACHE_CONFIG.RETRY_DELAY))
           if (fetchRef.current === currentFetchRef) {
-            const mockData = generateMockData(bindingMode)
-            entry!.data = mockData
-            entry!.value = bindingMode === 'single' ? mockData[0]?.[dataField || ''] : undefined
+            // 重试时调用 API
+            try {
+              const token = localStorage.getItem('token')
+              
+              const response = await fetch(`${API_BASE}/data-source/preview`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                },
+                body: JSON.stringify({
+                  dataSourceId: parseInt(dataSourceId),
+                  queryConfig: {
+                    type: bindingMode === 'table' ? 'table' : bindingMode === 'list' ? 'query' : 'endpoint',
+                    pagination: bindingMode === 'table' ? { page: 1, pageSize: 10 } : undefined,
+                  },
+                }),
+              })
+
+              if (response.ok) {
+                const result = await response.json()
+                const apiData = result.rows || []
+                
+                entry!.data = apiData
+                entry!.value = bindingMode === 'single' ? apiData[0]?.[dataField || ''] : undefined
+              } else {
+                // API 仍失败，使用模拟数据作为最后兜底
+                const mockData = generateMockData(bindingMode)
+                entry!.data = mockData
+                entry!.value = bindingMode === 'single' ? mockData[0]?.[dataField || ''] : undefined
+              }
+            } catch {
+              // 捕获所有异常，使用模拟数据
+              const mockData = generateMockData(bindingMode)
+              entry!.data = mockData
+              entry!.value = bindingMode === 'single' ? mockData[0]?.[dataField || ''] : undefined
+            }
+            
             entry!.isLoading = false
             entry!.timestamp = Date.now()
             entry!.fetchAttempts = 0

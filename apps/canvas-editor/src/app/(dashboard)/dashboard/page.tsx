@@ -13,13 +13,6 @@ interface StatCard {
   color: string
 }
 
-const statCards: StatCard[] = [
-  { title: '画布总数', value: 128, change: '+12%', changeType: 'up', icon: '🎨', color: 'blue' },
-  { title: '活跃用户', value: 1043, change: '+8%', changeType: 'up', icon: '👥', color: 'green' },
-  { title: 'AI 生成次数', value: 3257, change: '+23%', changeType: 'up', icon: '🤖', color: 'purple' },
-  { title: '知识库文档', value: 456, change: '-3%', changeType: 'down', icon: '📚', color: 'orange' },
-]
-
 // 最近的画布的类型
 interface RecentCanvas {
   id: string
@@ -39,18 +32,65 @@ interface AIActivity {
   timestamp: string
 }
 
-const aiActivities: AIActivity[] = [
-  { id: '1', action: '生成 React 组件', model: 'GPT-4', duration: '2.3s', timestamp: '10:30:15' },
-  { id: '2', action: '优化 SQL 查询', model: 'GPT-4', duration: '1.8s', timestamp: '10:28:42' },
-  { id: '3', action: '生成 NestJS CRUD', model: 'GPT-4', duration: '3.1s', timestamp: '10:25:08' },
-  { id: '4', action: '异常诊断分析', model: 'GPT-4', duration: '2.7s', timestamp: '10:22:33' },
-  { id: '5', action: '代码重构建议', model: 'GPT-4', duration: '1.5s', timestamp: '10:20:01' },
-]
+// API 基础地址
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
 
 export default function DashboardPage() {
   const router = useRouter()
   const [recentCanvases, setRecentCanvases] = useState<RecentCanvas[]>([])
   const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState<StatCard[]>([
+    { title: '画布总数', value: 0, change: '+0%', changeType: 'up', icon: '🎨', color: 'blue' },
+    { title: '活跃用户', value: 0, change: '+0%', changeType: 'up', icon: '👥', color: 'green' },
+    { title: 'AI 生成次数', value: 0, change: '+0%', changeType: 'up', icon: '🤖', color: 'purple' },
+    { title: '知识库文档', value: 0, change: '+0%', changeType: 'up', icon: '📚', color: 'orange' },
+  ])
+  const [aiActivities, setAiActivities] = useState<AIActivity[]>([])
+
+  // 获取统计数据
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch(`${API_BASE}/dashboard/stats`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setStats([
+            { title: '画布总数', value: data.canvasCount || 0, change: data.canvasChange || '+0%', changeType: data.canvasChange?.startsWith('-') ? 'down' : 'up', icon: '🎨', color: 'blue' },
+            { title: '活跃用户', value: data.activeUsers || 0, change: data.usersChange || '+0%', changeType: data.usersChange?.startsWith('-') ? 'down' : 'up', icon: '👥', color: 'green' },
+            { title: 'AI 生成次数', value: data.aiGenerationCount || 0, change: data.aiChange || '+0%', changeType: data.aiChange?.startsWith('-') ? 'down' : 'up', icon: '🤖', color: 'purple' },
+            { title: '知识库文档', value: data.knowledgeDocCount || 0, change: data.knowledgeChange || '+0%', changeType: data.knowledgeChange?.startsWith('-') ? 'down' : 'up', icon: '📚', color: 'orange' },
+          ])
+        }
+      } catch (error) {
+        console.error('获取统计数据失败:', error)
+      }
+    }
+
+    const fetchActivities = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch(`${API_BASE}/dashboard/activities?limit=5`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setAiActivities(data.activities || [])
+        }
+      } catch (error) {
+        console.error('获取 AI 活动记录失败:', error)
+      }
+    }
+
+    fetchStats()
+    fetchActivities()
+  }, [])
 
   // 获取最近创建的画布 - 延迟加载避免阻塞页面渲染
   useEffect(() => {
@@ -134,7 +174,7 @@ export default function DashboardPage() {
 
       {/* 统计卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {statCards.map((stat, index) => (
+        {stats.map((stat, index) => (
           <div
             key={index}
             className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow"
@@ -241,7 +281,10 @@ export default function DashboardPage() {
             <h2 className="text-lg font-bold text-gray-800">AI 活动</h2>
           </div>
           <div className="p-4">
-            {aiActivities.map((activity) => (
+            {aiActivities.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">暂无 AI 活动记录</div>
+            ) : (
+              aiActivities.map((activity) => (
               <div
                 key={activity.id}
                 className="flex items-start py-3 border-b border-gray-50 last:border-0"
@@ -262,7 +305,8 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-            ))}
+              ))
+            )}
           </div>
           <div className="p-4 border-t border-gray-100">
             <button className="w-full py-2 text-sm text-blue-600 hover:text-blue-700 font-medium">

@@ -27,6 +27,13 @@ const DATA_TYPES = [
   'email', 'url', 'phone', 'enum'
 ]
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
+
+const getAuthHeader = () => {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 export function EntityDefinitionPanel() {
   const [entityName, setEntityName] = useState('')
   const [columns, setColumns] = useState<ColumnDefinition[]>([
@@ -68,35 +75,107 @@ export function EntityDefinitionPanel() {
 
     setIsExecuting(true)
     setExecutionResults([
-      { step: 'DDL建表', status: 'pending' },
-      { step: 'CRUD接口生成', status: 'pending' },
-      { step: '组件绑定Schema', status: 'pending' },
-      { step: '接口测试', status: 'pending' },
+      { step: '代码生成', status: 'pending' },
+      { step: '文件打包', status: 'pending' },
+      { step: '下载准备', status: 'pending' },
     ])
     setOutputSummary('')
 
-    // 模拟执行流程
-    const steps = [
-      { step: 'DDL建表', delay: 1500, success: true, message: `表 ${entityName.toLowerCase()} 创建成功`, details: 'CREATE TABLE语句已生成' },
-      { step: 'CRUD接口生成', delay: 2000, success: true, message: '生成5个文件', details: 'Entity, Service, Controller, DTOs, Module' },
-      { step: '组件绑定Schema', delay: 500, success: true, message: 'Schema生成成功', details: 'Table组件绑定配置已生成' },
-      { step: '接口测试', delay: 1000, success: true, message: '测试通过', details: 'GET/POST接口测试成功' },
-    ]
-
-    for (const step of steps) {
+    try {
       setExecutionResults(prev => prev.map(r => 
-        r.step === step.step ? { ...r, status: 'running' } : r
+        r.step === '代码生成' ? { ...r, status: 'running' } : r
       ))
 
-      await new Promise(resolve => setTimeout(resolve, step.delay))
+      const schema = {
+        name: entityName,
+        columns: columns.map(col => ({
+          name: col.name,
+          type: col.type,
+          nullable: col.nullable,
+          primaryKey: col.primaryKey,
+          unique: col.unique,
+        })),
+      }
+
+      const response = await fetch(`${API_BASE}/codegen/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify({
+          type: 'full-stack',
+          schema,
+          framework: 'react',
+          enableRAG: false,
+          enableOptimization: false,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('代码生成失败')
+      }
+
+      const result = await response.json()
 
       setExecutionResults(prev => prev.map(r => 
-        r.step === step.step ? { ...r, status: step.success ? 'success' : 'error', message: step.message, details: step.details } : r
+        r.step === '代码生成' ? { ...r, status: 'success', message: `生成 ${result.fileCount} 个文件`, details: `时长 ${result.duration}ms` } : r
       ))
+
+      setExecutionResults(prev => prev.map(r => 
+        r.step === '文件打包' ? { ...r, status: 'running' } : r
+      ))
+
+      const downloadResponse = await fetch(`${API_BASE}/codegen/download`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify({
+          type: 'full-stack',
+          schema,
+          framework: 'react',
+          enableRAG: false,
+          enableOptimization: false,
+        }),
+      })
+
+      if (!downloadResponse.ok) {
+        throw new Error('打包失败')
+      }
+
+      setExecutionResults(prev => prev.map(r => 
+        r.step === '文件打包' ? { ...r, status: 'success', message: '打包成功', details: 'ZIP文件已生成' } : r
+      ))
+
+      setExecutionResults(prev => prev.map(r => 
+        r.step === '下载准备' ? { ...r, status: 'running' } : r
+      ))
+
+      const blob = await downloadResponse.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${entityName.toLowerCase()}-codegen.zip`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+
+      setExecutionResults(prev => prev.map(r => 
+        r.step === '下载准备' ? { ...r, status: 'success', message: '下载已开始', details: '浏览器已触发下载' } : r
+      ))
+
+      setOutputSummary(`全链路自动化完成！\n\n实体: ${entityName}\n字段数: ${columns.length}\n\n生成内容:\n- ${result.fileCount} 个文件\n- 时长: ${result.duration}ms\n- 文件已自动下载`)
+    } catch (error: any) {
+      setExecutionResults(prev => prev.map(r => 
+        r.status === 'running' ? { ...r, status: 'error', message: error.message } : r
+      ))
+      setOutputSummary(`执行失败: ${error.message}`)
+    } finally {
+      setIsExecuting(false)
     }
-
-    setIsExecuting(false)
-    setOutputSummary(`全链路自动化完成！\n\n实体: ${entityName}\n字段数: ${columns.length}\n\n生成内容:\n- PostgreSQL建表DDL\n- NestJS CRUD模块（5个文件）\n- 前端组件绑定Schema\n- API接口测试通过`)
   }
 
   const formatTypeScriptType = (type: string): string => {
@@ -113,14 +192,12 @@ export function EntityDefinitionPanel() {
 
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* 头部 */}
       <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white">
         <Database className="w-5 h-5" />
         <span className="font-medium">实体定义</span>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* 实体名称 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">实体名称</label>
           <input
@@ -132,7 +209,6 @@ export function EntityDefinitionPanel() {
           />
         </div>
 
-        {/* 字段列表 */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <label className="text-sm font-medium text-gray-700">字段列表</label>
@@ -232,7 +308,6 @@ export function EntityDefinitionPanel() {
           </div>
         </div>
 
-        {/* 执行按钮 */}
         <button
           onClick={executePipeline}
           disabled={isExecuting || !entityName.trim()}
@@ -246,7 +321,6 @@ export function EntityDefinitionPanel() {
           {isExecuting ? '执行中...' : '执行全链路自动化'}
         </button>
 
-        {/* 执行结果 */}
         {executionResults.length > 0 && (
           <div className="space-y-2">
             <div className="text-sm font-medium text-gray-700">执行进度</div>
@@ -284,7 +358,6 @@ export function EntityDefinitionPanel() {
           </div>
         )}
 
-        {/* 输出摘要 */}
         {outputSummary && (
           <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center gap-2 mb-2">

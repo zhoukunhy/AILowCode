@@ -16,20 +16,23 @@ export function DataSourceBinding() {
   const components = useCanvasStore((state) => state.components)
   const updateComponentProps = useCanvasStore((state) => state.updateComponentProps)
   
-  const { dataSources, getFieldsByDataSource, fetchPreviewData, getMockData } = useDataPreviewStore()
+  const { dataSources, getFieldsByDataSource, fetchPreviewData, getMockData, loadDataSources } = useDataPreviewStore()
   
   const [selectedDataSource, setSelectedDataSource] = useState<string>('')
   const [fieldMappings, setFieldMappings] = useState<FieldMapping[]>([])
   const [previewData, setPreviewData] = useState<any[]>([])
+  const [fields, setFields] = useState<any[]>([])
   
   const selectedComponent = components.find((c) => c.id === selectedId)
   const boundDataSource = selectedComponent?.props.dataSourceId || ''
-  
-  const fields = selectedDataSource ? getFieldsByDataSource(selectedDataSource) : []
 
   const componentProps = Object.keys(selectedComponent?.props || {}).filter(
     (key) => !['dataSourceId', 'dataField', 'eventBindings'].includes(key)
   )
+  
+  React.useEffect(() => {
+    loadDataSources()
+  }, [])
   
   React.useEffect(() => {
     if (boundDataSource) {
@@ -41,6 +44,18 @@ export function DataSourceBinding() {
     const savedMappings = selectedComponent?.props.fieldMappings as FieldMapping[] || []
     setFieldMappings(savedMappings)
   }, [selectedId, boundDataSource, selectedComponent])
+  
+  React.useEffect(() => {
+    const loadFields = async () => {
+      if (selectedDataSource) {
+        const dsFields = await getFieldsByDataSource(selectedDataSource)
+        setFields(dsFields)
+      } else {
+        setFields([])
+      }
+    }
+    loadFields()
+  }, [selectedDataSource, getFieldsByDataSource])
 
   const handleDataSourceChange = (dataSourceId: string) => {
     setSelectedDataSource(dataSourceId)

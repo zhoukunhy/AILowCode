@@ -23,6 +23,7 @@ import { WebhookModule } from './modules/webhook/webhook.module'
 import { SchemaModule } from './modules/schema/schema.module'
 import { CustomComponentModule } from './modules/custom-component/custom-component.module'
 import { MCPModule } from './mcp/mcp.module'
+import { DashboardModule } from './modules/dashboard/dashboard.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { PermissionsGuard } from './modules/auth/guards/permissions.guard'
 
@@ -71,6 +72,7 @@ import { PermissionsGuard } from './modules/auth/guards/permissions.guard'
     SchemaModule,
     CustomComponentModule,
     MCPModule,
+    DashboardModule,
   ],
   providers: [
     {

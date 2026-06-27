@@ -179,7 +179,7 @@ export function MCPPromptPanel() {
                   <div className="flex flex-wrap gap-2">
                     {selectedPrompt.variables.map((varName) => (
                       <span key={varName} className="px-2 py-1 bg-green-100 text-green-700 rounded text-sm">
-                        {{{varName}}}
+                        {'{'}{'{'}{varName}{'}'}{'}'}
                       </span>
                     ))}
                   </div>

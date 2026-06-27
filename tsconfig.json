@@ -30,7 +30,8 @@
       "@ai-lowcode/shared-types": ["packages/shared-types/src"],
       "@ai-lowcode/ui-components": ["packages/ui-components/src"],
       "@ai-lowcode/code-generator": ["packages/code-generator/src"],
-      "@ai-lowcode/datasource-core": ["packages/datasource-core/src"]
+      "@ai-lowcode/datasource-core": ["packages/datasource-core/src"],
+      "@ai-lowcode/lang-ai-core": ["packages/lang-ai-core/src"]
     }
   },
   "exclude": ["node_modules", "dist", "build", ".next", "out"]

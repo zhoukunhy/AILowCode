@@ -43,16 +43,23 @@ function addJsExtensions(dir) {
 
 // 创建 ESM 版本
 function createEsmVersion() {
-  // 读取 index.js 并创建 .mjs 版本
   const indexPath = path.join(distDir, 'index.js');
   if (fs.existsSync(indexPath)) {
     let content = fs.readFileSync(indexPath, 'utf8');
-    // 转换 CommonJS 导出为 ESM
-    content = content.replace(/exports\.__esModule = true;/g, '');
-    content = content.replace(/Object\.defineProperty\(exports, ["']([^"']+)["'], \{[^}]+\}\);/g, '');
-    content = content.replace(/exports\.(\w+) = void 0;/g, '');
-    content = content.replace(/exports\.(\w+) = (\w+);/g, 'export { $2 as $1 };');
+    
+    content = content.replace(/Object\.defineProperty\(exports, "__esModule", \{ value: true \}\);/g, '');
+    
+    content = content.replace(/exports\.[a-zA-Z0-9_]+(\s*=\s*exports\.[a-zA-Z0-9_]+)*\s*=\s*void 0;/g, '');
+    
+    content = content.replace(/Object\.defineProperty\(exports, ["']([^"']+)["'], \{ enumerable: true, get: function \(\) \{ return ([^;]+); \} \}\);/g, (match, name, getter) => {
+      return `export const ${name} = ${getter};`;
+    });
+    
+    content = content.replace(/exports\.(\w+) = (\w+);/g, 'export const $1 = $2;');
+    
     content = content.replace(/exports\.default = (\w+);/g, 'export default $1;');
+    
+    content = content.replace(/exports\.[a-zA-Z0-9_]+(\s*=\s*[^;]+);/g, '');
     
     const mjsPath = path.join(distDir, 'index.mjs');
     fs.writeFileSync(mjsPath, content);

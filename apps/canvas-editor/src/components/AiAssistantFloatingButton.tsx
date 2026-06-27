@@ -17,6 +17,9 @@ const quickQuestions = [
   '如何使用组件库？',
 ]
 
+// API 基础地址
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
+
 export function AiAssistantFloatingButton() {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
@@ -49,17 +52,44 @@ export function AiAssistantFloatingButton() {
     setInputValue('')
     setIsLoading(true)
 
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${API_BASE}/agent/generate-page`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          description: inputValue.trim(),
+          projectId: 1,
+        }),
+      })
 
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: `这是针对您问题 "${inputValue.trim()}" 的回答。\n\n我可以帮助您：\n\n1. 创建和编辑页面组件\n2. 配置数据源和API连接\n3. 实现表单验证逻辑\n4. 优化代码性能\n5. 解答技术问题\n\n请问您需要具体了解哪方面？`,
-      timestamp: new Date(),
+      if (response.ok) {
+        const data = await response.json()
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: data.schema ? `页面生成完成！\n\n已生成组件数量: ${data.schema.components?.length || 0}\n\n您可以在画布中查看生成的结果。` : '抱歉，我无法处理您的请求。',
+          timestamp: new Date(),
+        }
+        setMessages((prev) => [...prev, assistantMessage])
+      } else {
+        throw new Error('API 请求失败')
+      }
+    } catch (error) {
+      // 模拟AI响应作为后备
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `这是针对您问题 "${inputValue.trim()}" 的回答。\n\n我可以帮助您：\n\n1. 创建和编辑页面组件\n2. 配置数据源和API连接\n3. 实现表单验证逻辑\n4. 优化代码性能\n5. 解答技术问题\n\n请问您需要具体了解哪方面？`,
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, assistantMessage])
+    } finally {
+      setIsLoading(false)
     }
-
-    setMessages((prev) => [...prev, assistantMessage])
-    setIsLoading(false)
   }
 
   const handleQuickQuestion = (question: string) => {
