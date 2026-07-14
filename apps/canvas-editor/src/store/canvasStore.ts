@@ -1,6 +1,7 @@
 import { createStore } from 'zustand/vanilla'
 import { generateId } from '@ai-lowcode/common-util'
 import { canvasPageApi } from '../lib/api'
+import { generateCanvasCode } from '../utils/codeGenerator'
 
 export interface ConditionalRenderConfig {
   enabled: boolean
@@ -33,6 +34,7 @@ export interface ComponentConfig {
   opacity: number
   visible: boolean
   locked: boolean
+  customComponentId?: string
   hasAnimation?: boolean
   hasInteractiveState?: boolean
   conditionalRender?: ConditionalRenderConfig
@@ -104,18 +106,61 @@ interface ModalState {
   closable: boolean
 }
 
-// 数据建模相关类型
+export interface EnumOption {
+  label: string
+  value: string | number
+  color?: string
+}
+
+export interface EnumDefinition {
+  id: string
+  name: string
+  label: string
+  options: EnumOption[]
+}
+
+export interface ValidationRule {
+  id: string
+  type: 'required' | 'min' | 'max' | 'minLength' | 'maxLength' | 
+        'pattern' | 'email' | 'phone' | 'url' | 'custom'
+  value?: string | number
+  message: string
+}
+
+export interface DataPermission {
+  id: string
+  roleId: string
+  roleName: string
+  permissionType: 'read' | 'write' | 'delete' | 'manage'
+}
+
 export interface Field {
   id: string
   name: string
   label: string
-  type: 'string' | 'number' | 'integer' | 'boolean' | 'date' | 'datetime' | 
-        'text' | 'email' | 'phone' | 'password' | 'select' | 'textarea' | 'json'
+  type: 'string' | 'number' | 'integer' | 'bigint' | 'smallint' |
+        'decimal' | 'float' | 'double' | 'boolean' | 'date' | 'datetime' | 
+        'timestamp' | 'text' | 'email' | 'phone' | 'password' | 'select' | 
+        'textarea' | 'json' | 'uuid' | 'enum'
   required: boolean
   primaryKey: boolean
+  unique: boolean
+  index: boolean
+  foreignKey?: {
+    entityId: string
+    fieldId: string
+    onDelete?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION'
+    onUpdate?: 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION'
+  }
   defaultValue?: string | number | boolean
   length?: number
-  options?: string[]
+  precision?: number
+  scale?: number
+  options?: EnumOption[]
+  enumId?: string
+  validationRules: ValidationRule[]
+  dataPermissions: DataPermission[]
+  description?: string
 }
 
 export interface Entity {
@@ -124,6 +169,10 @@ export interface Entity {
   tableName: string
   description: string
   fields: Field[]
+  dataPermissions: DataPermission[]
+  softDelete: boolean
+  createdAtField: boolean
+  updatedAtField: boolean
 }
 
 export interface Relation {
@@ -134,6 +183,7 @@ export interface Relation {
   targetEntityId: string
   targetFieldId?: string
   type: 'one-to-one' | 'one-to-many' | 'many-to-many'
+  cascade?: boolean
 }
 
 export interface DataModel {
@@ -142,6 +192,7 @@ export interface DataModel {
   description: string
   entities: Entity[]
   relations: Relation[]
+  enums: EnumDefinition[]
 }
 
 // 完整的画布状态类型
@@ -191,7 +242,7 @@ export interface CanvasState {
   updateCurrentPage: (updates: Partial<PageConfig>) => void
   // 项目操作
   newProject: () => void
-  saveProject: () => Promise<void>
+  saveProject: (name?: string) => Promise<{ success: boolean; id?: string }>
   saveProjectAs: (name: string) => Promise<void>
   loadProject: (projectId: string) => Promise<void>
   autoSave: () => Promise<void>
@@ -200,6 +251,8 @@ export interface CanvasState {
   exportCanvasJson: () => string
   importCanvasJson: (json: string) => void
   importCanvasSchema: (schema: any) => void
+  // 代码生成
+  generateCode: () => { files: { path: string; content: string }[] }
   // 弹窗操作
   openModal: (title: string, content: string, closable?: boolean) => void
   closeModal: () => void
@@ -1818,21 +1871,32 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
   },
 
   // 保存项目（对接数据库）
-  saveProject: async () => {
+  saveProject: async (name?: string) => {
     const { components, currentPage } = get()
     try {
+      let savedId: string | null = null
+      
       const pageIdNum = Number(currentPage?.id)
       if (!isNaN(pageIdNum) && pageIdNum > 0) {
         // 已存在的页面，更新画布数据
-        await canvasPageApi.saveCanvas(pageIdNum, components)
-      } else if (currentPage?.name) {
+        if (name) {
+          // 如果有名称，先更新名称
+          await canvasPageApi.updatePage(pageIdNum, { name, canvasJson: components })
+        } else {
+          await canvasPageApi.saveCanvas(pageIdNum, components)
+        }
+        savedId = currentPage.id
+      } else if (name || currentPage?.name) {
         // 新页面，先创建
-        const created = await canvasPageApi.createPage(currentPage.name, components)
+        const pageName = name || currentPage!.name
+        const created = await canvasPageApi.createPage(pageName, components)
         // API 返回格式: { code: 200, data: { id: ... } }
         const newId = (created as any)?.data?.id || (created as any)?.id
         if (newId) {
+          const newSavedId = newId.toString()
+          savedId = newSavedId
           set((state) => ({
-            currentPage: { ...state.currentPage, id: newId.toString() },
+            currentPage: { ...state.currentPage, id: newSavedId, name: pageName },
           }))
         }
       }
@@ -1840,12 +1904,14 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
       set((state) => ({
         project: {
           ...state.project,
+          name: name || state.project.name,
           updatedAt: new Date(),
           isDirty: false,
         },
       }))
 
       console.log('画布保存成功')
+      return { success: true, id: savedId || undefined }
     } catch (error) {
       console.error('保存画布失败:', error)
       throw error
@@ -2012,6 +2078,12 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
       components,
     }
     return JSON.stringify(exportData, null, 2)
+  },
+
+  // 生成代码
+  generateCode: () => {
+    const { components, currentPage } = get()
+    return { files: generateCanvasCode(components, currentPage) }
   },
 
   // 导入AI生成的画布Schema

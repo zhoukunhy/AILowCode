@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { generateId } from '@ai-lowcode/common-util'
 
 export interface PreviewData {
   bindingId: string
@@ -69,7 +68,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
 
 const getAuthHeader = () => {
   const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  return token ? { Authorization: `Bearer ${token}` } : ({} as Record<string, string>)
 }
 
 export const useDataPreviewStore = create<DataPreviewState>((set, get) => ({
@@ -245,7 +244,7 @@ export const useDataPreviewStore = create<DataPreviewState>((set, get) => ({
       await get().fetchPreviewData(
         componentId,
         previewData.dataSourceId,
-        { pagination: { page: 1, pageSize: 10 } }
+        { type: 'table', pagination: { page: 1, pageSize: 10 } }
       )
     }
   },

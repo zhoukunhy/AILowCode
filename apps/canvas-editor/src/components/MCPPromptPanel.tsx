@@ -50,7 +50,7 @@ export function MCPPromptPanel() {
    */
   const fetchPrompts = async () => {
     try {
-      const result = await mcpApi.listPrompts()
+      const result: any = await mcpApi.listPrompts()
       const promptsData = result?.data || []
       // 标准化变量字段，确保总是数组类型
       const normalizedPrompts = promptsData.map((prompt: any) => ({

@@ -40,7 +40,7 @@ export function MCPToolPanel() {
    */
   const fetchTools = async () => {
     try {
-      const result = await mcpApi.listTools()
+      const result: any = await mcpApi.listTools()
       setTools(result?.data || [])
     } catch (err) {
       console.error('获取工具列表失败:', err)

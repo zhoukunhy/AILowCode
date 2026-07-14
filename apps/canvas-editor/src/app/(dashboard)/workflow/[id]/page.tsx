@@ -7,7 +7,6 @@ import { WorkflowCanvas } from '@/components/Workflow/WorkflowCanvas'
 import { ConfigPanel } from '@/components/Workflow/ConfigPanel'
 import { useWorkflowStore } from '@/store/workflowStore'
 import { apiClient as api } from '@/lib/api'
-import { ProcessDefinition } from '@ai-lowcode/shared-types'
 
 export default function WorkflowEditorPage() {
   const params = useParams<{ id: string }>()
@@ -24,8 +23,9 @@ export default function WorkflowEditorPage() {
 
     const fetchProcess = async () => {
       try {
-        const response = await api.get<{ data?: ProcessDefinition }>(`/api/workflow/processes/${params.id}/detail`)
-        if (response && 'data' in response && response.data) {
+        const res = await api.get(`/workflow/processes/${params.id}/detail`)
+        const response = res as unknown as { data?: any }
+        if (response?.data) {
           loadProcess(response.data)
         }
       } catch (error) {
@@ -58,7 +58,7 @@ export default function WorkflowEditorPage() {
         transitions,
       }
 
-      await api.post('/api/workflow/processes/save', processData)
+      await api.post('/workflow/processes/save', processData)
       setSaveStatus('保存成功')
     } catch {
       setSaveStatus('保存失败')
@@ -75,11 +75,12 @@ export default function WorkflowEditorPage() {
     }
 
     try {
-      const response = await api.post<{ data?: { valid: boolean; errors?: string[] } }>(`/api/workflow/processes/${currentProcess.id}/validate`, {})
-      if (response && 'data' in response && response.data?.valid) {
+      const res = await api.post(`/workflow/processes/${currentProcess.id}/validate`, {})
+      const response = res as unknown as { data?: { valid?: boolean; errors?: string[] } }
+      if (response?.data?.valid) {
         setSaveStatus('验证通过')
       } else {
-        const errors = response && 'data' in response && response.data?.errors?.join('; ') || '验证失败'
+        const errors = response?.data?.errors?.join('; ') || '验证失败'
         setSaveStatus(`验证失败: ${errors}`)
       }
     } catch {

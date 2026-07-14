@@ -113,7 +113,7 @@ function ArrayEditor({ value, onChange }: ArrayEditorProps) {
       const parsed = JSON.parse(jsonText)
       onChange(parsed)
       setIsExpanded(false)
-    } catch (error) {
+    } catch {
       alert('JSON 格式错误，请检查输入')
     }
   }

@@ -13,6 +13,7 @@ interface MenuItem {
   status: boolean
   description?: string
   pageId?: string
+  mountable?: boolean
   createdAt: string
   updatedAt: string
   children?: MenuItem[]
@@ -32,6 +33,7 @@ export default function MenuManagementPage() {
     parentId: '',
     sortOrder: 0,
     status: true,
+    mountable: true,
     description: '',
     pageId: '',
   })
@@ -108,6 +110,7 @@ export default function MenuManagementPage() {
       parentId: parentId || '',
       sortOrder: 0,
       status: true,
+      mountable: true,
       description: '',
       pageId: '',
     })
@@ -123,6 +126,7 @@ export default function MenuManagementPage() {
       parentId: menu.parentId || '',
       sortOrder: menu.sortOrder,
       status: menu.status,
+      mountable: menu.mountable !== undefined ? menu.mountable : true,
       description: menu.description || '',
       pageId: menu.pageId || '',
     })
@@ -423,6 +427,19 @@ export default function MenuManagementPage() {
                     className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
                   <span className="text-sm text-gray-700">启用</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.mountable}
+                    onChange={(e) => setFormData({ ...formData, mountable: e.target.checked })}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700">可挂载</span>
+                  <span className="text-xs text-gray-400">(允许画布挂载到此菜单)</span>
                 </label>
               </div>
 

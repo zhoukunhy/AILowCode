@@ -1,6 +1,6 @@
 import type { CustomComponentDefinition } from '@ai-lowcode/shared-types'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
 
 /**
  * 自定义组件 API 服务
@@ -10,7 +10,7 @@ export const customComponentApi = {
    * 创建自定义组件
    */
   async create(definition: Partial<CustomComponentDefinition>): Promise<CustomComponentDefinition> {
-    const response = await fetch(`${API_BASE}/api/custom-components`, {
+    const response = await fetch(`${API_BASE}/custom-components`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -53,7 +53,7 @@ export const customComponentApi = {
    * 获取用户的自定义组件列表
    */
   async findAll(): Promise<CustomComponentDefinition[]> {
-    const response = await fetch(`${API_BASE}/api/custom-components`, {
+    const response = await fetch(`${API_BASE}/custom-components`, {
       headers: {
         Authorization: `Bearer ${getAuthToken()}`,
       },

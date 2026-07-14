@@ -3,28 +3,15 @@
  * 提供系统统计数据和 AI 活动记录
  */
 import { Injectable } from '@nestjs/common'
-import { InjectRepository } from '@nestjs/typeorm'
-import { Repository, LessThan } from 'typeorm'
-import { PageEntity } from '../page/entities/page.entity'
-import { UserEntity } from '../user/entities/user.entity'
-import { KnowledgeEntity } from '../knowledge/entities/knowledge.entity'
-import { LlmCallLogEntity } from '../logging/entities/llm-call-log.entity'
-import { CodeGenerationLogEntity } from '../codegen/entities/code-generation-log.entity'
+import { InjectDataSource } from '@nestjs/typeorm'
+import { DataSource, LessThan } from 'typeorm'
 import { GetStatsResponseDto, AIActivityDto } from './dto/dashboard.dto'
 
 @Injectable()
 export class DashboardService {
   constructor(
-    @InjectRepository(PageEntity)
-    private readonly pageRepository: Repository<PageEntity>,
-    @InjectRepository(UserEntity)
-    private readonly userRepository: Repository<UserEntity>,
-    @InjectRepository(KnowledgeEntity)
-    private readonly knowledgeRepository: Repository<KnowledgeEntity>,
-    @InjectRepository(LlmCallLogEntity)
-    private readonly llmLogRepository: Repository<LlmCallLogEntity>,
-    @InjectRepository(CodeGenerationLogEntity)
-    private readonly codegenLogRepository: Repository<CodeGenerationLogEntity>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -34,21 +21,19 @@ export class DashboardService {
     const now = new Date()
     const lastWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    // 获取当前统计数据
     const [canvasCount, userCount, knowledgeCount, aiGenerationCount] = await Promise.all([
-      this.pageRepository.count(),
-      this.userRepository.count(),
-      this.knowledgeRepository.count(),
-      this.codegenLogRepository.count({ where: { status: 'completed' } }),
+      this.dataSource.getRepository('PageEntity').count(),
+      this.dataSource.getRepository('UserEntity').count(),
+      this.dataSource.getRepository('KnowledgeEntity').count(),
+      this.dataSource.getRepository('CodeGenerationLogEntity').count({ where: { status: 'completed' } }),
     ])
 
-    // 获取上周统计数据（用于计算变化）
     const [lastWeekCanvasCount, lastWeekUserCount, lastWeekKnowledgeCount, lastWeekAiCount] =
       await Promise.all([
-        this.pageRepository.count({ where: { createdAt: LessThan(lastWeek) } }),
-        this.userRepository.count({ where: { createdAt: LessThan(lastWeek) } }),
-        this.knowledgeRepository.count({ where: { createdAt: LessThan(lastWeek) } }),
-        this.codegenLogRepository.count({
+        this.dataSource.getRepository('PageEntity').count({ where: { createdAt: LessThan(lastWeek) } }),
+        this.dataSource.getRepository('UserEntity').count({ where: { createdAt: LessThan(lastWeek) } }),
+        this.dataSource.getRepository('KnowledgeEntity').count({ where: { createdAt: LessThan(lastWeek) } }),
+        this.dataSource.getRepository('CodeGenerationLogEntity').count({
           where: {
             status: 'completed',
             startTime: LessThan(lastWeek),
@@ -79,14 +64,12 @@ export class DashboardService {
    * 获取 AI 活动记录
    */
   async getActivities(limit: number = 10): Promise<AIActivityDto[]> {
-    // 获取最近的 LLM 调用记录
-    const llmLogs = await this.llmLogRepository.find({
+    const llmLogs = await this.dataSource.getRepository('LlmCallLogEntity').find({
       order: { createdAt: 'DESC' },
       take: limit,
     })
 
-    // 获取最近的代码生成记录
-    const codegenLogs = await this.codegenLogRepository.find({
+    const codegenLogs = await this.dataSource.getRepository('CodeGenerationLogEntity').find({
       order: { startTime: 'DESC' },
       take: limit,
     })

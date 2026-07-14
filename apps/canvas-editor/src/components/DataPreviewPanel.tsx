@@ -23,7 +23,15 @@ export function DataPreviewPanel() {
   const previewData = selectedId ? getPreviewData(selectedId) : undefined
   const dataSourceId = selectedComponent?.props.dataSourceId || ''
   const dataField = selectedComponent?.props.dataField || ''
-  const fields = dataSourceId ? getFieldsByDataSource(dataSourceId) : []
+  const [fields, setFields] = useState<any[]>([])
+
+  useEffect(() => {
+    if (dataSourceId) {
+      getFieldsByDataSource(dataSourceId).then((result) => setFields(result || []))
+    } else {
+      setFields([])
+    }
+  }, [dataSourceId, getFieldsByDataSource])
 
   useEffect(() => {
     if (selectedId && dataSourceId && !previewData) {

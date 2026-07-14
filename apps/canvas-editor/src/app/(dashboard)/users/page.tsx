@@ -3,15 +3,18 @@
 import React, { useState, useEffect } from 'react'
 import { RefreshCw } from 'lucide-react'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
 
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('token')
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  return headers
 }
 
 interface User {

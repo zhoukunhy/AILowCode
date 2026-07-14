@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useCanvasStore } from '@/store/canvasStore'
 import { Database, Plus, Trash2, Edit2, Table, List, RefreshCw } from 'lucide-react'
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
 
 interface FieldConfig {
   id: string
@@ -39,10 +39,13 @@ const defaultFieldTypes = [
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('token')
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  return headers
 }
 
 // API 函数
@@ -50,6 +53,9 @@ async function fetchSchemas(): Promise<TableSchema[]> {
   const response = await fetch(`${API_BASE}/schema`, { headers: getAuthHeaders() })
   if (!response.ok) throw new Error('获取数据表失败')
   const data = await response.json()
+  if (Array.isArray(data)) {
+    return data
+  }
   return data.data || []
 }
 
@@ -60,7 +66,8 @@ async function saveSchema(schema: Omit<TableSchema, 'id'>): Promise<TableSchema>
     body: JSON.stringify(schema),
   })
   if (!response.ok) throw new Error('保存数据表失败')
-  return response.json()
+  const data = await response.json()
+  return data.data || data
 }
 
 async function updateSchema(id: number, schema: Partial<TableSchema>): Promise<TableSchema> {
@@ -70,7 +77,8 @@ async function updateSchema(id: number, schema: Partial<TableSchema>): Promise<T
     body: JSON.stringify(schema),
   })
   if (!response.ok) throw new Error('更新数据表失败')
-  return response.json()
+  const data = await response.json()
+  return data.data || data
 }
 
 async function deleteSchema(id: number): Promise<void> {
@@ -184,11 +192,11 @@ export function DataManagementPanel() {
       let updatedFields: FieldConfig[]
       
       if (editingField) {
-        updatedFields = selectedSchema.fields.map(f => 
+        updatedFields = (selectedSchema.fields || []).map(f => 
           f.id === editingField.id ? newField : f
         )
       } else {
-        updatedFields = [...selectedSchema.fields, newField]
+        updatedFields = [...(selectedSchema.fields || []), newField]
       }
 
       const updated = await updateSchema(selectedSchema.id, { fields: updatedFields })
@@ -211,7 +219,7 @@ export function DataManagementPanel() {
 
     try {
       setSaving(true)
-      const updatedFields = selectedSchema.fields.filter(f => f.id !== fieldId)
+      const updatedFields = (selectedSchema.fields || []).filter(f => f.id !== fieldId)
       const updated = await updateSchema(selectedSchema.id, { fields: updatedFields })
       setSchemas(schemas.map(s => s.id === selectedSchema.id ? updated : s))
       setSelectedSchema(updated)
@@ -224,15 +232,15 @@ export function DataManagementPanel() {
   }
 
   const handleGenerateForm = () => {
-    if (!selectedSchema || selectedSchema.fields.length === 0) {
+    if (!selectedSchema || (selectedSchema.fields || []).length === 0) {
       alert('请选择一个数据表并添加字段')
       return
     }
 
-    let y = 50
-    selectedSchema.fields.forEach((field, index) => {
+    (selectedSchema.fields || []).forEach((field, index) => {
       const x = 50
       const height = field.type === 'textarea' ? 120 : 50
+      const currentY = 50 + index * (height + 20)
 
       let componentType = 'input'
       const props: Record<string, any> = {
@@ -269,17 +277,15 @@ export function DataManagementPanel() {
       }
 
       setTimeout(() => {
-        addComponent(componentType, x, y)
+        addComponent(componentType, x, currentY)
       }, index * 100)
-
-      y += height + 20
     })
 
     alert(`已根据 ${selectedSchema.name} 生成表单！`)
   }
 
   const handleGenerateTable = () => {
-    if (!selectedSchema || selectedSchema.fields.length === 0) {
+    if (!selectedSchema || (selectedSchema.fields || []).length === 0) {
       alert('请选择一个数据表并添加字段')
       return
     }
@@ -377,7 +383,7 @@ export function DataManagementPanel() {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-medium text-gray-700">
-              {selectedSchema.name} ({selectedSchema.fields.length} 个字段)
+              {selectedSchema.name} ({(selectedSchema.fields || []).length} 个字段)
             </h3>
             <button
               onClick={() => handleOpenFieldModal()}
@@ -389,7 +395,7 @@ export function DataManagementPanel() {
           </div>
 
           <div className="space-y-2">
-            {selectedSchema.fields.length === 0 ? (
+            {(selectedSchema.fields || []).length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <Database className="w-12 h-12 mx-auto mb-2 opacity-50" />
                 <p className="text-sm">暂无字段</p>
@@ -401,7 +407,7 @@ export function DataManagementPanel() {
                 </button>
               </div>
             ) : (
-              selectedSchema.fields.map((field) => (
+              (selectedSchema.fields || []).map((field) => (
                 <div
                   key={field.id}
                   className="flex items-center justify-between p-2 bg-gray-50 rounded-lg"
@@ -449,7 +455,7 @@ export function DataManagementPanel() {
       )}
 
       {/* 生成按钮 */}
-      {selectedSchema && selectedSchema.fields.length > 0 && (
+      {selectedSchema && (selectedSchema.fields || []).length > 0 && (
         <div className="p-3 border-t border-gray-200 space-y-2">
           <button
             onClick={handleGenerateForm}

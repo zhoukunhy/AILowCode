@@ -10,7 +10,7 @@ import {
   MoveNodeDto,
 } from './dto/workflow.dto'
 
-@Controller('api/workflow')
+@Controller('workflow')
 @ApiTags('流程编排')
 export class WorkflowController {
   constructor(private readonly workflowService: WorkflowService) {}

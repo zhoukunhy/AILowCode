@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useRef, useCallback, useState, useEffect } from 'react'
-import { Stage, Layer, Rect, Circle, Text, Line, Arrow } from 'react-konva'
+import { Stage, Layer, Group, Rect, Circle, Text, Line, Arrow } from 'react-konva'
 import { useWorkflowStore } from '@/store/workflowStore'
 import { NodeType } from '@ai-lowcode/shared-types'
 
@@ -29,6 +29,110 @@ const getNodeIcon = (type: NodeType): string => {
     action: '⚡',
   }
   return icons[type]
+}
+
+interface Port {
+  id: string
+  nodeId: string
+  position: 'left' | 'right'
+  x: number
+  y: number
+}
+
+const getNodePorts = (node: any): Port[] => {
+  const ports: Port[] = []
+  const isRound = node.type === 'start' || node.type === 'end'
+  
+  let leftX: number
+  let rightX: number
+  let centerY: number
+
+  if (isRound) {
+    centerY = node.y
+    leftX = node.x - node.width / 2
+    rightX = node.x + node.width / 2
+  } else {
+    centerY = node.y + node.height / 2
+    leftX = node.x
+    rightX = node.x + node.width
+  }
+
+  switch (node.type) {
+    case 'start':
+      ports.push({
+        id: `${node.id}-right`,
+        nodeId: node.id,
+        position: 'right',
+        x: rightX,
+        y: centerY,
+      })
+      break
+    case 'end':
+      ports.push({
+        id: `${node.id}-left`,
+        nodeId: node.id,
+        position: 'left',
+        x: leftX,
+        y: centerY,
+      })
+      break
+    case 'condition':
+    case 'fork':
+    case 'join':
+      ports.push({
+        id: `${node.id}-left`,
+        nodeId: node.id,
+        position: 'left',
+        x: leftX,
+        y: centerY,
+      })
+      ports.push({
+        id: `${node.id}-right`,
+        nodeId: node.id,
+        position: 'right',
+        x: rightX,
+        y: centerY,
+      })
+      break
+    default:
+      ports.push({
+        id: `${node.id}-left`,
+        nodeId: node.id,
+        position: 'left',
+        x: leftX,
+        y: centerY,
+      })
+      ports.push({
+        id: `${node.id}-right`,
+        nodeId: node.id,
+        position: 'right',
+        x: rightX,
+        y: centerY,
+      })
+  }
+
+  return ports
+}
+
+const getBezierPoints = (x1: number, y1: number, x2: number, y2: number): number[] => {
+  const dx = x2 - x1
+  const controlOffset = Math.min(Math.abs(dx) * 0.4, 100)
+
+  if (dx > 0) {
+    return [
+      x1, y1,
+      x1 + controlOffset, y1,
+      x2 - controlOffset, y2,
+      x2, y2,
+    ]
+  } else {
+    return [
+      x1, y1,
+      x1 - controlOffset, y1,
+      x2 + controlOffset, y2,
+      x2, y2,
+    ]
+  }
 }
 
 export function WorkflowCanvas() {
@@ -157,40 +261,40 @@ export function WorkflowCanvas() {
     }
   }, [isConnecting, connectingFromNodeId, endConnection])
 
-  const getConnectionPoints = useCallback((transition: any) => {
-    const sourceNode = nodes.find((n) => n.id === transition.sourceNodeId)
-    const targetNode = nodes.find((n) => n.id === transition.targetNodeId)
+  const handlePortMouseDown = useCallback((nodeId: string, e: any) => {
+    e.cancelBubble = true
+    selectNode(nodeId)
+    startConnection(nodeId)
+  }, [selectNode, startConnection])
 
-    if (!sourceNode || !targetNode) return []
-
-    const sourceX = sourceNode.x + sourceNode.width / 2
-    const sourceY = sourceNode.y + sourceNode.height / 2
-    const targetX = targetNode.x + targetNode.width / 2
-    const targetY = targetNode.y + targetNode.height / 2
-
-    return [
-      { x: sourceX, y: sourceY },
-      { x: targetX, y: targetY },
-    ]
-  }, [nodes])
-
-  const connectingLinePoints = useCallback(() => {
-    if (!isConnecting || !connectingFromNodeId || !connectionLine) return []
-
-    const sourceNode = nodes.find((n) => n.id === connectingFromNodeId)
-    if (!sourceNode) return []
-
-    const sourceX = sourceNode.x + sourceNode.width / 2
-    const sourceY = sourceNode.y + sourceNode.height / 2
-
-    return [
-      { x: sourceX, y: sourceY },
-      { x: connectionLine.x, y: connectionLine.y },
-    ]
-  }, [isConnecting, connectingFromNodeId, connectionLine, nodes])
+  const handlePortMouseUp = useCallback((nodeId: string) => {
+    if (isConnecting && connectingFromNodeId) {
+      endConnection(nodeId)
+    }
+  }, [isConnecting, connectingFromNodeId, endConnection])
 
   const scaledWidth = dimensions.width * zoom
   const scaledHeight = dimensions.height * zoom
+
+  const allPorts = nodes.flatMap(getNodePorts)
+
+  const validTransitions = transitions.filter((t) => {
+    const sourceNode = nodes.find((n) => n.id === t.sourceNodeId)
+    const targetNode = nodes.find((n) => n.id === t.targetNodeId)
+    if (!sourceNode || !targetNode) return false
+    const sourcePorts = getNodePorts(sourceNode)
+    const targetPorts = getNodePorts(targetNode)
+    return sourcePorts.some((p) => p.position === 'right') &&
+           targetPorts.some((p) => p.position === 'left')
+  })
+
+  const connectingSourcePort = (() => {
+    if (!isConnecting || !connectingFromNodeId) return null
+    const sourceNode = nodes.find((n) => n.id === connectingFromNodeId)
+    if (!sourceNode) return null
+    const sourcePorts = getNodePorts(sourceNode)
+    return sourcePorts.find((p) => p.position === 'right')
+  })()
 
   return (
     <div
@@ -218,7 +322,6 @@ export function WorkflowCanvas() {
               stroke="#E2E8F0"
               strokeWidth={1}
             />
-            
             {Array.from({ length: Math.ceil(dimensions.width / 20) }).map((_, i) => (
               <Line
                 key={`h-${i}`}
@@ -240,40 +343,53 @@ export function WorkflowCanvas() {
           </Layer>
 
           <Layer>
-            {transitions.map((transition) => {
-              const points = getConnectionPoints(transition)
-              if (points.length < 2) return null
+            {validTransitions.map((transition) => {
+              const sourceNode = nodes.find((n) => n.id === transition.sourceNodeId)!
+              const targetNode = nodes.find((n) => n.id === transition.targetNodeId)!
+              const sourcePorts = getNodePorts(sourceNode)
+              const targetPorts = getNodePorts(targetNode)
+              const sourcePort = sourcePorts.find((p) => p.position === 'right')!
+              const targetPort = targetPorts.find((p) => p.position === 'left')!
+              const bezierPoints = getBezierPoints(sourcePort.x, sourcePort.y, targetPort.x, targetPort.y)
+              const endX = bezierPoints[bezierPoints.length - 2]
+              const endY = bezierPoints[bezierPoints.length - 1]
+              const controlX = bezierPoints[bezierPoints.length - 4]
+              const controlY = bezierPoints[bezierPoints.length - 3]
+              const arrowStartX = endX + (controlX - endX) * 0.3
+              const arrowStartY = endY + (controlY - endY) * 0.3
 
               return (
-                <Arrow
-                  key={transition.id}
-                  points={[points[0].x, points[0].y, points[1].x, points[1].y]}
-                  stroke="#64748B"
-                  strokeWidth={2}
-                  fill="#64748B"
-                  pointerWidth={8}
-                  pointerLength={8}
-                  onClick={(e) => {
-                    e.cancelBubble = true
-                  }}
-                />
+                <Group key={transition.id}>
+                  <Line
+                    points={bezierPoints}
+                    stroke="#64748B"
+                    strokeWidth={2}
+                    fill="none"
+                    tension={0.5}
+                    lineCap="round"
+                  />
+                  <Arrow
+                    points={[arrowStartX, arrowStartY, endX, endY]}
+                    stroke="#64748B"
+                    strokeWidth={2}
+                    fill="#64748B"
+                    pointerWidth={8}
+                    pointerLength={8}
+                    onClick={(e) => {
+                      e.cancelBubble = true
+                    }}
+                  />
+                </Group>
               )
             })}
-
-            {isConnecting && connectingLinePoints().length >= 2 && (
-              <Arrow
-                points={[
-                  connectingLinePoints()[0].x,
-                  connectingLinePoints()[0].y,
-                  connectingLinePoints()[1].x,
-                  connectingLinePoints()[1].y,
-                ]}
+            {isConnecting && connectingSourcePort && connectionLine && (
+              <Line
+                points={[connectingSourcePort.x, connectingSourcePort.y, connectionLine.x, connectionLine.y]}
                 stroke="#3B82F6"
                 strokeWidth={2}
                 strokeDash={[5, 5]}
-                fill="#3B82F6"
-                pointerWidth={8}
-                pointerLength={8}
+                fill="none"
+                tension={0.5}
               />
             )}
           </Layer>
@@ -286,7 +402,7 @@ export function WorkflowCanvas() {
               const isRound = node.type === 'start' || node.type === 'end'
 
               return (
-                <React.Fragment key={node.id}>
+                <Group key={node.id}>
                   {isRound ? (
                     <Circle
                       x={node.x}
@@ -324,7 +440,6 @@ export function WorkflowCanvas() {
                       shadowOffsetY={2}
                     />
                   )}
-                  
                   <Text
                     x={node.x + node.width / 2}
                     y={node.y + node.height / 2 - 8}
@@ -335,7 +450,6 @@ export function WorkflowCanvas() {
                     offsetX={8}
                     offsetY={8}
                   />
-                  
                   <Text
                     x={node.x + node.width / 2}
                     y={node.y + node.height + 4}
@@ -344,7 +458,32 @@ export function WorkflowCanvas() {
                     fill="#374151"
                     offsetX={node.name.length * 3}
                   />
-                </React.Fragment>
+                </Group>
+              )
+            })}
+          </Layer>
+
+          <Layer>
+            {allPorts.map((port) => {
+              const node = nodes.find((n) => n.id === port.nodeId)!
+              const isSelected = selectedNodeId === node.id
+              const canConnectFrom = port.position === 'right' || node.type === 'end'
+
+              return (
+                <Circle
+                  key={port.id}
+                  x={port.x}
+                  y={port.y}
+                  radius={6}
+                  fill={isSelected ? '#1E40AF' : '#FFFFFF'}
+                  stroke={isSelected ? '#1E40AF' : '#64748B'}
+                  strokeWidth={2}
+                  draggable={false}
+                  onMouseDown={(e) => handlePortMouseDown(port.nodeId, e)}
+                  onMouseUp={() => handlePortMouseUp(port.nodeId)}
+                  cursor={canConnectFrom ? 'pointer' : 'default'}
+                  opacity={isSelected ? 1 : 0.7}
+                />
               )
             })}
           </Layer>

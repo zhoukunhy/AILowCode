@@ -22,7 +22,7 @@ import { SSETransport } from '@ai-lowcode/lang-ai-core'
  */
 @ApiTags('MCP')
 @ApiBearerAuth('JWT-auth')
-@Controller('api/mcp')
+@Controller('mcp')
 export class MCPController {
   private readonly sseTransport: SSETransport
 

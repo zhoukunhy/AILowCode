@@ -16,11 +16,11 @@ interface CanvasItem {
   status: 'draft' | 'published' | 'archived'
 }
 
-// 菜单类型
 interface MenuItem {
   id: string
   name: string
   parentId?: string
+  mountable?: boolean
 }
 
 // 数据模型类型
@@ -108,16 +108,19 @@ export default function CanvasManagementPage() {
       })
       if (response.ok) {
         const data = await response.json()
-        setMenus(data.data || [])
+        // 只显示可挂载的菜单
+        const allMenus = data.data || []
+        const mountableMenus = allMenus.filter((menu: any) => menu.mountable !== false)
+        setMenus(mountableMenus)
       }
     } catch (error) {
       console.error('获取菜单列表失败:', error)
       setMenus([
-        { id: '1', name: '首页', parentId: undefined },
-        { id: '2', name: '用户管理', parentId: undefined },
-        { id: '3', name: '订单管理', parentId: undefined },
-        { id: '4', name: '数据统计', parentId: undefined },
-        { id: '5', name: '产品管理', parentId: undefined },
+        { id: '1', name: '首页', parentId: undefined, mountable: true },
+        { id: '2', name: '用户管理', parentId: undefined, mountable: true },
+        { id: '3', name: '订单管理', parentId: undefined, mountable: true },
+        { id: '4', name: '数据统计', parentId: undefined, mountable: true },
+        { id: '5', name: '产品管理', parentId: undefined, mountable: true },
       ])
     }
   }

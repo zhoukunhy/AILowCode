@@ -76,8 +76,9 @@ export class WorkflowService {
       order: { zIndex: 'ASC' },
     })
 
+    const nodeIds = nodes.map(n => n.id)
     const transitions = await this.processTransitionRepository.find({
-      where: [{ sourceNodeId: In([id]) }, { targetNodeId: In([id]) }],
+      where: [{ sourceNodeId: In(nodeIds) }, { targetNodeId: In(nodeIds) }],
     })
 
     return {

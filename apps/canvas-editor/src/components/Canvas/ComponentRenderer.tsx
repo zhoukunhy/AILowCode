@@ -100,7 +100,7 @@ export function ComponentRenderer({
       <Group>
         {/* label */}
         {component.props.label && (
-          <>
+          <Group>
             <Text
               x={0}
               y={component.height / 2}
@@ -112,7 +112,7 @@ export function ComponentRenderer({
               offsetY={component.height / 2}
               width={labelWidth - 8}
             />
-          </>
+          </Group>
         )}
         
         {/* 输入框 */}

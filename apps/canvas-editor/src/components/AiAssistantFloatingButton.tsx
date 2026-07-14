@@ -78,8 +78,7 @@ export function AiAssistantFloatingButton() {
       } else {
         throw new Error('API 请求失败')
       }
-    } catch (error) {
-      // 模拟AI响应作为后备
+    } catch {
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',

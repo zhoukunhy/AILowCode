@@ -3,10 +3,10 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { apiClient as api } from '@/lib/api'
-import { ProcessDefinition } from '@ai-lowcode/shared-types'
+
 
 interface WorkflowListProps {
-  processes: ProcessDefinition[]
+  processes: { id: string; name: string; description?: string; status: string; createdAt: string }[]
   total: number
   page: number
   pageSize: number
@@ -27,14 +27,15 @@ export default function WorkflowListPage() {
 
   const fetchWorkflows = async () => {
     try {
-      const url = `/api/workflow/processes?page=${workflows.page}&pageSize=${workflows.pageSize}`
-      const response = await api.get<{ data?: { items: ProcessDefinition[]; total: number; page: number; pageSize: number } }>(url)
-      if (response && 'data' in response && response.data) {
+      const url = `/workflow/processes?page=${workflows.page}&pageSize=${workflows.pageSize}`
+      const res = await api.get(url)
+      const response = res as unknown as { data?: { items: any[]; total: number; page: number; pageSize: number } }
+      if (response?.data?.items) {
         setWorkflows({
           processes: response.data.items,
-          total: response.data.total,
-          page: response.data.page,
-          pageSize: response.data.pageSize,
+          total: response.data.total || 0,
+          page: response.data.page || 1,
+          pageSize: response.data.pageSize || 10,
         })
       }
     } catch {
@@ -48,7 +49,7 @@ export default function WorkflowListPage() {
     if (!confirm(`确定要删除流程 "${name}" 吗？`)) return
 
     try {
-      await api.delete(`/api/workflow/processes/${id}`)
+      await api.delete(`/workflow/processes/${id}`)
       setWorkflows((prev) => ({
         ...prev,
         processes: prev.processes.filter((p) => p.id !== id),

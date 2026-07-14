@@ -207,6 +207,8 @@ export function VirtualCanvas() {
         component={component}
         isSelected={isSelected}
         onSelect={callbacks.onSelect}
+        onDragStart={() => {}}
+        onDragEnd={() => {}}
         onDragMove={callbacks.onDragMove}
         onTransform={callbacks.onTransform}
       />

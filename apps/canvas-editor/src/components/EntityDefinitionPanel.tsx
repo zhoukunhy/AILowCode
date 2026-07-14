@@ -31,7 +31,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
 
 const getAuthHeader = () => {
   const token = localStorage.getItem('token')
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  return token ? { Authorization: `Bearer ${token}` } : ({} as Record<string, string>)
 }
 
 export function EntityDefinitionPanel() {

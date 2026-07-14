@@ -385,7 +385,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         >
           <div className="h-12 flex items-center justify-between px-4 border-b border-gray-200">
             <span className="text-sm font-medium text-gray-600">
-              {getSelectedMainMenuData()?.name || '菜单'}
+              {!isCollapsed ? getSelectedMainMenuData()?.name || '菜单' : ''}
             </span>
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}

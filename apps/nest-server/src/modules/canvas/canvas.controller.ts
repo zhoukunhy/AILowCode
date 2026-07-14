@@ -7,7 +7,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
 import { CanvasService, Canvas } from './canvas.service'
 
 @ApiTags('画布')
-@Controller('api/canvas')
+@Controller('canvas')
 export class CanvasController {
   constructor(private readonly canvasService: CanvasService) {}
 

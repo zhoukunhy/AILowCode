@@ -4,7 +4,7 @@ import { CreateMenuDto, UpdateMenuDto } from './dto/menu.dto'
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
 
 @ApiTags('菜单管理')
-@Controller('api/menus')
+@Controller('menus')
 export class MenuController {
   constructor(private readonly menuService: MenuService) {}
 

@@ -251,12 +251,16 @@ export function useDataBindingCache(
         // 调用后端 API 获取数据
         const token = localStorage.getItem('token')
         
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        }
+        if (token) {
+          headers.Authorization = `Bearer ${token}`
+        }
+        
         const response = await fetch(`${API_BASE}/data-source/preview`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
+          headers,
           body: JSON.stringify({
             dataSourceId: parseInt(dataSourceId),
             queryConfig: {
@@ -306,13 +310,16 @@ export function useDataBindingCache(
             // 重试时调用 API
             try {
               const token = localStorage.getItem('token')
+              const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+              }
+              if (token) {
+                headers.Authorization = `Bearer ${token}`
+              }
               
               const response = await fetch(`${API_BASE}/data-source/preview`, {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                },
+                headers,
                 body: JSON.stringify({
                   dataSourceId: parseInt(dataSourceId),
                   queryConfig: {

@@ -21,6 +21,7 @@ export function DataModelingPanel() {
       name: '新建数据模型',
       entities: [],
       relations: [],
+      enums: [],
       description: '',
     }
     addDataModel(newModel)

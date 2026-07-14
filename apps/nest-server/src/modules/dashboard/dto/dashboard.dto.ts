@@ -1,33 +1,33 @@
 import { ApiProperty } from '@nestjs/swagger'
-import { IsOptional, IsString, IsNumber, Min } from 'class-validator'
+import { IsOptional, IsNumber, Min } from 'class-validator'
 
 /**
  * 获取统计数据响应 DTO
  */
 export class GetStatsResponseDto {
   @ApiProperty({ description: '画布总数' })
-  canvasCount: number
+  canvasCount!: number
 
   @ApiProperty({ description: '活跃用户数' })
-  activeUsers: number
+  activeUsers!: number
 
   @ApiProperty({ description: 'AI 生成次数' })
-  aiGenerationCount: number
+  aiGenerationCount!: number
 
   @ApiProperty({ description: '知识库文档数' })
-  knowledgeDocCount: number
+  knowledgeDocCount!: number
 
   @ApiProperty({ description: '画布数量变化百分比' })
-  canvasChange: string
+  canvasChange!: string
 
   @ApiProperty({ description: '用户数量变化百分比' })
-  usersChange: string
+  usersChange!: string
 
   @ApiProperty({ description: 'AI 生成次数变化百分比' })
-  aiChange: string
+  aiChange!: string
 
   @ApiProperty({ description: '知识库数量变化百分比' })
-  knowledgeChange: string
+  knowledgeChange!: string
 }
 
 /**
@@ -35,19 +35,19 @@ export class GetStatsResponseDto {
  */
 export class AIActivityDto {
   @ApiProperty({ description: '活动ID' })
-  id: string
+  id!: string
 
   @ApiProperty({ description: '活动描述' })
-  action: string
+  action!: string
 
   @ApiProperty({ description: '使用的模型' })
-  model: string
+  model!: string
 
   @ApiProperty({ description: '持续时间' })
-  duration: string
+  duration!: string
 
   @ApiProperty({ description: '时间戳' })
-  timestamp: string
+  timestamp!: string
 }
 
 /**
@@ -55,7 +55,7 @@ export class AIActivityDto {
  */
 export class GetActivitiesResponseDto {
   @ApiProperty({ description: '活动记录列表', type: [AIActivityDto] })
-  activities: AIActivityDto[]
+  activities!: AIActivityDto[]
 }
 
 /**

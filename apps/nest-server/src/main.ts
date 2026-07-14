@@ -29,6 +29,9 @@ async function bootstrap() {
   // 全局响应转换拦截器
   app.useGlobalInterceptors(new TransformInterceptor())
 
+  // 配置全局 API 前缀
+  app.setGlobalPrefix('api')
+
   // 启用 CORS
   app.enableCors({
     origin: process.env.CORS_ORIGIN || ['http://localhost:3000', 'http://localhost:3001'],

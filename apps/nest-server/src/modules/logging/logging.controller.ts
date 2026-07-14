@@ -7,7 +7,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger'
 import { LoggingService } from './logging.service'
 import { LlmProvider, LlmModel } from './entities/llm-call-log.entity'
 
-@Controller('api/logging')
+@Controller('logging')
 @ApiTags('日志管理')
 export class LoggingController {
   constructor(private readonly loggingService: LoggingService) {}

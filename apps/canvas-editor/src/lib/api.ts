@@ -1,4 +1,15 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002'
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
+
+function normalizePath(url: string): string {
+  let normalized = url
+  if (normalized.startsWith('/api')) {
+    normalized = normalized.substring(4)
+  }
+  if (!normalized.startsWith('/')) {
+    normalized = '/' + normalized
+  }
+  return normalized
+}
 
 // 简单的内存缓存
 const cache = new Map<string, { data: any; timestamp: number }>()
@@ -23,26 +34,30 @@ function setCachedData<T>(key: string, data: T): void {
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return { 'Content-Type': 'application/json' }
   const token = localStorage.getItem('token')
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  return headers
 }
 
 export const apiClient = {
   async get<T>(url: string, options?: RequestInit & { useCache?: boolean }): Promise<T> {
-    const cacheKey = getCacheKey(url, 'GET')
+    const normalizedUrl = normalizePath(url)
+    const cacheKey = getCacheKey(normalizedUrl, 'GET')
     
     // 检查缓存
     if (options?.useCache !== false) {
       const cached = getCachedData<T>(cacheKey)
       if (cached) {
-        console.log(`[API Cache] Using cached data for ${url}`)
+        console.log(`[API Cache] Using cached data for ${normalizedUrl}`)
         return cached
       }
     }
 
-    const response = await fetch(`${BASE_URL}${url}`, {
+    const response = await fetch(`${BASE_URL}${normalizedUrl}`, {
       method: 'GET',
       headers: getAuthHeaders(),
       ...options,
@@ -59,7 +74,8 @@ export const apiClient = {
   },
 
   async post<T>(url: string, body: any, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${BASE_URL}${url}`, {
+    const normalizedUrl = normalizePath(url)
+    const response = await fetch(`${BASE_URL}${normalizedUrl}`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -69,7 +85,8 @@ export const apiClient = {
   },
 
   async put<T>(url: string, body: any, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${BASE_URL}${url}`, {
+    const normalizedUrl = normalizePath(url)
+    const response = await fetch(`${BASE_URL}${normalizedUrl}`, {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(body),
@@ -79,7 +96,8 @@ export const apiClient = {
   },
 
   async delete<T>(url: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(`${BASE_URL}${url}`, {
+    const normalizedUrl = normalizePath(url)
+    const response = await fetch(`${BASE_URL}${normalizedUrl}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
       ...options,
@@ -519,11 +537,15 @@ export const knowledgeApi = {
     formData.append('knowledgeBaseId', String(knowledgeBaseId))
     formData.append('type', type)
 
+    const token = localStorage.getItem('token')
+    const headers: Record<string, string> = {}
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+    
     const response = await fetch(`${BASE_URL}/api/knowledge/documents/upload-file`, {
       method: 'POST',
-      headers: {
-        ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
-      },
+      headers,
       body: formData,
     })
     return response.json()

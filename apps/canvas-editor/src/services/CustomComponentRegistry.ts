@@ -4,15 +4,24 @@ import type {
   CustomPropSchema,
 } from '@ai-lowcode/shared-types'
 
+export interface CompilationResult {
+  success: boolean
+  compiledCode?: (props: any) => React.ReactNode
+  error?: string
+}
+
 export interface RegisteredComponent {
   definition: any
   renderFunction?: (props: any) => React.ReactNode
   compiledCode?: (props: any) => React.ReactNode
+  compilationError?: string
+  compiledAt?: number
 }
 
 class CustomComponentRegistry {
   private components: Map<string, RegisteredComponent> = new Map()
   private listeners: Set<() => void> = new Set()
+  private styleSheets: Map<string, HTMLStyleElement> = new Map()
 
   /**
    * 注册自定义组件
@@ -104,35 +113,139 @@ class CustomComponentRegistry {
    * 编译代码模板组件
    */
   compileCodeTemplate(componentId: string): boolean {
+    const result = this.tryCompileCodeTemplate(componentId)
+    return result.success
+  }
+
+  /**
+   * 尝试编译代码模板组件，返回详细的编译结果
+   */
+  tryCompileCodeTemplate(componentId: string): CompilationResult {
     const registered = this.components.get(componentId)
     if (!registered || registered.definition.template.type !== 'code') {
-      return false
+      return { success: false, error: '组件不存在或不是代码模板类型' }
     }
 
     const codeConfig = registered.definition.template.codeConfig
     if (!codeConfig?.renderCode) {
-      return false
+      return { success: false, error: '渲染代码为空' }
     }
 
     try {
-      // 编译代码
+      const renderCode = codeConfig.renderCode.trim()
+      let functionBody = renderCode
+
+      if (!renderCode.startsWith('return') && !renderCode.startsWith('(') && !renderCode.startsWith('{')) {
+        functionBody = `return ${renderCode}`
+      }
+
       const compiledFunction = new Function(
         'React',
         'props',
         'state',
         'setState',
-        codeConfig.renderCode
+        functionBody
       )
 
       registered.compiledCode = (props: any) => {
-        return compiledFunction(React, props, {}, () => {})
+        try {
+          return compiledFunction(React, props, {}, () => {})
+        } catch (runtimeError) {
+          console.error(`Runtime error in component ${componentId}:`, runtimeError)
+          return null
+        }
+      }
+      registered.compilationError = undefined
+      registered.compiledAt = Date.now()
+
+      this.injectStyles(componentId, codeConfig.styleCode)
+
+      this.notifyListeners()
+
+      return { success: true, compiledCode: registered.compiledCode }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      console.error(`Failed to compile custom component ${componentId}:`, error)
+      
+      if (registered) {
+        registered.compilationError = errorMessage
+        registered.compiledCode = undefined
       }
 
-      return true
-    } catch (error) {
-      console.error(`Failed to compile custom component ${componentId}:`, error)
-      return false
+      return { success: false, error: errorMessage }
     }
+  }
+
+  /**
+   * 实时编译代码（用于编辑器预览）
+   */
+  compileCodeForPreview(renderCode: string, styleCode?: string): CompilationResult {
+    if (!renderCode || !renderCode.trim()) {
+      return { success: false, error: '渲染代码为空' }
+    }
+
+    try {
+      const trimmedCode = renderCode.trim()
+      let functionBody = trimmedCode
+
+      if (!trimmedCode.startsWith('return') && !trimmedCode.startsWith('(') && !trimmedCode.startsWith('{')) {
+        functionBody = `return ${trimmedCode}`
+      }
+
+      const compiledFunction = new Function(
+        'React',
+        'props',
+        'state',
+        'setState',
+        functionBody
+      )
+
+      const compiledCode = (props: any) => {
+        try {
+          return compiledFunction(React, props, {}, () => {})
+        } catch (runtimeError) {
+          console.error('Runtime error in preview:', runtimeError)
+          return null
+        }
+      }
+
+      if (styleCode) {
+        this.injectStyles('preview', styleCode)
+      }
+
+      return { success: true, compiledCode }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      return { success: false, error: errorMessage }
+    }
+  }
+
+  /**
+   * 注入样式到页面
+   */
+  private injectStyles(componentId: string, styleCode?: string): void {
+    const existingStyle = this.styleSheets.get(componentId)
+    if (existingStyle) {
+      document.head.removeChild(existingStyle)
+    }
+
+    if (!styleCode || !styleCode.trim()) {
+      this.styleSheets.delete(componentId)
+      return
+    }
+
+    const styleElement = document.createElement('style')
+    styleElement.textContent = styleCode
+    styleElement.id = `custom-component-style-${componentId}`
+    document.head.appendChild(styleElement)
+    this.styleSheets.set(componentId, styleElement)
+  }
+
+  /**
+   * 获取组件编译错误
+   */
+  getCompilationError(componentId: string): string | undefined {
+    return this.components.get(componentId)?.compilationError
   }
 
   /**
@@ -358,5 +471,10 @@ export function useCustomComponentRegistry() {
     searchDefinitions: customComponentRegistry.searchDefinitions.bind(customComponentRegistry),
     createInstance: customComponentRegistry.createInstance.bind(customComponentRegistry),
     validateProps: customComponentRegistry.validateProps.bind(customComponentRegistry),
+    compileCodeTemplate: customComponentRegistry.compileCodeTemplate.bind(customComponentRegistry),
+    tryCompileCodeTemplate: customComponentRegistry.tryCompileCodeTemplate.bind(customComponentRegistry),
+    compileCodeForPreview: customComponentRegistry.compileCodeForPreview.bind(customComponentRegistry),
+    getCompilationError: customComponentRegistry.getCompilationError.bind(customComponentRegistry),
+    getRenderFunction: customComponentRegistry.getRenderFunction.bind(customComponentRegistry),
   }
 }

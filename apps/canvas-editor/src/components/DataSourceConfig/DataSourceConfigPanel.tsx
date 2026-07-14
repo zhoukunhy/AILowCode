@@ -8,17 +8,17 @@ import { useDataPreviewStore } from '@/store/dataPreviewStore'
 export type DataSourceType = 'mysql' | 'http' | 'postgres' | 'mongodb'
 
 export interface DataSourceItem {
-  id: string
+  id: string | number
   name: string
   type: DataSourceType
   config: Record<string, any>
-  status: 'connected' | 'disconnected' | 'connecting'
+  status: 'connected' | 'disconnected' | 'connecting' | 'pending'
 }
 
 export function DataSourceConfigPanel() {
   const { dataSources, addDataSource, updateDataSource, removeDataSource } = useDataPreviewStore()
   const [isAdding, setIsAdding] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | number | null>(null)
   const [selectedType, setSelectedType] = useState<DataSourceType>('mysql')
 
   const handleSubmit = async (config: MySQLConfig) => {
@@ -31,7 +31,7 @@ export function DataSourceConfigPanel() {
     }
 
     if (editingId) {
-      await updateDataSource(editingId, dataSource)
+      await updateDataSource(String(editingId), dataSource)
       setEditingId(null)
     } else {
       await addDataSource(dataSource)
@@ -230,7 +230,7 @@ export function DataSourceConfigPanel() {
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDelete(ds.id)}
+                        onClick={() => handleDelete(String(ds.id))}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
                         title="删除"
                       >

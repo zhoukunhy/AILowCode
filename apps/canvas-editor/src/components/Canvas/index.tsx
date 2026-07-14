@@ -1,65 +1,11 @@
 'use client'
 
 import React, { useRef, useCallback, useMemo, useEffect, useState, useReducer } from 'react'
-import { Stage, Layer, Rect } from 'react-konva'
+import { Stage, Layer, Rect, Text, Group } from 'react-konva'
 import { useCanvasStore } from '@/store/canvasStore'
 import { CanvasGrid } from './CanvasGrid'
 import { OptimizedComponentRenderer } from './OptimizedComponentRenderer'
 import { ComponentToolbar } from './ComponentToolbar'
-
-// LRU缓存实现
-class LRUCache<K, V> {
-  private cache = new Map<K, V>()
-  private maxSize: number
-
-  constructor(maxSize: number = 100) {
-    this.maxSize = maxSize
-  }
-
-  get(key: K): V | undefined {
-    const value = this.cache.get(key)
-    if (value !== undefined) {
-      this.cache.delete(key)
-      this.cache.set(key, value)
-    }
-    return value
-  }
-
-  set(key: K, value: V): void {
-    if (this.cache.has(key)) {
-      this.cache.delete(key)
-    } else if (this.cache.size >= this.maxSize) {
-      const firstKey = this.cache.keys().next().value!
-      this.cache.delete(firstKey)
-    }
-    this.cache.set(key, value)
-  }
-
-  delete(key: K): void {
-    this.cache.delete(key)
-  }
-
-  clear(): void {
-    this.cache.clear()
-  }
-
-  keys(): IterableIterator<K> {
-    return this.cache.keys()
-  }
-
-  deleteByPrefix(prefix: string): void {
-    const keysToDelete: K[] = []
-    this.cache.forEach((_, key) => {
-      if (String(key).startsWith(prefix)) {
-        keysToDelete.push(key)
-      }
-    })
-    keysToDelete.forEach(key => this.cache.delete(key))
-  }
-}
-
-// 组件缓存（使用LRU）
-const componentCache = new LRUCache<string, React.ReactNode>(200)
 
 // 批量更新状态
 interface BatchUpdateState {
@@ -96,6 +42,7 @@ export function Canvas() {
   const [isDragSelecting, setIsDragSelecting] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [dragEnd, setDragEnd] = useState({ x: 0, y: 0 })
+  const [isDraggingComponent, setIsDraggingComponent] = useState(false)
   
   // 使用 useReducer 管理批量更新
   const [batchState, dispatchBatch] = useReducer(batchUpdateReducer, {
@@ -208,13 +155,6 @@ export function Canvas() {
     return () => cancelAnimationFrame(animationFrameId)
   }, [batchState.updates, batchState.isProcessing, currentPage, updateComponent])
 
-  // 当组件数量变化时清空缓存
-  useEffect(() => {
-    return () => {
-      componentCache.clear()
-    }
-  }, [components.length])
-
   // 判断组件是否在可见区域内（带有边距）
   const isComponentVisible = useCallback((component: any, margin: number = 150) => {
     const { x, y, width, height } = visibleRect
@@ -236,43 +176,15 @@ export function Canvas() {
     return [...components].sort((a, b) => a.zIndex - b.zIndex)
   }, [components])
 
-  // 过滤可见组件（虚拟化）- 组件数超过30启用
+  // 过滤可见组件（虚拟化）- 组件数超过30启用，拖拽过程中禁用过滤
   const visibleComponents = useMemo(() => {
-    if (components.length < 30) {
+    if (components.length < 30 || isDraggingComponent) {
       return sortedComponents
     }
     return sortedComponents.filter(component => isComponentVisible(component))
-  }, [sortedComponents, isComponentVisible, components.length])
+  }, [sortedComponents, isComponentVisible, components.length, isDraggingComponent])
 
-  // 组件渲染缓存
-  const renderCachedComponent = useCallback((component: any, isSelected: boolean, callbacks: any) => {
-    // 使用更合理的缓存键：id + zIndex + isSelected + 位置
-    const cacheKey = `${component.id}-${component.zIndex}-${isSelected}-${component.x}-${component.y}`
-    
-    // 检查缓存
-    const cached = componentCache.get(cacheKey)
-    if (cached) {
-      return cached
-    }
-
-    const element = (
-      <OptimizedComponentRenderer
-        key={component.id}
-        component={component}
-        isSelected={isSelected}
-        onSelect={callbacks.onSelect}
-        onDragMove={callbacks.onDragMove}
-        onTransform={callbacks.onTransform}
-      />
-    )
-
-    // 只缓存静态组件（没有动画或交互状态的组件）
-    if (!component.hasAnimation && !component.hasInteractiveState) {
-      componentCache.set(cacheKey, element)
-    }
-
-    return element
-  }, [])
+  
 
   // 处理拖拽放置
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -357,9 +269,6 @@ export function Canvas() {
 
   // 处理组件拖拽移动（优化版本）
   const handleComponentDragMove = useCallback((id: string, newX: number, newY: number) => {
-    // 清除该组件的缓存
-    componentCache.deleteByPrefix(id)
-
     // 如果多个组件被选中，一起移动（直接更新）
     if (selectedIds.length > 1) {
       const currentComponent = components.find(c => c.id === id)
@@ -403,8 +312,7 @@ export function Canvas() {
   return (
     <div 
       ref={containerRef}
-      className="absolute inset-0 overflow-auto p-4 bg-gray-100"
-      style={{ width: '100%', height: '100%' }}
+      className="w-full h-full overflow-auto p-4 bg-gray-100"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
@@ -453,44 +361,48 @@ export function Canvas() {
             <Layer>
               {visibleComponents.map((component) => {
                 const isSelected = selectedIds.includes(component.id)
-                const callbacks = {
-                  onSelect: (e: any) => {
-                    e.cancelBubble = true
-                    const multiSelect = e.ctrlKey || e.metaKey
-                    selectComponent(component.id, multiSelect)
-                  },
-                  onDragMove: (newX: number, newY: number) => handleComponentDragMove(component.id, newX, newY),
-                  onTransform: (attrs: any) => {
-                    componentCache.deleteByPrefix(component.id)
-                    updateComponent(component.id, attrs)
-                  },
-                }
-                
-                return renderCachedComponent(component, isSelected, callbacks)
+                return (
+                  <OptimizedComponentRenderer
+                    key={component.id}
+                    component={component}
+                    isSelected={isSelected}
+                    onSelect={(e: any) => {
+                      e.cancelBubble = true
+                      const multiSelect = e.ctrlKey || e.metaKey
+                      selectComponent(component.id, multiSelect)
+                    }}
+                    onDragStart={() => setIsDraggingComponent(true)}
+                    onDragEnd={() => setIsDraggingComponent(false)}
+                    onDragMove={(newX: number, newY: number) => handleComponentDragMove(component.id, newX, newY)}
+                    onTransform={(attrs: any) => updateComponent(component.id, attrs)}
+                  />
+                )
               })}
             </Layer>
 
             <Layer>
-              {components.length > 30 && (
-                <text
-                  x={10}
-                  y={20}
-                  fontSize={12}
-                  fill="#666"
-                  opacity={0.6}
-                >
-                  {`${visibleComponents.length}/${components.length} 组件可见`}
-                </text>
-              )}
-              <text
-                x={dimensions.width - 80}
-                y={20}
-                fontSize={12}
-                fill="#666"
-                opacity={0.6}
-              >
-                {`${Math.round(zoom * 100)}%`}
-              </text>
+              <Group>
+                {components.length > 30 && (
+                  <Text
+                    x={10}
+                    y={20}
+                    fontSize={12}
+                    fill="#666"
+                    opacity={0.6}
+                    text={`${visibleComponents.length}/${components.length} 组件可见`}
+                  />
+                )}
+                {dimensions.width > 0 && (
+                  <Text
+                    x={dimensions.width - 80}
+                    y={20}
+                    fontSize={12}
+                    fill="#666"
+                    opacity={0.6}
+                    text={`${Math.round(zoom * 100)}%`}
+                  />
+                )}
+              </Group>
             </Layer>
           </Stage>
       </div>

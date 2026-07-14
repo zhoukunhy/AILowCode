@@ -43,6 +43,7 @@ export class SchemaFieldDto {
   options?: string[]
 
   @ApiPropertyOptional({ description: '默认值' })
+  @IsOptional()
   defaultValue?: any
 }
 

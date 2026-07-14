@@ -29,7 +29,7 @@ import {
  */
 @ApiTags('知识库')
 @ApiBearerAuth('JWT-auth')
-@Controller('api/knowledge')
+@Controller('knowledge')
 export class KnowledgeController {
   constructor(private readonly knowledgeService: KnowledgeService) {}
 

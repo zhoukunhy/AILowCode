@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Rect } from 'react-konva'
+import { Rect, Group } from 'react-konva'
 
 interface CanvasGridProps {
   width: number
@@ -11,7 +11,17 @@ interface CanvasGridProps {
 }
 
 export function CanvasGrid({ width, height, gridSize, visible }: CanvasGridProps) {
-  if (!visible) return null
+  if (!visible) {
+    return (
+      <Rect
+        x={0}
+        y={0}
+        width={0}
+        height={0}
+        fill="transparent"
+      />
+    )
+  }
 
   // 生成栅格线
   const verticalLines: JSX.Element[] = []
@@ -46,9 +56,9 @@ export function CanvasGrid({ width, height, gridSize, visible }: CanvasGridProps
   }
 
   return (
-    <React.Fragment>
+    <Group>
       {verticalLines}
       {horizontalLines}
-    </React.Fragment>
+    </Group>
   )
 }

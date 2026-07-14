@@ -1,11 +1,13 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { useCanvasStore, DEFAULT_BREAKPOINTS } from '@/store/canvasStore'
 import { PropertyForm } from './PropertyForm'
 import { DataSourceBinding } from './DataSourceBinding'
+import { DataModelBinding } from './DataModelBinding'
 import { EventBinding } from './EventBinding'
 import { RenderLogic } from './RenderLogic'
+import { CodeEditor } from './CodeEditor'
 import { DataPreviewPanel } from '../DataPreviewPanel'
 
 export function PropertyPanel() {
@@ -15,8 +17,11 @@ export function PropertyPanel() {
   const componentList = useCanvasStore((state) => state.componentList)
   const currentPage = useCanvasStore((state) => state.currentPage)
   const updateCurrentPage = useCanvasStore((state) => state.updateCurrentPage)
-  const updateComponent = useCanvasStore((state) => state.updateComponent)
   const updateComponentProps = useCanvasStore((state) => state.updateComponentProps)
+  const updateComponent = useCanvasStore((state) => state.updateComponent)
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_previewCode, setPreviewCode] = useState<string | undefined>()
 
   const selectedComponent = components.find(c => c.id === selectedId)
   const componentMeta = componentList.find(m => m.type === selectedComponent?.type)
@@ -298,8 +303,16 @@ export function PropertyPanel() {
           </div>
         )}
         
+        {/* 代码编辑器（仅适用于代码模板自定义组件） */}
+        {selectedComponent?.customComponentId && (
+          <CodeEditor onPreviewChange={setPreviewCode} />
+        )}
+        
         {/* 数据源绑定 */}
         <DataSourceBinding />
+        
+        {/* 数据模型绑定 */}
+        <DataModelBinding />
         
         {/* 渲染逻辑 */}
         <RenderLogic />

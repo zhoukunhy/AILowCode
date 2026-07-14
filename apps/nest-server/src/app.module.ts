@@ -15,6 +15,7 @@ import { MenuModule } from './modules/menu/menu.module'
 import { WorkflowModule } from './modules/workflow/workflow.module'
 import { CodegenModule } from './modules/codegen/codegen.module'
 import { DataSourceModule } from './modules/data-source/data-source.module'
+import { DataModelModule } from './modules/data-model/data-model.module'
 import { AiConfigModule } from './modules/ai-config/ai-config.module'
 import { LoggingModule } from './modules/logging/logging.module'
 import { RedisModule } from './common/redis/redis.module'
@@ -39,7 +40,7 @@ import { PermissionsGuard } from './modules/auth/guards/permissions.guard'
         type: 'sqlite',
         database: configService.get('DB_DATABASE', 'ai_lowcode.sqlite'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: configService.get('NODE_ENV') !== 'production',
+        synchronize: true,
         logging: configService.get('NODE_ENV') !== 'production',
       }),
       inject: [ConfigService],
@@ -64,6 +65,7 @@ import { PermissionsGuard } from './modules/auth/guards/permissions.guard'
     WorkflowModule,
     CodegenModule,
     DataSourceModule,
+    DataModelModule,
     AiConfigModule,
     LoggingModule,
     RedisModule,

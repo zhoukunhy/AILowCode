@@ -25,7 +25,7 @@ import { CreatePageDto, UpdatePageDto, QueryPageDto } from './dto/page.dto'
  */
 @ApiTags('canvas-pages')
 @ApiBearerAuth('JWT-auth')
-@Controller('api/canvas-pages')
+@Controller('canvas-pages')
 export class CanvasPageController {
   constructor(private readonly pageService: PageService) {}
 

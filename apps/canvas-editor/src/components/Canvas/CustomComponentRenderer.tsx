@@ -17,6 +17,7 @@ interface CustomComponentRendererProps {
   width: number
   height: number
   onEvent?: (eventName: string, data: any) => void
+  previewCode?: string
 }
 
 /**
@@ -33,6 +34,7 @@ export function CustomComponentRenderer({
   width,
   height,
   onEvent,
+  previewCode,
 }: CustomComponentRendererProps) {
   // 获取组件定义
   const definition = useMemo(() => {
@@ -61,12 +63,38 @@ export function CustomComponentRenderer({
   // 渲染可视化模板组件
   const renderVisualTemplate = () => {
     if (!definition || definition.template.type !== 'visual') {
-      return null
+      return (
+        <Group x={x} y={y}>
+          <Rect
+            x={0}
+            y={0}
+            width={width}
+            height={height}
+            fill="#f0f0f0"
+            stroke="#d9d9d9"
+            strokeWidth={1}
+            cornerRadius={4}
+          />
+        </Group>
+      )
     }
 
     const visualConfig = definition.template.visualConfig
     if (!visualConfig) {
-      return null
+      return (
+        <Group x={x} y={y}>
+          <Rect
+            x={0}
+            y={0}
+            width={width}
+            height={height}
+            fill="#f0f0f0"
+            stroke="#d9d9d9"
+            strokeWidth={1}
+            cornerRadius={4}
+          />
+        </Group>
+      )
     }
 
     // 渲染子组件
@@ -123,13 +151,346 @@ export function CustomComponentRenderer({
     )
   }
 
-  // 渲染代码模板组件（简化版，实际需要更复杂的实现）
+  // 渲染代码模板组件（支持实时编译和预览）
   const renderCodeTemplate = () => {
     if (!definition || definition.template.type !== 'code') {
-      return null
+      return (
+        <Group x={x} y={y}>
+          <Rect
+            x={0}
+            y={0}
+            width={width}
+            height={height}
+            fill="#f0f0f0"
+            stroke="#d9d9d9"
+            strokeWidth={1}
+            cornerRadius={4}
+          />
+        </Group>
+      )
     }
 
-    // 对于代码模板，在画布中显示占位符
+    const codeConfig = definition.template.codeConfig
+    const codeToCompile = previewCode || codeConfig?.renderCode
+
+    // 尝试编译代码
+    let compilationResult = null
+    if (codeToCompile && codeToCompile.trim()) {
+      compilationResult = customComponentRegistry.compileCodeForPreview(codeToCompile)
+    }
+
+    // 如果有编译错误，显示错误信息
+    if (compilationResult && !compilationResult.success) {
+      return (
+        <Group x={x} y={y}>
+          <Rect
+            x={0}
+            y={0}
+            width={width}
+            height={height}
+            fill="#fff1f0"
+            stroke="#ff4d4f"
+            strokeWidth={1}
+            cornerRadius={4}
+          />
+          <Text
+            x={16}
+            y={24}
+            text="编译错误"
+            fontSize={14}
+            fontWeight="bold"
+            fill="#ff4d4f"
+          />
+          <Text
+            x={16}
+            y={48}
+            text={compilationResult.error?.slice(0, 100) || '未知错误'}
+            fontSize={12}
+            fill="#ff7875"
+            width={width - 32}
+          />
+          {isSelected && (
+            <Rect
+              x={0}
+              y={0}
+              width={width}
+              height={height}
+              stroke="#1890ff"
+              strokeWidth={2}
+              cornerRadius={4}
+            />
+          )}
+        </Group>
+      )
+    }
+
+    // 如果编译成功，尝试渲染组件
+    if (compilationResult && compilationResult.success && compilationResult.compiledCode) {
+      try {
+        const compiledOutput = compilationResult.compiledCode(instance.props)
+        
+        const renderContent = () => {
+          if (!compiledOutput) {
+            return (
+              <Text
+                x={width / 2}
+                y={height / 2}
+                text="空输出"
+                fontSize={14}
+                fill="#999"
+                align="center"
+                verticalAlign="middle"
+                offsetX={width / 2}
+                offsetY={height / 2}
+              />
+            )
+          }
+          
+          if (typeof compiledOutput === 'string') {
+            return (
+              <Text
+                x={width / 2}
+                y={height / 2}
+                text={compiledOutput.slice(0, 50)}
+                fontSize={14}
+                fill="#333"
+                align="center"
+                verticalAlign="middle"
+                offsetX={width / 2}
+                offsetY={height / 2}
+                width={width - 32}
+              />
+            )
+          }
+          
+          if (React.isValidElement(compiledOutput)) {
+            const elementType = compiledOutput.type
+            const props = compiledOutput.props
+            
+            if (typeof elementType === 'string') {
+              switch (elementType) {
+                case 'button':
+                  return (
+                    <Group>
+                      <Rect
+                        x={width / 2 - 60}
+                        y={height / 2 - 20}
+                        width={120}
+                        height={40}
+                        fill="#1890ff"
+                        cornerRadius={4}
+                      />
+                      <Text
+                        x={width / 2}
+                        y={height / 2}
+                        text={(props.children as string)?.slice(0, 20) || '按钮'}
+                        fontSize={14}
+                        fill="#fff"
+                        align="center"
+                        verticalAlign="middle"
+                        offsetX={60}
+                        offsetY={20}
+                      />
+                    </Group>
+                  )
+                case 'span':
+                case 'div':
+                  return (
+                    <Text
+                      x={width / 2}
+                      y={height / 2}
+                      text={String(props.children).slice(0, 50)}
+                      fontSize={14}
+                      fill="#333"
+                      align="center"
+                      verticalAlign="middle"
+                      offsetX={width / 2}
+                      offsetY={height / 2}
+                      width={width - 32}
+                    />
+                  )
+                case 'input':
+                  return (
+                    <Group>
+                      <Rect
+                        x={8}
+                        y={height / 2 - 15}
+                        width={width - 16}
+                        height={30}
+                        fill="#fff"
+                        stroke="#d9d9d9"
+                        strokeWidth={1}
+                        cornerRadius={4}
+                      />
+                      <Text
+                        x={20}
+                        y={height / 2}
+                        text={props.placeholder || '输入框'}
+                        fontSize={12}
+                        fill="#999"
+                        verticalAlign="middle"
+                        offsetY={15}
+                      />
+                    </Group>
+                  )
+                case 'h1':
+                case 'h2':
+                case 'h3':
+                case 'h4':
+                case 'h5':
+                case 'h6':
+                  return (
+                    <Text
+                      x={width / 2}
+                      y={height / 2}
+                      text={String(props.children).slice(0, 50)}
+                      fontSize={elementType === 'h1' ? 24 : elementType === 'h2' ? 20 : elementType === 'h3' ? 18 : 16}
+                      fontWeight="bold"
+                      fill="#333"
+                      align="center"
+                      verticalAlign="middle"
+                      offsetX={width / 2}
+                      offsetY={height / 2}
+                      width={width - 32}
+                    />
+                  )
+                case 'p':
+                  return (
+                    <Text
+                      x={width / 2}
+                      y={height / 2}
+                      text={String(props.children).slice(0, 100)}
+                      fontSize={14}
+                      fill="#666"
+                      align="center"
+                      verticalAlign="middle"
+                      offsetX={width / 2}
+                      offsetY={height / 2}
+                      width={width - 32}
+                    />
+                  )
+                default:
+                  return (
+                    <Text
+                      x={width / 2}
+                      y={height / 2}
+                      text={`<${elementType}>`}
+                      fontSize={14}
+                      fill="#1890ff"
+                      align="center"
+                      verticalAlign="middle"
+                      offsetX={width / 2}
+                      offsetY={height / 2}
+                    />
+                  )
+              }
+            }
+            
+            return (
+              <Text
+                x={width / 2}
+                y={height / 2}
+                text={definition.displayName}
+                fontSize={14}
+                fill="#333"
+                align="center"
+                verticalAlign="middle"
+                offsetX={width / 2}
+                offsetY={height / 2}
+              />
+            )
+          }
+          
+          return (
+            <Text
+              x={width / 2}
+              y={height / 2}
+              text={String(compiledOutput).slice(0, 50)}
+              fontSize={14}
+              fill="#333"
+              align="center"
+              verticalAlign="middle"
+              offsetX={width / 2}
+              offsetY={height / 2}
+              width={width - 32}
+            />
+          )
+        }
+        
+        return (
+          <Group x={x} y={y}>
+            <Rect
+              x={0}
+              y={0}
+              width={width}
+              height={height}
+              fill="#fff"
+              stroke="#e8e8e8"
+              strokeWidth={1}
+              cornerRadius={4}
+            />
+            
+            {renderContent()}
+            
+            {isSelected && (
+              <Rect
+                x={0}
+                y={0}
+                width={width}
+                height={height}
+                stroke="#1890ff"
+                strokeWidth={2}
+                cornerRadius={4}
+              />
+            )}
+          </Group>
+        )
+      } catch {
+        return (
+          <Group x={x} y={y}>
+            <Rect
+              x={0}
+              y={0}
+              width={width}
+              height={height}
+              fill="#fff7e6"
+              stroke="#fa8c16"
+              strokeWidth={1}
+              cornerRadius={4}
+            />
+            <Text
+              x={16}
+              y={24}
+              text="运行时错误"
+              fontSize={14}
+              fontWeight="bold"
+              fill="#fa8c16"
+            />
+            <Text
+              x={16}
+              y={48}
+              text="组件运行时出现错误"
+              fontSize={12}
+              fill="#faad14"
+              width={width - 32}
+            />
+            {isSelected && (
+              <Rect
+                x={0}
+                y={0}
+                width={width}
+                height={height}
+                stroke="#1890ff"
+                strokeWidth={2}
+                cornerRadius={4}
+              />
+            )}
+          </Group>
+        )
+      }
+    }
+
+    // 默认占位符（当没有代码时）
     return (
       <Group x={x} y={y}>
         <Rect

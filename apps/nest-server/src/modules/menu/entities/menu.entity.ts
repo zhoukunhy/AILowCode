@@ -29,6 +29,9 @@ export class MenuEntity {
   @Column({ default: true })
   status!: boolean
 
+  @Column({ default: true })
+  mountable!: boolean
+
   @Column({ length: 500, nullable: true })
   description?: string
 

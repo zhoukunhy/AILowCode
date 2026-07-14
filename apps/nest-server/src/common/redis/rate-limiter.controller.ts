@@ -9,7 +9,7 @@ import { AIRateLimiter, RateLimitResult } from './rate-limiter.service'
 import { AuthGuard } from '@nestjs/passport'
 import { Roles } from '../../modules/auth/decorators/roles.decorator'
 
-@Controller('api/rate-limit')
+@Controller('rate-limit')
 @ApiTags('限流管理')
 @UseGuards(AuthGuard('jwt'))
 export class RateLimitController {
