@@ -312,15 +312,16 @@ export function Canvas() {
   return (
     <div 
       ref={containerRef}
-      className="w-full h-full overflow-auto p-4 bg-gray-100"
+      className="w-full h-full overflow-auto bg-gray-100"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      <ComponentToolbar />
-      <div 
-        className="canvas-wrapper bg-white shadow-lg rounded-lg overflow-hidden mt-2"
-        style={{ width: 'fit-content', maxWidth: '100%' }}
-      >
+      <div className="p-4">
+        <ComponentToolbar />
+        <div 
+          className="canvas-wrapper bg-white shadow-lg rounded-lg overflow-hidden mt-2"
+          style={{ width: 'fit-content', maxWidth: '100%' }}
+        >
         <Stage
           ref={stageRef}
           width={scaledWidth}
@@ -332,7 +333,6 @@ export function Canvas() {
           onMouseDown={handleStageMouseDown}
           onMouseMove={handleStageMouseMove}
           onMouseUp={handleStageMouseUp}
-          onMouseLeave={handleStageMouseUp}
         >
             <Layer>
               <CanvasGrid
@@ -405,6 +405,7 @@ export function Canvas() {
               </Group>
             </Layer>
           </Stage>
+        </div>
       </div>
     </div>
   )

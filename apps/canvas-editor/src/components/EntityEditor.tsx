@@ -6,9 +6,10 @@ import { DataModel, Entity, Field, EnumDefinition, EnumOption, ValidationRule, D
 interface EntityEditorProps {
   model: DataModel
   onUpdate: (model: DataModel) => void
+  onGenerateForm?: (entity: Entity) => void
 }
 
-export function EntityEditor({ model, onUpdate }: EntityEditorProps) {
+export function EntityEditor({ model, onUpdate, onGenerateForm }: EntityEditorProps) {
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null)
   const [newEntityName, setNewEntityName] = useState('')
@@ -369,20 +370,34 @@ export function EntityEditor({ model, onUpdate }: EntityEditorProps) {
               }}
             >
               <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-sm">{entity.name}</div>
-                  <div className="text-xs text-gray-500">{entity.fields.length} 个字段</div>
+                  <div>
+                    <div className="font-medium text-sm">{entity.name}</div>
+                    <div className="text-xs text-gray-500">{entity.fields.length} 个字段</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {onGenerateForm && entity.fields.length > 0 && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onGenerateForm(entity)
+                        }}
+                        className="text-xs text-green-600 hover:text-green-700 bg-green-50 px-2 py-1 rounded"
+                        title="一键生成表单"
+                      >
+                        📝
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteEntity(entity.id)
+                      }}
+                      className="text-xs text-red-500 hover:text-red-700"
+                    >
+                      ×
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteEntity(entity.id)
-                  }}
-                  className="text-xs text-red-500 hover:text-red-700"
-                >
-                  ×
-                </button>
-              </div>
             </div>
           ))}
         </div>

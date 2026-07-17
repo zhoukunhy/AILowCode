@@ -10,7 +10,8 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
-    "@ai-lowcode/shared-types": "workspace:*"
+    "@ai-lowcode/shared-types": "workspace:*",
+    "mysql2": "^3.23.0"
   },
   "devDependencies": {
     "tsup": "^8.0.0",

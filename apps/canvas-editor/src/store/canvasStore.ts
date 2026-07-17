@@ -211,6 +211,7 @@ export interface CanvasState {
   dataModels: DataModel[]
   // 组件操作
   addComponent: (componentType: string, x: number, y: number) => void
+  addComponentsBatch: (components: ComponentConfig[]) => void
   removeComponent: (id: string) => void
   clearCanvas: () => void
   updateComponent: (id: string, updates: Partial<ComponentConfig>) => void
@@ -1492,6 +1493,35 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
       selectedId: newComponent.id,
       project: { ...state.project, isDirty: true },
     }))
+  },
+
+  // 批量添加组件到画布
+  addComponentsBatch: (components: ComponentConfig[]) => {
+    const { currentPage } = get()
+
+    const alignedComponents = components.map(comp => {
+      let finalX = comp.x
+      let finalY = comp.y
+      if (currentPage.snapToGrid) {
+        finalX = Math.round(comp.x / currentPage.gridSize) * currentPage.gridSize
+        finalY = Math.round(comp.y / currentPage.gridSize) * currentPage.gridSize
+      }
+      return { ...comp, x: finalX, y: finalY }
+    })
+
+    set((state) => {
+      const maxZIndex = Math.max(...state.components.map(c => c.zIndex), 0)
+      const updatedComponents = alignedComponents.map((comp, index) => ({
+        ...comp,
+        zIndex: maxZIndex + index + 1,
+      }))
+
+      return {
+        components: [...state.components, ...updatedComponents],
+        selectedId: updatedComponents.length > 0 ? updatedComponents[0].id : state.selectedId,
+        project: { ...state.project, isDirty: true },
+      }
+    })
   },
 
   // 删除组件

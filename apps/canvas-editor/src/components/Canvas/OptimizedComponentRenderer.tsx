@@ -91,8 +91,8 @@ const RenderInput = React.memo(({ component }: { component: ComponentConfig }) =
     return component.props.value ?? ''
   }
 
-  const labelWidth = component.props.label ? 80 : 0
-  const inputWidth = component.width - labelWidth
+  const labelWidth = component.props.label ? component.props.label.length * 14 + 8 : 0
+  const inputWidth = component.width - labelWidth - (component.props.label ? 4 : 0)
   const displayValue = getDisplayValue()
 
   return (
@@ -106,13 +106,12 @@ const RenderInput = React.memo(({ component }: { component: ComponentConfig }) =
           fill="#333"
           align="left"
           verticalAlign="middle"
-          offsetY={component.height / 2}
-          width={labelWidth - 8}
+          offsetY={7}
         />
       )}
       
       <Rect
-        x={labelWidth}
+        x={labelWidth + (component.props.label ? 4 : 0)}
         y={0}
         width={inputWidth}
         height={component.height}
@@ -124,7 +123,7 @@ const RenderInput = React.memo(({ component }: { component: ComponentConfig }) =
       
       {component.props.dataSourceId && (
         <Rect
-          x={labelWidth + 4}
+          x={labelWidth + 8}
           y={component.height - 8}
           width={6}
           height={6}
@@ -134,14 +133,14 @@ const RenderInput = React.memo(({ component }: { component: ComponentConfig }) =
       )}
       
       <Text
-        x={labelWidth + 8 + (component.props.dataSourceId ? 8 : 0)}
+        x={labelWidth + 12 + (component.props.dataSourceId ? 8 : 0)}
         y={component.height / 2}
         text={displayValue || component.props.placeholder}
         fontSize={14}
         fill={displayValue ? '#333' : '#bfbfbf'}
         align="left"
         verticalAlign="middle"
-        offsetY={component.height / 2}
+        offsetY={7}
         width={inputWidth - 16 - (component.props.dataSourceId ? 12 : 0)}
       />
     </Group>
@@ -361,24 +360,25 @@ const RenderTable = React.memo(({ component }: { component: ComponentConfig }) =
 })
 
 const RenderTextarea = React.memo(({ component }: { component: ComponentConfig }) => {
-  const labelWidth = component.props.label ? 80 : 0
-  const inputWidth = component.width - labelWidth
+  const labelWidth = component.props.label ? component.props.label.length * 14 + 8 : 0
+  const inputWidth = component.width - labelWidth - (component.props.label ? 4 : 0)
 
   return (
     <Group>
       {component.props.label && (
         <Text
           x={0}
-          y={16}
+          y={component.height / 2}
           text={component.props.label}
           fontSize={14}
           fill="#333"
           align="left"
-          width={labelWidth - 8}
+          verticalAlign="middle"
+          offsetY={7}
         />
       )}
       <Rect
-        x={labelWidth}
+        x={labelWidth + (component.props.label ? 4 : 0)}
         y={0}
         width={inputWidth}
         height={component.height}
@@ -388,12 +388,14 @@ const RenderTextarea = React.memo(({ component }: { component: ComponentConfig }
         cornerRadius={4}
       />
       <Text
-        x={labelWidth + 8}
-        y={24}
+        x={labelWidth + 12}
+        y={component.height / 2}
         text={component.props.placeholder}
         fontSize={14}
         fill="#bfbfbf"
         align="left"
+        verticalAlign="middle"
+        offsetY={7}
         width={inputWidth - 16}
       />
     </Group>
@@ -408,8 +410,8 @@ const RenderTextarea = React.memo(({ component }: { component: ComponentConfig }
 })
 
 const RenderSelect = React.memo(({ component }: { component: ComponentConfig }) => {
-  const labelWidth = component.props.label ? 80 : 0
-  const inputWidth = component.width - labelWidth
+  const labelWidth = component.props.label ? component.props.label.length * 14 + 8 : 0
+  const inputWidth = component.width - labelWidth - (component.props.label ? 4 : 0)
 
   return (
     <Group>
@@ -422,12 +424,11 @@ const RenderSelect = React.memo(({ component }: { component: ComponentConfig }) 
           fill="#333"
           align="left"
           verticalAlign="middle"
-          offsetY={component.height / 2}
-          width={labelWidth - 8}
+          offsetY={7}
         />
       )}
       <Rect
-        x={labelWidth}
+        x={labelWidth + (component.props.label ? 4 : 0)}
         y={0}
         width={inputWidth}
         height={component.height}
@@ -437,24 +438,24 @@ const RenderSelect = React.memo(({ component }: { component: ComponentConfig }) 
         cornerRadius={4}
       />
       <Text
-        x={labelWidth + 8}
+        x={labelWidth + 12}
         y={component.height / 2}
         text={component.props.placeholder}
         fontSize={14}
         fill="#bfbfbf"
         align="left"
         verticalAlign="middle"
-        offsetY={component.height / 2}
-        width={inputWidth - 32}
+        offsetY={7}
+        width={inputWidth - 36}
       />
       <Text
-        x={labelWidth + inputWidth - 20}
+        x={labelWidth + inputWidth + 4 - 20}
         y={component.height / 2}
         text="▼"
         fontSize={10}
         fill="#999"
         verticalAlign="middle"
-        offsetY={component.height / 2}
+        offsetY={5}
       />
     </Group>
   )
@@ -511,8 +512,8 @@ const RenderSwitch = React.memo(({ component }: { component: ComponentConfig }) 
 })
 
 const RenderDatePicker = React.memo(({ component }: { component: ComponentConfig }) => {
-  const labelWidth = component.props.label ? 80 : 0
-  const inputWidth = component.width - labelWidth
+  const labelWidth = component.props.label ? component.props.label.length * 14 + 8 : 0
+  const inputWidth = component.width - labelWidth - (component.props.label ? 4 : 0)
 
   return (
     <Group>
@@ -525,12 +526,11 @@ const RenderDatePicker = React.memo(({ component }: { component: ComponentConfig
           fill="#333"
           align="left"
           verticalAlign="middle"
-          offsetY={component.height / 2}
-          width={labelWidth - 8}
+          offsetY={7}
         />
       )}
       <Rect
-        x={labelWidth}
+        x={labelWidth + (component.props.label ? 4 : 0)}
         y={0}
         width={inputWidth}
         height={component.height}
@@ -540,22 +540,22 @@ const RenderDatePicker = React.memo(({ component }: { component: ComponentConfig
         cornerRadius={4}
       />
       <Text
-        x={labelWidth + 8}
+        x={labelWidth + 12}
         y={component.height / 2}
         text="📅"
         fontSize={16}
         verticalAlign="middle"
-        offsetY={component.height / 2}
+        offsetY={8}
       />
       <Text
-        x={labelWidth + 32}
+        x={labelWidth + 36}
         y={component.height / 2}
         text={component.props.placeholder}
         fontSize={14}
         fill="#bfbfbf"
         align="left"
         verticalAlign="middle"
-        offsetY={component.height / 2}
+        offsetY={7}
         width={inputWidth - 48}
       />
     </Group>
@@ -1640,8 +1640,8 @@ const RenderPopover = React.memo(({ component }: { component: ComponentConfig })
 })
 
 const RenderCascader = React.memo(({ component }: { component: ComponentConfig }) => {
-  const labelWidth = component.props.label ? 80 : 0
-  const inputWidth = component.width - labelWidth
+  const labelWidth = component.props.label ? component.props.label.length * 14 + 8 : 0
+  const inputWidth = component.width - labelWidth - (component.props.label ? 4 : 0)
 
   return (
     <Group>
@@ -1654,12 +1654,11 @@ const RenderCascader = React.memo(({ component }: { component: ComponentConfig }
           fill="#333"
           align="left"
           verticalAlign="middle"
-          offsetY={component.height / 2}
-          width={labelWidth - 8}
+          offsetY={7}
         />
       )}
       <Rect
-        x={labelWidth}
+        x={labelWidth + (component.props.label ? 4 : 0)}
         y={0}
         width={inputWidth}
         height={component.height}
@@ -1669,22 +1668,22 @@ const RenderCascader = React.memo(({ component }: { component: ComponentConfig }
         cornerRadius={4}
       />
       <Text
-        x={labelWidth + 8}
+        x={labelWidth + 12}
         y={component.height / 2}
         text="🌲"
         fontSize={16}
         verticalAlign="middle"
-        offsetY={component.height / 2}
+        offsetY={8}
       />
       <Text
-        x={labelWidth + 32}
+        x={labelWidth + 36}
         y={component.height / 2}
         text={component.props.placeholder}
         fontSize={14}
         fill="#bfbfbf"
         align="left"
         verticalAlign="middle"
-        offsetY={component.height / 2}
+        offsetY={7}
         width={inputWidth - 48}
       />
     </Group>

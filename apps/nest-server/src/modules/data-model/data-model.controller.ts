@@ -13,6 +13,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagg
 import { DataModelService } from './data-model.service'
 import { TableGeneratorService } from './services/table-generator.service'
 import { CrudGeneratorService } from './services/crud-generator.service'
+import { SchemaImportService } from './services/schema-import.service'
 import { CreateDataModelDto, UpdateDataModelDto } from './dto/data-model.dto'
 
 @ApiTags('数据模型')
@@ -23,6 +24,7 @@ export class DataModelController {
     private readonly dataModelService: DataModelService,
     private readonly tableGeneratorService: TableGeneratorService,
     private readonly crudGeneratorService: CrudGeneratorService,
+    private readonly schemaImportService: SchemaImportService,
   ) {}
 
   @Post()
@@ -138,5 +140,30 @@ export class DataModelController {
   async generateCrud(@Param('id', ParseUUIDPipe) id: string) {
     const model = await this.dataModelService.findOne(id)
     return this.crudGeneratorService.generateCrudCode(model)
+  }
+
+  @Post('import')
+  @ApiOperation({ summary: '从数据源导入表结构' })
+  @ApiResponse({ status: 200, description: '导入成功' })
+  async importFromDataSource(@Body() body: { dataSourceId: string; tableNames?: string[] }) {
+    return this.schemaImportService.importFromDataSource(body.dataSourceId, body.tableNames)
+  }
+
+  @Post('import-and-create')
+  @ApiOperation({ summary: '从数据源导入表结构并创建数据模型' })
+  @ApiResponse({ status: 201, description: '创建成功' })
+  async importAndCreate(@Body() body: { dataSourceId: string; tableNames?: string[]; projectId?: string }) {
+    const result = await this.schemaImportService.importFromDataSource(body.dataSourceId, body.tableNames)
+    
+    const createDto: CreateDataModelDto = {
+      name: result.modelName,
+      description: '从数据库导入的数据模型',
+      entities: result.entities,
+      relations: result.relations,
+      enums: [],
+      projectId: body.projectId,
+    }
+
+    return this.dataModelService.create(createDto)
   }
 }

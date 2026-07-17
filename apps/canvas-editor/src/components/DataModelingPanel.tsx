@@ -4,16 +4,23 @@ import React, { useState } from 'react'
 import { useCanvasStore } from '@/store/canvasStore'
 import { EntityEditor } from './EntityEditor'
 import { RelationEditor } from './RelationEditor'
+import { FormGenerator } from '@/services/FormGenerator'
 
 export function DataModelingPanel() {
   const dataModels = useCanvasStore((state) => state.dataModels)
   const addDataModel = useCanvasStore((state) => state.addDataModel)
   const updateDataModel = useCanvasStore((state) => state.updateDataModel)
   const deleteDataModel = useCanvasStore((state) => state.deleteDataModel)
+  const addComponentsBatch = useCanvasStore((state) => state.addComponentsBatch)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'entities' | 'relations'>('entities')
 
   const selectedModel = dataModels.find(m => m.id === selectedModelId)
+
+  const handleGenerateForm = (entity: any) => {
+    const components = FormGenerator.generateFromEntity(entity)
+    addComponentsBatch(components)
+  }
 
   const handleAddModel = () => {
     const newModel = {
@@ -107,6 +114,7 @@ export function DataModelingPanel() {
               <EntityEditor
                 model={selectedModel}
                 onUpdate={(updatedModel) => updateDataModel(selectedModelId!, updatedModel)}
+                onGenerateForm={handleGenerateForm}
               />
             ) : (
               <RelationEditor

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Plus, Database, Globe, Settings, Trash2, Edit2 } from 'lucide-react'
+import { Plus, Database, Globe, Settings, Trash2, Edit2, Upload, Check, X, Table2 } from 'lucide-react'
 import { MySQLConfigForm, MySQLConfig } from './MySQLConfigForm'
 import { useDataPreviewStore } from '@/store/dataPreviewStore'
 
@@ -15,11 +15,32 @@ export interface DataSourceItem {
   status: 'connected' | 'disconnected' | 'connecting' | 'pending'
 }
 
+export interface TableInfo {
+  name: string
+  tableName: string
+  columns: { name: string; type: string }[]
+  primaryKey: string[]
+}
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api'
+
+const getAuthHeader = () => {
+  const token = localStorage.getItem('token')
+  return token ? { Authorization: `Bearer ${token}` } : ({} as Record<string, string>)
+}
+
 export function DataSourceConfigPanel() {
   const { dataSources, addDataSource, updateDataSource, removeDataSource } = useDataPreviewStore()
   const [isAdding, setIsAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | number | null>(null)
   const [selectedType, setSelectedType] = useState<DataSourceType>('mysql')
+  
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [selectedDataSourceForImport, setSelectedDataSourceForImport] = useState<DataSourceItem | null>(null)
+  const [importTables, setImportTables] = useState<TableInfo[]>([])
+  const [selectedTables, setSelectedTables] = useState<string[]>([])
+  const [importLoading, setImportLoading] = useState(false)
+  const [importSuccess, setImportSuccess] = useState(false)
 
   const handleSubmit = async (config: MySQLConfig) => {
     const dataSource: DataSourceItem = {
@@ -106,9 +127,104 @@ export function DataSourceConfigPanel() {
     return labels[type]
   }
 
+  const handleOpenImportModal = async (dataSource: DataSourceItem) => {
+    if (dataSource.status !== 'connected') {
+      alert('请先测试连接并确保数据源已连接')
+      return
+    }
+
+    setSelectedDataSourceForImport(dataSource)
+    setShowImportModal(true)
+    setImportLoading(true)
+
+    try {
+      const response = await fetch(`${API_BASE}/data-model/import`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify({ dataSourceId: String(dataSource.id) }),
+      })
+
+      if (!response.ok) {
+        throw new Error('获取表结构失败')
+      }
+
+      const result = await response.json()
+      setImportTables(result.entities || [])
+      setSelectedTables(result.entities?.map((e: any) => e.tableName) || [])
+    } catch (error: any) {
+      console.error('获取表结构失败:', error)
+      alert(`获取表结构失败: ${error.message}`)
+      setShowImportModal(false)
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
+  const handleToggleTable = (tableName: string) => {
+    setSelectedTables(prev =>
+      prev.includes(tableName)
+        ? prev.filter(t => t !== tableName)
+        : [...prev, tableName]
+    )
+  }
+
+  const handleSelectAll = () => {
+    if (selectedTables.length === importTables.length) {
+      setSelectedTables([])
+    } else {
+      setSelectedTables(importTables.map(t => t.tableName))
+    }
+  }
+
+  const handleImport = async () => {
+    if (selectedTables.length === 0) {
+      alert('请至少选择一个表')
+      return
+    }
+
+    setImportLoading(true)
+
+    try {
+      const response = await fetch(`${API_BASE}/data-model/import-and-create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        },
+        body: JSON.stringify({
+          dataSourceId: String(selectedDataSourceForImport?.id),
+          tableNames: selectedTables,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('导入失败')
+      }
+
+      const result = await response.json()
+      console.log('导入成功:', result)
+      setImportSuccess(true)
+
+      setTimeout(() => {
+        setShowImportModal(false)
+        setImportSuccess(false)
+        setSelectedTables([])
+        setImportTables([])
+        setSelectedDataSourceForImport(null)
+      }, 2000)
+    } catch (error: any) {
+      console.error('导入失败:', error)
+      alert(`导入失败: ${error.message}`)
+    } finally {
+      setImportLoading(false)
+    }
+  }
+
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* 头部 */}
       <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
         <div className="flex items-center gap-2">
           <Database className="w-5 h-5" />
@@ -125,9 +241,7 @@ export function DataSourceConfigPanel() {
         )}
       </div>
 
-      {/* 内容区 */}
       <div className="flex-1 overflow-y-auto">
-        {/* 添加/编辑表单 */}
         {isAdding && (
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
@@ -142,7 +256,6 @@ export function DataSourceConfigPanel() {
               </button>
             </div>
 
-            {/* 类型选择 */}
             <div className="mb-4">
               <label className="block text-xs text-gray-600 mb-2">选择类型</label>
               <div className="flex gap-2">
@@ -163,7 +276,6 @@ export function DataSourceConfigPanel() {
               </div>
             </div>
 
-            {/* 配置表单 */}
             {selectedType === 'mysql' && (
               <MySQLConfigForm
                 initialConfig={editingId ? dataSources.find(ds => ds.id === editingId)?.config : undefined}
@@ -194,7 +306,6 @@ export function DataSourceConfigPanel() {
           </div>
         )}
 
-        {/* 数据源列表 */}
         {!isAdding && (
           <div className="p-4 space-y-3">
             {dataSources.length === 0 ? (
@@ -222,6 +333,15 @@ export function DataSourceConfigPanel() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      {ds.status === 'connected' && (
+                        <button
+                          onClick={() => handleOpenImportModal(ds)}
+                          className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded"
+                          title="导入表结构"
+                        >
+                          <Upload className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleEdit(ds)}
                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
@@ -239,7 +359,6 @@ export function DataSourceConfigPanel() {
                     </div>
                   </div>
                   
-                  {/* 配置摘要 */}
                   <div className="mt-2 text-xs text-gray-500 space-y-1">
                     {ds.type === 'mysql' && (
                       <>
@@ -266,6 +385,131 @@ export function DataSourceConfigPanel() {
           </div>
         )}
       </div>
+
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h3 className="text-lg font-semibold text-gray-800">
+                从数据源导入表结构
+              </h3>
+              <button
+                onClick={() => {
+                  setShowImportModal(false)
+                  setSelectedTables([])
+                  setImportTables([])
+                }}
+                className="p-1 hover:bg-gray-100 rounded"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">
+                  数据源: <span className="font-medium">{selectedDataSourceForImport?.name}</span>
+                </p>
+              </div>
+
+              {importLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : importSuccess ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                    <Check className="w-8 h-8 text-green-600" />
+                  </div>
+                  <p className="text-lg font-medium text-green-600">导入成功</p>
+                  <p className="text-sm text-gray-500 mt-2">已创建数据模型</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="text-sm font-medium text-gray-700">选择要导入的表</label>
+                    <button
+                      onClick={handleSelectAll}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      {selectedTables.length === importTables.length ? '取消全选' : '全选'}
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {importTables.map((table) => (
+                      <div
+                        key={table.tableName}
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          selectedTables.includes(table.tableName)
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                        onClick={() => handleToggleTable(table.tableName)}
+                      >
+                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                          selectedTables.includes(table.tableName)
+                            ? 'border-blue-500 bg-blue-500'
+                            : 'border-gray-300'
+                        }`}>
+                          {selectedTables.includes(table.tableName) && (
+                            <Check className="w-3 h-3 text-white" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Table2 className="w-4 h-4 text-gray-400" />
+                            <span className="text-sm font-medium text-gray-800 truncate">{table.name}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {table.columns.length} 个字段
+                            {table.primaryKey.length > 0 && (
+                              <span className="ml-2">· 主键: {table.primaryKey.join(', ')}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {importTables.length === 0 && (
+                    <div className="text-center py-8 text-gray-400">
+                      <Table2 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p>未找到表</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {!importLoading && !importSuccess && (
+              <div className="flex items-center justify-end gap-3 px-6 py-4 border-t">
+                <button
+                  onClick={() => {
+                    setShowImportModal(false)
+                    setSelectedTables([])
+                    setImportTables([])
+                  }}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleImport}
+                  disabled={selectedTables.length === 0}
+                  className={`px-4 py-2 text-sm rounded-lg transition-colors ${
+                    selectedTables.length === 0
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  导入 ({selectedTables.length})
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

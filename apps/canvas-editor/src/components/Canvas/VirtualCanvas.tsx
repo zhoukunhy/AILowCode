@@ -389,7 +389,6 @@ export function VirtualCanvas() {
           onMouseDown={handleStageMouseDown}
           onMouseMove={handleStageMouseMove}
           onMouseUp={handleStageMouseUp}
-          onMouseLeave={handleStageMouseUp}
         >
             <Layer>
               <CanvasGrid
