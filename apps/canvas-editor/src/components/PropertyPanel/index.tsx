@@ -21,7 +21,7 @@ export function PropertyPanel() {
   const updateComponentProps = useCanvasStore((state) => state.updateComponentProps)
   const updateComponent = useCanvasStore((state) => state.updateComponent)
 
-  const [_previewCode, setPreviewCode] = useState<string | undefined>()
+  const [, setPreviewCode] = useState<string | undefined>()
   const [panelMode, setPanelMode] = useState<PanelMode>('page')
 
   const selectedComponent = components.find(c => c.id === selectedId)

@@ -19,6 +19,11 @@ interface MenuItem {
   children?: MenuItem[]
 }
 
+interface PageOption {
+  id: string
+  name: string
+}
+
 export default function MenuManagementPage() {
   const router = useRouter()
   const [menus, setMenus] = useState<MenuItem[]>([])
@@ -26,6 +31,7 @@ export default function MenuManagementPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingMenu, setEditingMenu] = useState<MenuItem | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [pages, setPages] = useState<PageOption[]>([])
   const [formData, setFormData] = useState({
     name: '',
     icon: '',
@@ -85,8 +91,29 @@ export default function MenuManagementPage() {
     return rootMenus
   }
 
+  const fetchPages = async () => {
+    try {
+      const response = await fetch('http://localhost:3002/api/canvas-pages', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
+      if (response.ok) {
+        const result = await response.json()
+        const pageList = result.list || result.data || []
+        setPages(pageList.map((page: any) => ({
+          id: page.id,
+          name: page.name,
+        })))
+      }
+    } catch (error) {
+      console.error('获取页面列表失败:', error)
+    }
+  }
+
   useEffect(() => {
     fetchMenus()
+    fetchPages()
   }, [])
 
   const toggleExpand = (id: string) => {
@@ -408,14 +435,19 @@ export default function MenuManagementPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">关联页面ID</label>
-                <input
-                  type="text"
+                <label className="block text-sm font-medium text-gray-700 mb-1">关联页面</label>
+                <select
                   value={formData.pageId}
                   onChange={(e) => setFormData({ ...formData, pageId: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="页面UUID"
-                />
+                >
+                  <option value="">不关联页面</option>
+                  {pages.map((page) => (
+                    <option key={page.id} value={page.id}>
+                      {page.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>

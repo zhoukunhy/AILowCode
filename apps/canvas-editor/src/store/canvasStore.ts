@@ -1902,7 +1902,7 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
 
   // 保存项目（对接数据库）
   saveProject: async (name?: string) => {
-    const { components, currentPage } = get()
+    const { components, currentPage, dataModels } = get()
     try {
       let savedId: string | null = null
       
@@ -1910,16 +1910,15 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
       if (!isNaN(pageIdNum) && pageIdNum > 0) {
         // 已存在的页面，更新画布数据
         if (name) {
-          // 如果有名称，先更新名称
-          await canvasPageApi.updatePage(pageIdNum, { name, canvasJson: components })
+          await canvasPageApi.updatePage(pageIdNum, { name, canvasJson: components, dataModels })
         } else {
-          await canvasPageApi.saveCanvas(pageIdNum, components)
+          await canvasPageApi.saveCanvas(pageIdNum, components, dataModels)
         }
         savedId = currentPage.id
       } else if (name || currentPage?.name) {
         // 新页面，先创建
         const pageName = name || currentPage!.name
-        const created = await canvasPageApi.createPage(pageName, components)
+        const created = await canvasPageApi.createPage(pageName, components, dataModels)
         // API 返回格式: { code: 200, data: { id: ... } }
         const newId = (created as any)?.data?.id || (created as any)?.id
         if (newId) {
@@ -1950,9 +1949,9 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
 
   // 另存为项目
   saveProjectAs: async (name: string) => {
-    const { components } = get()
+    const { components, dataModels } = get()
     try {
-      const created = await canvasPageApi.createPage(name, components)
+      const created = await canvasPageApi.createPage(name, components, dataModels)
       const newId = (created as any)?.id?.toString() || generateId()
       const newName = (created as any)?.name || name
 
@@ -2035,6 +2034,7 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
             currentPage: pageConfig,
             components: loadedComponents,
             selectedId: null,
+            dataModels: pageData.dataModels || [],
           })
           console.log('加载画布成功:', pageData.id)
           return

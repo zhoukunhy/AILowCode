@@ -63,6 +63,9 @@ export class Page {
   @Column({ name: 'data_model', length: 100, nullable: true })
   dataModel?: string
 
+  @Column({ name: 'data_models', type: 'json', nullable: true })
+  dataModels?: any[]
+
   @Column({ name: 'description', length: 500, nullable: true })
   description?: string
 

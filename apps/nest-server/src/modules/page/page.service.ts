@@ -144,10 +144,14 @@ export class PageService {
   async saveCanvasJson(
     id: number,
     canvasJson: any,
-    userId?: number
+    userId?: number,
+    dataModels?: any[]
   ): Promise<{ page: Page; version: any }> {
     const page = await this.findOne(id)
     page.canvasJson = canvasJson
+    if (dataModels !== undefined) {
+      page.dataModels = dataModels
+    }
     const savedPage = await this.pageRepository.save(page)
 
     // 自动创建版本快照

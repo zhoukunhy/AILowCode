@@ -89,9 +89,10 @@ export class CanvasPageController {
   saveCanvasJson(
     @Param('id', ParseIntPipe) id: number,
     @Body('canvasJson') canvasJson: any,
+    @Body('dataModels') dataModels?: any[],
     @Body('userId') userId?: number
   ) {
-    return this.pageService.saveCanvasJson(id, canvasJson, userId)
+    return this.pageService.saveCanvasJson(id, canvasJson, userId, dataModels)
   }
 
   @Get(':id/export')

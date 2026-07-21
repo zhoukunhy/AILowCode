@@ -12,6 +12,7 @@ interface MenuItem {
   parentId?: string | null
   sortOrder: number
   status: boolean
+  pageId?: string
   children?: MenuItem[]
 }
 
@@ -254,7 +255,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   const handleSubMenuClick = (menu: MenuItem) => {
     setIsMobileMenuOpen(false)
-    if (menu.path) {
+    if (menu.pageId) {
+      router.push(`/runtime/${menu.pageId}`)
+    } else if (menu.path) {
       router.push(menu.path)
     }
   }

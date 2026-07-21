@@ -149,6 +149,10 @@ export class UpdatePageDto {
   @IsString()
   dataModel?: string
 
+  @ApiPropertyOptional({ description: '数据模型列表' })
+  @IsOptional()
+  dataModels?: any[]
+
   @ApiPropertyOptional({ description: '页面描述' })
   @IsOptional()
   @IsString()

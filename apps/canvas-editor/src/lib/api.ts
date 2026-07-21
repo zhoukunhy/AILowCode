@@ -403,7 +403,7 @@ export const codegenApi = {
 }
 
 export const canvasPageApi = {
-  async createPage(name: string, canvasJson?: any, config?: Partial<{
+  async createPage(name: string, canvasJson?: any, dataModels?: any[], config?: Partial<{
     width: number
     height: number
     backgroundColor: string
@@ -411,19 +411,19 @@ export const canvasPageApi = {
     showGrid: boolean
     snapToGrid: boolean
   }>) {
-    return apiClient.post('/api/canvas-pages', { name, canvasJson, ...config })
+    return apiClient.post('/api/canvas-pages', { name, canvasJson, dataModels, ...config })
   },
 
   async getPage(id: string | number) {
     return apiClient.get(`/api/canvas-pages/${id}`)
   },
 
-  async updatePage(id: string | number, data: { name?: string; canvasJson?: any }) {
+  async updatePage(id: string | number, data: { name?: string; canvasJson?: any; dataModels?: any[] }) {
     return apiClient.put(`/api/canvas-pages/${id}`, data)
   },
 
-  async saveCanvas(id: string | number, canvasJson: any) {
-    return apiClient.put(`/api/canvas-pages/${id}/canvas`, { canvasJson })
+  async saveCanvas(id: string | number, canvasJson: any, dataModels?: any[]) {
+    return apiClient.put(`/api/canvas-pages/${id}/canvas`, { canvasJson, dataModels })
   },
 
   async deletePage(id: string | number) {

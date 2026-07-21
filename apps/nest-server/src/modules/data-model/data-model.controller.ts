@@ -14,6 +14,7 @@ import { DataModelService } from './data-model.service'
 import { TableGeneratorService } from './services/table-generator.service'
 import { CrudGeneratorService } from './services/crud-generator.service'
 import { SchemaImportService } from './services/schema-import.service'
+import { SqlParserService } from './services/sql-parser.service'
 import { CreateDataModelDto, UpdateDataModelDto } from './dto/data-model.dto'
 
 @ApiTags('数据模型')
@@ -25,6 +26,7 @@ export class DataModelController {
     private readonly tableGeneratorService: TableGeneratorService,
     private readonly crudGeneratorService: CrudGeneratorService,
     private readonly schemaImportService: SchemaImportService,
+    private readonly sqlParserService: SqlParserService,
   ) {}
 
   @Post()
@@ -32,6 +34,31 @@ export class DataModelController {
   @ApiResponse({ status: 201, description: '创建成功' })
   async create(@Body() dto: CreateDataModelDto) {
     return this.dataModelService.create(dto)
+  }
+
+  @Post('parse-sql')
+  @ApiOperation({ summary: '解析SQL语句生成数据模型结构' })
+  @ApiResponse({ status: 200, description: '解析成功' })
+  async parseSql(@Body() body: { sql: string }) {
+    return this.sqlParserService.parseFromSql(body.sql)
+  }
+
+  @Post('create-from-sql')
+  @ApiOperation({ summary: '从SQL语句创建数据模型' })
+  @ApiResponse({ status: 201, description: '创建成功' })
+  async createFromSql(@Body() body: { sql: string; projectId?: string }) {
+    const result = await this.sqlParserService.parseFromSql(body.sql)
+
+    const createDto: CreateDataModelDto = {
+      name: result.modelName,
+      description: '从SQL语句生成的数据模型',
+      entities: result.entities,
+      relations: result.relations,
+      enums: [],
+      projectId: body.projectId,
+    }
+
+    return this.dataModelService.create(createDto)
   }
 
   @Get()

@@ -6,11 +6,12 @@ import { DataModelController } from './data-model.controller'
 import { TableGeneratorService } from './services/table-generator.service'
 import { CrudGeneratorService } from './services/crud-generator.service'
 import { SchemaImportService } from './services/schema-import.service'
+import { SqlParserService } from './services/sql-parser.service'
 
 @Module({
   imports: [TypeOrmModule.forFeature([DataModelEntity])],
-  providers: [DataModelService, TableGeneratorService, CrudGeneratorService, SchemaImportService],
+  providers: [DataModelService, TableGeneratorService, CrudGeneratorService, SchemaImportService, SqlParserService],
   controllers: [DataModelController],
-  exports: [DataModelService, TableGeneratorService, CrudGeneratorService, SchemaImportService],
+  exports: [DataModelService, TableGeneratorService, CrudGeneratorService, SchemaImportService, SqlParserService],
 })
 export class DataModelModule {}
