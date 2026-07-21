@@ -18,9 +18,83 @@ interface ParsedTable {
   }>
 }
 
+const MAX_SQL_LENGTH = 100000
+const MAX_TABLES = 50
+const MAX_COLUMNS_PER_TABLE = 100
+
+const DANGEROUS_KEYWORDS = [
+  'DROP', 'DELETE', 'TRUNCATE', 'UPDATE', 'INSERT', 'ALTER', 'GRANT', 'REVOKE',
+  'EXEC', 'EXECUTE', 'UNION', 'SELECT', '--', '/*', '*/', ';',
+]
+
+const SAFE_TABLE_NAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+const SAFE_COLUMN_NAME_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/
+const SAFE_DEFAULT_VALUE_REGEX = /^[a-zA-Z0-9_.@#$%^&*()+\-=<>?/\\|~`'"]*$/
+
 @Injectable()
 export class SqlParserService {
   private readonly logger = new Logger(SqlParserService.name)
+
+  private sanitizeSql(sql: string): string {
+    let sanitized = sql
+
+    for (const keyword of DANGEROUS_KEYWORDS) {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'gi')
+      sanitized = sanitized.replace(regex, '')
+    }
+
+    sanitized = sanitized.replace(/--.*$/gm, '')
+    sanitized = sanitized.replace(/\/\*[\s\S]*?\*\//g, '')
+
+    return sanitized
+  }
+
+  private validateSql(sql: string): void {
+    if (sql.length > MAX_SQL_LENGTH) {
+      throw new BadRequestException(`SQL语句过长，最大允许 ${MAX_SQL_LENGTH} 字符`)
+    }
+
+    for (const keyword of DANGEROUS_KEYWORDS) {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'gi')
+      if (regex.test(sql)) {
+        throw new BadRequestException(`SQL语句包含非法关键词: ${keyword}`)
+      }
+    }
+
+    if (sql.includes(';') && sql.split(';').filter(s => s.trim()).length > MAX_TABLES) {
+      throw new BadRequestException(`表数量超过限制，最大允许 ${MAX_TABLES} 个表`)
+    }
+  }
+
+  private validateTableName(name: string): void {
+    if (!SAFE_TABLE_NAME_REGEX.test(name)) {
+      throw new BadRequestException(`非法表名: ${name}，仅允许字母、数字和下划线`)
+    }
+    if (name.length > 64) {
+      throw new BadRequestException(`表名过长，最大允许64字符`)
+    }
+  }
+
+  private validateColumnName(name: string): void {
+    if (!SAFE_COLUMN_NAME_REGEX.test(name)) {
+      throw new BadRequestException(`非法字段名: ${name}，仅允许字母、数字和下划线`)
+    }
+    if (name.length > 64) {
+      throw new BadRequestException(`字段名过长，最大允许64字符`)
+    }
+  }
+
+  private validateDefaultValue(value: string): string {
+    if (!SAFE_DEFAULT_VALUE_REGEX.test(value)) {
+      throw new BadRequestException(`非法默认值: ${value}`)
+    }
+
+    if (value.length > 255) {
+      throw new BadRequestException(`默认值过长，最大允许255字符`)
+    }
+
+    return value
+  }
 
   private mapDbTypeToFieldType(dbType: string): string {
     const typeMap: Record<string, string> = {
@@ -79,6 +153,8 @@ export class SqlParserService {
     const tableName = match[1]
     const columnsSql = match[2]
 
+    this.validateTableName(tableName)
+
     const columns: ParsedTable['columns'] = []
     const foreignKeys: ParsedTable['foreignKeys'] = []
 
@@ -89,6 +165,12 @@ export class SqlParserService {
       const columnName = columnMatch[2]
       const columnDef = columnMatch[3]
 
+      if (columns.length >= MAX_COLUMNS_PER_TABLE) {
+        throw new BadRequestException(`每个表最多允许 ${MAX_COLUMNS_PER_TABLE} 个字段`)
+      }
+
+      this.validateColumnName(columnName)
+
       const typeMatch = columnDef.match(/^([a-zA-Z]+(?:\(\d+(?:,\s*\d+)?\))?)/i)
       const dbType = typeMatch ? typeMatch[1] : 'string'
 
@@ -97,7 +179,10 @@ export class SqlParserService {
       const unique = /UNIQUE/i.test(columnDef)
 
       const defaultMatch = columnDef.match(/DEFAULT\s+(['"]?)([^'"\s]+)\1/i)
-      const defaultValue = defaultMatch ? defaultMatch[2] : undefined
+      let defaultValue = defaultMatch ? defaultMatch[2] : undefined
+      if (defaultValue) {
+        defaultValue = this.validateDefaultValue(defaultValue)
+      }
 
       if (!/FOREIGN\s+KEY/i.test(columnDef)) {
         columns.push({
@@ -115,6 +200,10 @@ export class SqlParserService {
     let fkMatch
 
     while ((fkMatch = fkPattern.exec(columnsSql)) !== null) {
+      this.validateColumnName(fkMatch[1])
+      this.validateTableName(fkMatch[2])
+      this.validateColumnName(fkMatch[3])
+
       foreignKeys.push({
         column: fkMatch[1],
         referencedTable: fkMatch[2],
@@ -127,7 +216,15 @@ export class SqlParserService {
 
   private parseSql(sql: string): ParsedTable[] {
     const tables: ParsedTable[] = []
-    const createTableStatements = sql.split(';').filter(s => s.trim().toUpperCase().startsWith('CREATE TABLE'))
+
+    const sanitizedSql = this.sanitizeSql(sql)
+    this.validateSql(sanitizedSql)
+
+    const createTableStatements = sanitizedSql.split(';').filter(s => s.trim().toUpperCase().startsWith('CREATE TABLE'))
+
+    if (createTableStatements.length > MAX_TABLES) {
+      throw new BadRequestException(`表数量超过限制，最大允许 ${MAX_TABLES} 个表`)
+    }
 
     for (const statement of createTableStatements) {
       const parsed = this.parseCreateTable(statement)
