@@ -187,6 +187,17 @@ export class KeyboardManager {
    * 处理按键
    */
   private handleKeyDown(e: KeyboardEvent): void {
+    // 在输入框/文本域等可编辑元素内按键时，不触发快捷键（避免编辑文字时误删组件等）
+    const target = e.target as HTMLElement | null
+    if (
+      target &&
+      (target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable)
+    ) {
+      return
+    }
     const key = this.getKeyString(e)
     const handlers = this.handlers.get(key)
     if (handlers) {

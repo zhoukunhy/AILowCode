@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useCanvasStore } from '@/store/canvasStore'
 import type { ComponentConfig, PageConfig } from '@/store/canvasStore'
+import { RuntimeRenderer } from '@/components/RuntimeRenderer'
+import '@/components/RuntimeRenderer/renderers'
 
 interface PreviewModeProps {
   onClose: () => void
@@ -203,46 +205,28 @@ interface PreviewContentProps {
 }
 
 function PreviewContent({ components, currentPage, refreshKey }: PreviewContentProps) {
-  return (
-    <div
-      key={refreshKey}
-      className="relative w-full h-full"
-      style={{
-        backgroundColor: currentPage.backgroundColor,
-        minWidth: currentPage.width,
-        minHeight: currentPage.height,
-      }}
-    >
-      {components.length === 0 ? (
-        <div className="flex items-center justify-center h-full text-gray-400">
-          <div className="text-center">
-            <div className="text-6xl mb-4">📋</div>
-            <p>暂无组件</p>
-          </div>
+  if (components.length === 0) {
+    return (
+      <div
+        key={refreshKey}
+        className="relative w-full h-full flex items-center justify-center text-gray-400"
+        style={{
+          backgroundColor: currentPage.backgroundColor,
+          minWidth: currentPage.width,
+          minHeight: currentPage.height,
+        }}
+      >
+        <div className="text-center">
+          <div className="text-6xl mb-4">📋</div>
+          <p>暂无组件</p>
         </div>
-      ) : (
-        components.map((component) => (
-          <div
-            key={component.id}
-            className="absolute"
-            style={{
-              left: component.x,
-              top: component.y,
-              width: component.width,
-              height: component.height,
-              zIndex: component.zIndex,
-              opacity: component.opacity,
-              transform: `rotate(${component.rotation}deg)`,
-              visibility: component.visible ? 'visible' : 'hidden',
-            }}
-          >
-            {/* 简化的预览渲染 */}
-            <div className="w-full h-full bg-blue-50 border border-blue-200 rounded flex items-center justify-center text-sm text-blue-600">
-              {component.type}
-            </div>
-          </div>
-        ))
-      )}
+      </div>
+    )
+  }
+
+  return (
+    <div key={refreshKey} className="relative w-full h-full">
+      <RuntimeRenderer components={components} currentPage={currentPage} />
     </div>
   )
 }

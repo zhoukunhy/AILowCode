@@ -126,6 +126,17 @@ export function VirtualCanvas() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
+        // 在输入框/文本域等可编辑元素内按键时，不删除组件（避免删除文字时误删组件）
+        const target = e.target as HTMLElement | null
+        if (
+          target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable)
+        ) {
+          return
+        }
         e.preventDefault()
         selectedIds.forEach(id => removeComponent(id))
       }

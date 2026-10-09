@@ -140,7 +140,8 @@ export function Toolbar({ isViewMode = false, projectId = 'new' }: ToolbarProps)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${project.name || 'canvas-page'}-code.zip`
+    const safeName = (project.name || 'canvas-page').replace(/[^a-zA-Z0-9-_]+/g, '-').toLowerCase() || 'canvas-page'
+    a.download = `${safeName}-code.zip`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)

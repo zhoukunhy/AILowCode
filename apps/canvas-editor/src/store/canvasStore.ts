@@ -363,9 +363,10 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
     icon: '☑️',
     defaultWidth: 200,
     defaultHeight: 32,
-    defaultProps: { 
-      label: '复选框标签', 
-      checked: false,
+    defaultProps: {
+      label: '复选框标签',
+      options: ['选项A', '选项B'],
+      values: ['选项A'],
       disabled: false,
     },
     schema: {

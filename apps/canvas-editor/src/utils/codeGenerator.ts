@@ -424,9 +424,15 @@ export function generateCanvasCode(
     .map(generateComponentWithPosition)
     .join('\n')
 
-  const componentName = pageConfig.name ? 
-    pageConfig.name.split(/[-_\s]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('') : 
-    'CanvasPage'
+  // 将页面名转为合法的 PascalCase 英文标识符（中文名会被过滤）
+  const toPascalCaseIdentifier = (name: string): string => {
+    const parts = name.split(/[^a-zA-Z0-9]+/).filter(Boolean)
+    let result = parts.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('')
+    if (!result) return 'CanvasPage'
+    if (/^[0-9]/.test(result)) result = 'Page' + result
+    return result
+  }
+  const componentName = toPascalCaseIdentifier(pageConfig.name || 'CanvasPage')
 
   const componentContent = `import React from 'react'
 import './${componentName}.css'

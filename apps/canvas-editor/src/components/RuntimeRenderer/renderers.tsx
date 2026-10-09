@@ -21,20 +21,35 @@ const getComponentStyle = (component: ComponentConfig): React.CSSProperties => (
 
 const InputRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
   const { props } = component
+  const inputType =
+    component.type === 'passwordInput'
+      ? 'password'
+      : component.type === 'emailInput'
+      ? 'email'
+      : component.type === 'phoneInput'
+      ? 'tel'
+      : component.type === 'numberInput'
+      ? 'number'
+      : 'text'
   return (
-    <div style={getComponentStyle(component)}>
+    <div style={getComponentStyle(component)} className="flex items-center gap-2 overflow-hidden">
       {props.label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          className="text-sm font-medium text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis"
+          style={{ width: 80, flexShrink: 0 }}
+          title={props.label}
+        >
           {props.label}
-          {props.required && <span className="text-red-500 ml-1">*</span>}
+          {props.required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
       )}
       <input
-        type={component.type === 'passwordInput' ? 'password' : component.type === 'emailInput' ? 'email' : component.type === 'phoneInput' ? 'tel' : component.type === 'numberInput' ? 'number' : 'text'}
+        type={inputType}
         value={props.value || ''}
         placeholder={props.placeholder}
-        className="w-full h-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-        style={{ height: props.label ? 'calc(100% - 24px)' : '100%' }}
+        disabled={props.disabled}
+        required={props.required}
+        className="flex-1 min-w-0 h-full px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
       />
     </div>
   )
@@ -43,19 +58,23 @@ const InputRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
 const TextareaRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
   const { props } = component
   return (
-    <div style={getComponentStyle(component)}>
+    <div style={getComponentStyle(component)} className="flex items-start gap-2 overflow-hidden">
       {props.label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          className="text-sm font-medium text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis pt-2"
+          style={{ width: 80, flexShrink: 0 }}
+          title={props.label}
+        >
           {props.label}
-          {props.required && <span className="text-red-500 ml-1">*</span>}
+          {props.required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
       )}
       <textarea
         value={props.value || ''}
         placeholder={props.placeholder}
         rows={props.rows || 3}
-        className="w-full h-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
-        style={{ height: props.label ? 'calc(100% - 24px)' : '100%' }}
+        disabled={props.disabled}
+        className="flex-1 min-w-0 h-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
       />
     </div>
   )
@@ -65,24 +84,32 @@ const SelectRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
   const { props } = component
   const options = props.options || []
   return (
-    <div style={getComponentStyle(component)}>
+    <div style={getComponentStyle(component)} className="flex items-center gap-2 overflow-hidden">
       {props.label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          className="text-sm font-medium text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis"
+          style={{ width: 80, flexShrink: 0 }}
+          title={props.label}
+        >
           {props.label}
-          {props.required && <span className="text-red-500 ml-1">*</span>}
+          {props.required && <span className="text-red-500 ml-0.5">*</span>}
         </label>
       )}
       <select
         value={props.value || ''}
-        className="w-full h-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
-        style={{ height: props.label ? 'calc(100% - 24px)' : '100%' }}
+        disabled={props.disabled}
+        className="flex-1 min-w-0 h-full px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
       >
         <option value="">{props.placeholder || '请选择'}</option>
-        {options.map((opt: any, index: number) => (
-          <option key={index} value={opt.value || opt}>
-            {opt.label || opt}
-          </option>
-        ))}
+        {options.map((opt: any, index: number) => {
+          const optValue = typeof opt === 'object' ? opt.value : opt
+          const optLabel = typeof opt === 'object' ? opt.label : opt
+          return (
+            <option key={index} value={optValue}>
+              {optLabel}
+            </option>
+          )
+        })}
       </select>
     </div>
   )
@@ -192,19 +219,24 @@ const SwitchRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
 
 const DatePickerRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
   const { props } = component
+  const inputType =
+    component.type === 'timepicker' ? 'time' : component.type === 'daterange' ? 'date' : 'date'
   return (
-    <div style={getComponentStyle(component)}>
+    <div style={getComponentStyle(component)} className="flex items-center gap-2 overflow-hidden">
       {props.label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          className="text-sm font-medium text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis"
+          style={{ width: 80, flexShrink: 0 }}
+          title={props.label}
+        >
           {props.label}
         </label>
       )}
       <input
-        type="date"
+        type={inputType}
         value={props.value || ''}
         placeholder={props.placeholder}
-        className="w-full h-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-        style={{ height: props.label ? 'calc(100% - 24px)' : '100%' }}
+        className="flex-1 min-w-0 h-full px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
       />
     </div>
   )
@@ -540,15 +572,19 @@ const DrawerRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
 const CascaderRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
   const { props } = component
   return (
-    <div style={getComponentStyle(component)}>
+    <div style={getComponentStyle(component)} className="flex items-center gap-2 overflow-hidden">
       {props.label && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label
+          className="text-sm font-medium text-gray-700 whitespace-nowrap overflow-hidden text-ellipsis"
+          style={{ width: 80, flexShrink: 0 }}
+          title={props.label}
+        >
           {props.label}
         </label>
       )}
-      <div className="w-full h-full px-3 py-2 border border-gray-300 rounded-md text-sm flex items-center justify-between bg-white">
-        <span className="text-gray-500">{props.placeholder || '请选择'}</span>
-        <span className="text-gray-400">▼</span>
+      <div className="flex-1 min-w-0 h-full px-3 py-2 border border-gray-300 rounded-md text-sm flex items-center justify-between bg-white">
+        <span className="text-gray-500 overflow-hidden text-ellipsis">{props.placeholder || '请选择'}</span>
+        <span className="text-gray-400 ml-2">▼</span>
       </div>
     </div>
   )
@@ -709,6 +745,323 @@ const FormRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
   )
 }
 
+const CheckboxRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  return (
+    <label
+      className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none"
+      style={getComponentStyle(component)}
+    >
+      <input
+        type="checkbox"
+        checked={props.checked || false}
+        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+      />
+      {props.label && <span>{props.label}</span>}
+    </label>
+  )
+}
+
+const RadioRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  const options = props.options || []
+  const value = props.value
+  return (
+    <div
+      className="flex flex-wrap items-center gap-4 text-sm text-gray-700"
+      style={getComponentStyle(component)}
+    >
+      {props.label && <span className="font-medium text-gray-700">{props.label}</span>}
+      {options.map((opt: any, index: number) => {
+        const optValue = typeof opt === 'object' ? opt.value : opt
+        const optLabel = typeof opt === 'object' ? opt.label : opt
+        return (
+          <label key={index} className="flex items-center gap-1.5 cursor-pointer">
+            <input
+              type="radio"
+              name={component.id}
+              checked={value === optValue}
+              className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+            />
+            <span>{optLabel}</span>
+          </label>
+        )
+      })}
+    </div>
+  )
+}
+
+const TableRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  const cols = props.columns || 4
+  const rows = props.rows || 5
+  const headers = props.headers || Array.from({ length: cols }, (_, i) => `列${i + 1}`)
+  const data = props.data || Array.from({ length: rows }, (_, r) =>
+    Array.from({ length: cols }, (_, c) => `单元格${r + 1}-${c + 1}`)
+  )
+
+  return (
+    <div
+      className="bg-white border border-gray-200 rounded-lg overflow-hidden flex flex-col"
+      style={getComponentStyle(component)}
+    >
+      {props.title && (
+        <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+          {props.title}
+        </div>
+      )}
+      <div className="flex-1 overflow-auto">
+        <table className={`w-full text-sm text-left ${props.striped ? '' : ''}`}>
+          <thead className={props.striped ? 'bg-gray-50' : ''}>
+            <tr>
+              {headers.map((h: string, i: number) => (
+                <th
+                  key={i}
+                  className="px-3 py-2 font-medium text-gray-600 border-b border-gray-200 whitespace-nowrap"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {data.map((row: any[], r: number) => (
+              <tr
+                key={r}
+                className={
+                  props.striped && r % 2 === 1
+                    ? 'bg-gray-50'
+                    : props.hoverable
+                    ? 'hover:bg-blue-50 transition-colors'
+                    : ''
+                }
+              >
+                {row.map((cell: any, c: number) => (
+                  <td key={c} className="px-3 py-2 text-gray-700 border-b border-gray-100">
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+const ListRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  const items = props.items || []
+  return (
+    <div
+      className={`bg-white overflow-hidden flex flex-col ${props.bordered ? 'border border-gray-200 rounded-lg' : ''}`}
+      style={getComponentStyle(component)}
+    >
+      {props.title && (
+        <div className="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm font-medium text-gray-700">
+          {props.title}
+        </div>
+      )}
+      <ul className="flex-1 overflow-auto divide-y divide-gray-100">
+        {items.length === 0 ? (
+          <li className="px-4 py-3 text-sm text-gray-400 text-center">暂无数据</li>
+        ) : (
+          items.map((item: any, index: number) => (
+            <li key={index} className="px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50">
+              {typeof item === 'object' ? item.label || item.title || JSON.stringify(item) : item}
+            </li>
+          ))
+        )}
+      </ul>
+    </div>
+  )
+}
+
+const CardRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  return (
+    <div
+      className={`bg-white rounded-lg shadow-sm flex flex-col overflow-hidden ${
+        props.bordered ? 'border border-gray-200' : ''
+      } ${props.hoverable ? 'hover:shadow-md transition-shadow' : ''}`}
+      style={getComponentStyle(component)}
+    >
+      {props.title && (
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h3 className="font-medium text-gray-900">{props.title}</h3>
+        </div>
+      )}
+      <div className="flex-1 px-4 py-3 text-sm text-gray-600 overflow-auto">
+        {props.content}
+      </div>
+    </div>
+  )
+}
+
+const ApprovalRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  const statusMap: Record<string, { label: string; className: string }> = {
+    pending: { label: '待审批', className: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
+    approved: { label: '已通过', className: 'bg-green-100 text-green-800 border-green-200' },
+    rejected: { label: '已拒绝', className: 'bg-red-100 text-red-800 border-red-200' },
+  }
+  const status = statusMap[props.status as string] || statusMap.pending
+  return (
+    <div
+      className="bg-white border border-gray-200 rounded-lg overflow-hidden"
+      style={getComponentStyle(component)}
+    >
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <span className="font-medium text-gray-900">{props.title || '审批流程'}</span>
+        <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${status.className}`}>
+          {status.label}
+        </span>
+      </div>
+      <div className="px-4 py-3 space-y-2 text-sm">
+        {props.approver && (
+          <div className="flex items-center gap-2">
+            <span className="text-gray-500">审批人:</span>
+            <span className="text-gray-900">{props.approver}</span>
+          </div>
+        )}
+        {props.comment && (
+          <div className="flex items-start gap-2">
+            <span className="text-gray-500">审批意见:</span>
+            <span className="text-gray-900">{props.comment}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const FlowNodeRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  const typeMap: Record<string, { color: string; bg: string }> = {
+    start: { color: 'text-white', bg: 'bg-green-500' },
+    end: { color: 'text-white', bg: 'bg-red-500' },
+    task: { color: 'text-gray-700', bg: 'bg-blue-100' },
+    approval: { color: 'text-white', bg: 'bg-yellow-500' },
+    condition: { color: 'text-gray-700', bg: 'bg-purple-100' },
+  }
+  const style = typeMap[props.type as string] || typeMap.task
+  return (
+    <div
+      className={`rounded-lg flex items-center justify-center text-sm font-medium border-2 border-transparent ${style.color} ${style.bg}`}
+      style={getComponentStyle(component)}
+    >
+      {props.label || '流程节点'}
+    </div>
+  )
+}
+
+const ConditionRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  return (
+    <div
+      className="bg-white border border-gray-200 rounded-lg flex flex-col overflow-hidden"
+      style={getComponentStyle(component)}
+    >
+      <div className="px-3 py-2 bg-purple-50 border-b border-purple-100 text-xs text-purple-700 font-mono break-all">
+        {props.condition || 'condition'}
+      </div>
+      <div className="flex-1 flex">
+        <div className="flex-1 flex items-center justify-center text-sm text-gray-700 border-r border-gray-100 bg-green-50">
+          {props.trueLabel || '是'}
+        </div>
+        <div className="flex-1 flex items-center justify-center text-sm text-gray-700 bg-red-50">
+          {props.falseLabel || '否'}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const ApiConnectorRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  const methodColors: Record<string, string> = {
+    GET: 'bg-green-100 text-green-700',
+    POST: 'bg-blue-100 text-blue-700',
+    PUT: 'bg-yellow-100 text-yellow-700',
+    DELETE: 'bg-red-100 text-red-700',
+  }
+  const methodClass = methodColors[props.method as string] || methodColors.GET
+  return (
+    <div
+      className="bg-white border border-gray-200 rounded-lg overflow-hidden"
+      style={getComponentStyle(component)}
+    >
+      <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+        <span className={`px-2 py-0.5 rounded text-xs font-bold ${methodClass}`}>
+          {props.method || 'GET'}
+        </span>
+        <span className="text-xs text-gray-700 font-mono break-all flex-1">
+          {props.url || '/api/endpoint'}
+        </span>
+      </div>
+      {(Object.keys(props.headers || {}).length > 0 || Object.keys(props.params || {}).length > 0) && (
+        <div className="px-3 py-2 text-xs text-gray-500 space-y-1">
+          {Object.keys(props.headers || {}).length > 0 && (
+            <div>Headers: {Object.keys(props.headers).length} 项</div>
+          )}
+          {Object.keys(props.params || {}).length > 0 && (
+            <div>Params: {Object.keys(props.params).length} 项</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const PaymentRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  const methodMap: Record<string, { label: string; icon: string }> = {
+    alipay: { label: '支付宝', icon: '💳' },
+    wechat: { label: '微信支付', icon: '💚' },
+    card: { label: '银行卡', icon: '🏦' },
+  }
+  const method = methodMap[props.method as string] || methodMap.alipay
+  return (
+    <div
+      className="bg-white border border-gray-200 rounded-lg flex items-center gap-3 px-4"
+      style={getComponentStyle(component)}
+    >
+      <span className="text-2xl">{method.icon}</span>
+      <div className="flex-1">
+        <div className="text-sm text-gray-500">{method.label}</div>
+        <div className="text-lg font-semibold text-gray-900">
+          ¥{(props.amount || 0).toFixed(2)}
+        </div>
+      </div>
+      <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+        去支付
+      </button>
+    </div>
+  )
+}
+
+const MapRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
+  const { props } = component
+  return (
+    <div
+      className="bg-gray-100 border border-gray-200 rounded-lg flex items-center justify-center relative overflow-hidden"
+      style={getComponentStyle(component)}
+    >
+      <div className="text-center text-gray-400">
+        <div className="text-4xl mb-2">🗺️</div>
+        <div className="text-sm">地图区域</div>
+        <div className="text-xs mt-1">
+          中心: [{props.center?.[0] || 0}, {props.center?.[1] || 0}] · 缩放: {props.zoom || 12}
+        </div>
+      </div>
+      <div className="absolute top-2 right-2 bg-white rounded shadow px-2 py-1 text-xs text-gray-600">
+        Zoom: {props.zoom || 12}
+      </div>
+    </div>
+  )
+}
+
 registerComponent('input', InputRenderer)
 registerComponent('textarea', TextareaRenderer)
 registerComponent('select', SelectRenderer)
@@ -747,3 +1100,14 @@ registerComponent('numberInput', InputRenderer)
 registerComponent('passwordInput', InputRenderer)
 registerComponent('emailInput', InputRenderer)
 registerComponent('phoneInput', InputRenderer)
+registerComponent('checkbox', CheckboxRenderer)
+registerComponent('radio', RadioRenderer)
+registerComponent('table', TableRenderer)
+registerComponent('list', ListRenderer)
+registerComponent('card', CardRenderer)
+registerComponent('approval', ApprovalRenderer)
+registerComponent('flowNode', FlowNodeRenderer)
+registerComponent('condition', ConditionRenderer)
+registerComponent('apiConnector', ApiConnectorRenderer)
+registerComponent('payment', PaymentRenderer)
+registerComponent('map', MapRenderer)

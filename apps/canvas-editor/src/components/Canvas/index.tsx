@@ -60,7 +60,11 @@ export function Canvas() {
   const updateComponent = useCanvasStore((state) => state.updateComponent)
   const removeComponent = useCanvasStore((state) => state.removeComponent)
 
-  // 监听容器尺寸变化
+  // 固定逻辑画布尺寸（来自页面配置，默认 800x600）
+  const pageWidth = currentPage.width
+  const pageHeight = currentPage.height
+
+  // 监听容器尺寸变化（仅用于虚拟化可视区域判断）
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
@@ -68,52 +72,53 @@ export function Canvas() {
     const resizeObserver = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect
-        setDimensions({
-          width: Math.max(width - 32, 400),
-          height: Math.max(height - 60, 300),
-        })
+        setDimensions({ width, height })
       }
     })
 
     resizeObserver.observe(container)
-    
+
     const rect = container.getBoundingClientRect()
-    setDimensions({
-      width: Math.max(rect.width - 32, 400),
-      height: Math.max(rect.height - 60, 300),
-    })
+    setDimensions({ width: rect.width, height: rect.height })
 
     return () => resizeObserver.disconnect()
   }, [])
 
-  // 监听容器滚动，更新可见区域
+  // 监听容器滚动，更新可见区域（转换为逻辑坐标，考虑 zoom）
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
     const handleScroll = () => {
-      const rect = container.getBoundingClientRect()
-      const scrollLeft = container.scrollLeft
-      const scrollTop = container.scrollTop
-      
       setVisibleRect({
-        x: scrollLeft,
-        y: scrollTop,
-        width: rect.width,
-        height: rect.height,
+        x: container.scrollLeft / zoom,
+        y: container.scrollTop / zoom,
+        width: dimensions.width / zoom,
+        height: dimensions.height / zoom,
       })
     }
 
     container.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
-    
+
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [])
+  }, [zoom, dimensions.width, dimensions.height])
 
   // 键盘事件处理
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIds.length > 0) {
+        // 在输入框/文本域等可编辑元素内按键时，不删除组件（避免删除文字时误删组件）
+        const target = e.target as HTMLElement | null
+        if (
+          target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable)
+        ) {
+          return
+        }
         e.preventDefault()
         selectedIds.forEach(id => removeComponent(id))
       }
@@ -196,11 +201,11 @@ export function Canvas() {
     if (!stage) return
 
     const rect = stage.getContainer().getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
+    const x = (e.clientX - rect.left) / zoom
+    const y = (e.clientY - rect.top) / zoom
 
     addComponent(componentType, x, y)
-  }, [addComponent])
+  }, [addComponent, zoom])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -295,9 +300,9 @@ export function Canvas() {
     }
   }, [currentPage, updateComponent, selectedIds, components])
 
-  // 计算缩放后的尺寸
-  const scaledWidth = dimensions.width * zoom
-  const scaledHeight = dimensions.height * zoom
+  // 缩放后的画布尺寸（固定逻辑画布 × zoom）
+  const scaledWidth = pageWidth * zoom
+  const scaledHeight = pageHeight * zoom
 
   // 框选矩形属性
   const selectionRect = useMemo(() => {
@@ -310,101 +315,101 @@ export function Canvas() {
   }, [isDragSelecting, dragStart, dragEnd])
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="w-full h-full overflow-auto bg-gray-100"
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      <div className="p-4">
+      <div className="min-w-full min-h-full p-4">
         <ComponentToolbar />
-        <div 
-          className="canvas-wrapper bg-white shadow-lg rounded-lg overflow-hidden mt-2"
-          style={{ width: 'fit-content', maxWidth: '100%' }}
-        >
-        <Stage
-          ref={stageRef}
-          width={scaledWidth}
-          height={scaledHeight}
-          scaleX={zoom}
-          scaleY={zoom}
-          onClick={handleStageMouseUp}
-          onTap={handleStageMouseUp}
-          onMouseDown={handleStageMouseDown}
-          onMouseMove={handleStageMouseMove}
-          onMouseUp={handleStageMouseUp}
-        >
-            <Layer>
-              <CanvasGrid
-                width={dimensions.width}
-                height={dimensions.height}
-                gridSize={currentPage.gridSize}
-                visible={currentPage.showGrid}
-              />
-            </Layer>
-            
-            <Layer>
-              {selectionRect && (
-                <Rect
-                  x={selectionRect.x}
-                  y={selectionRect.y}
-                  width={selectionRect.width}
-                  height={selectionRect.height}
-                  fill="rgba(59, 130, 246, 0.15)"
-                  stroke="#3B82F6"
-                  strokeWidth={2}
-                  strokeDash={[5, 5]}
+        <div className="flex min-w-full justify-center mt-2" style={{ minHeight: 'calc(100% - 60px)' }}>
+          <div
+            className="canvas-wrapper bg-white shadow-lg rounded-lg overflow-hidden"
+            style={{ width: scaledWidth, height: scaledHeight, margin: '0 auto' }}
+          >
+            <Stage
+              ref={stageRef}
+              width={scaledWidth}
+              height={scaledHeight}
+              scaleX={zoom}
+              scaleY={zoom}
+              onClick={handleStageMouseUp}
+              onTap={handleStageMouseUp}
+              onMouseDown={handleStageMouseDown}
+              onMouseMove={handleStageMouseMove}
+              onMouseUp={handleStageMouseUp}
+            >
+              <Layer>
+                <CanvasGrid
+                  width={pageWidth}
+                  height={pageHeight}
+                  gridSize={currentPage.gridSize}
+                  visible={currentPage.showGrid}
                 />
-              )}
-            </Layer>
-            
-            <Layer>
-              {visibleComponents.map((component) => {
-                const isSelected = selectedIds.includes(component.id)
-                return (
-                  <OptimizedComponentRenderer
-                    key={component.id}
-                    component={component}
-                    isSelected={isSelected}
-                    onSelect={(e: any) => {
-                      e.cancelBubble = true
-                      const multiSelect = e.ctrlKey || e.metaKey
-                      selectComponent(component.id, multiSelect)
-                    }}
-                    onDragStart={() => setIsDraggingComponent(true)}
-                    onDragEnd={() => setIsDraggingComponent(false)}
-                    onDragMove={(newX: number, newY: number) => handleComponentDragMove(component.id, newX, newY)}
-                    onTransform={(attrs: any) => updateComponent(component.id, attrs)}
-                  />
-                )
-              })}
-            </Layer>
+              </Layer>
 
-            <Layer>
-              <Group>
-                {components.length > 30 && (
-                  <Text
-                    x={10}
-                    y={20}
-                    fontSize={12}
-                    fill="#666"
-                    opacity={0.6}
-                    text={`${visibleComponents.length}/${components.length} 组件可见`}
+              <Layer>
+                {selectionRect && (
+                  <Rect
+                    x={selectionRect.x}
+                    y={selectionRect.y}
+                    width={selectionRect.width}
+                    height={selectionRect.height}
+                    fill="rgba(59, 130, 246, 0.15)"
+                    stroke="#3B82F6"
+                    strokeWidth={2}
+                    strokeDash={[5, 5]}
                   />
                 )}
-                {dimensions.width > 0 && (
+              </Layer>
+
+              <Layer>
+                {visibleComponents.map((component) => {
+                  const isSelected = selectedIds.includes(component.id)
+                  return (
+                    <OptimizedComponentRenderer
+                      key={component.id}
+                      component={component}
+                      isSelected={isSelected}
+                      onSelect={(e: any) => {
+                        e.cancelBubble = true
+                        const multiSelect = e.ctrlKey || e.metaKey
+                        selectComponent(component.id, multiSelect)
+                      }}
+                      onDragStart={() => setIsDraggingComponent(true)}
+                      onDragEnd={() => setIsDraggingComponent(false)}
+                      onDragMove={(newX: number, newY: number) => handleComponentDragMove(component.id, newX, newY)}
+                      onTransform={(attrs: any) => updateComponent(component.id, attrs)}
+                    />
+                  )
+                })}
+              </Layer>
+
+              <Layer>
+                <Group>
+                  {components.length > 30 && (
+                    <Text
+                      x={10}
+                      y={20}
+                      fontSize={12}
+                      fill="#666"
+                      opacity={0.6}
+                      text={`${visibleComponents.length}/${components.length} 组件可见`}
+                    />
+                  )}
                   <Text
-                    x={dimensions.width - 80}
+                    x={pageWidth - 80}
                     y={20}
                     fontSize={12}
                     fill="#666"
                     opacity={0.6}
                     text={`${Math.round(zoom * 100)}%`}
                   />
-                )}
-              </Group>
-            </Layer>
-          </Stage>
+                </Group>
+              </Layer>
+            </Stage>
+          </div>
         </div>
       </div>
     </div>

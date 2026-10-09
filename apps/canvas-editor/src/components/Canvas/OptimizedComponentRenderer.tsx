@@ -43,25 +43,22 @@ const RenderButton = React.memo(({ component }: { component: ComponentConfig }) 
         cornerRadius={4}
       />
       <Text
-        x={component.width / 2}
-        y={component.height / 2}
+        x={0}
+        y={0}
+        width={component.width}
+        height={component.height}
         text={component.props.text}
         fontSize={14}
         fill={component.props.type === 'primary' ? '#fff' : '#333'}
         align="center"
         verticalAlign="middle"
-        offsetX={component.width / 2}
-        offsetY={component.height / 2}
       />
     </Group>
   )
 }, (prev, next) => {
-  const p = prev.component.props
-  const n = next.component.props
-  return prev.component.width === next.component.width &&
-         prev.component.height === next.component.height &&
-         p.type === n.type &&
-         p.text === n.text
+  const p = prev.component
+  const n = next.component
+  return p === n
 })
 
 const RenderInput = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -148,11 +145,7 @@ const RenderInput = React.memo(({ component }: { component: ComponentConfig }) =
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.label === n.props.label &&
-         p.props.dataSourceId === n.props.dataSourceId &&
-         p.props.dataField === n.props.dataField
+  return p === n
 })
 
 const RenderText = React.memo(({ component }: { component: ComponentConfig }) => (
@@ -352,16 +345,16 @@ const RenderTable = React.memo(({ component }: { component: ComponentConfig }) =
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.columns === n.props.columns &&
-         p.props.rows === n.props.rows &&
-         p.props.dataSourceId === n.props.dataSourceId
+  return p === n
 })
 
 const RenderTextarea = React.memo(({ component }: { component: ComponentConfig }) => {
   const labelWidth = component.props.label ? component.props.label.length * 14 + 8 : 0
   const inputWidth = component.width - labelWidth - (component.props.label ? 4 : 0)
+  const rows = component.props.rows || 3
+  const innerX = labelWidth + (component.props.label ? 4 : 0)
+  const rowHeight = component.height / rows
+  const rowLines = Array.from({ length: rows - 1 }, (_, i) => rowHeight * (i + 1))
 
   return (
     <Group>
@@ -378,7 +371,7 @@ const RenderTextarea = React.memo(({ component }: { component: ComponentConfig }
         />
       )}
       <Rect
-        x={labelWidth + (component.props.label ? 4 : 0)}
+        x={innerX}
         y={0}
         width={inputWidth}
         height={component.height}
@@ -387,26 +380,38 @@ const RenderTextarea = React.memo(({ component }: { component: ComponentConfig }
         strokeWidth={1}
         cornerRadius={4}
       />
+      {rowLines.map((y, i) => (
+        <Line
+          key={i}
+          points={[innerX + 2, y, innerX + inputWidth - 2, y]}
+          stroke="#f0f0f0"
+          strokeWidth={1}
+        />
+      ))}
       <Text
-        x={labelWidth + 12}
-        y={component.height / 2}
+        x={innerX + 12}
+        y={4}
         text={component.props.placeholder}
         fontSize={14}
         fill="#bfbfbf"
         align="left"
-        verticalAlign="middle"
-        offsetY={7}
-        width={inputWidth - 16}
+        width={inputWidth - 24}
+      />
+      <Text
+        x={innerX + inputWidth - 40}
+        y={component.height - 16}
+        text={`${rows}行`}
+        fontSize={10}
+        fill="#999"
+        align="right"
+        width={36}
       />
     </Group>
   )
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.label === n.props.label &&
-         p.props.placeholder === n.props.placeholder
+  return p === n
 })
 
 const RenderSelect = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -462,10 +467,7 @@ const RenderSelect = React.memo(({ component }: { component: ComponentConfig }) 
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.label === n.props.label &&
-         p.props.placeholder === n.props.placeholder
+  return p === n
 })
 
 const RenderSwitch = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -505,10 +507,7 @@ const RenderSwitch = React.memo(({ component }: { component: ComponentConfig }) 
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.label === n.props.label &&
-         p.props.checked === n.props.checked
+  return p === n
 })
 
 const RenderDatePicker = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -563,10 +562,7 @@ const RenderDatePicker = React.memo(({ component }: { component: ComponentConfig
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.label === n.props.label &&
-         p.props.placeholder === n.props.placeholder
+  return p === n
 })
 
 const RenderSlider = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -623,11 +619,7 @@ const RenderSlider = React.memo(({ component }: { component: ComponentConfig }) 
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.props.label === n.props.label &&
-         p.props.value === n.props.value &&
-         p.props.min === n.props.min &&
-         p.props.max === n.props.max
+  return p === n
 })
 
 const RenderRate = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -663,10 +655,7 @@ const RenderRate = React.memo(({ component }: { component: ComponentConfig }) =>
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.props.label === n.props.label &&
-         p.props.count === n.props.count &&
-         p.props.value === n.props.value
+  return p === n
 })
 
 const RenderUpload = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -719,88 +708,176 @@ const RenderUpload = React.memo(({ component }: { component: ComponentConfig }) 
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.label === n.props.label &&
-         p.props.placeholder === n.props.placeholder
+  return p === n
 })
 
-const RenderCheckbox = React.memo(({ component }: { component: ComponentConfig }) => (
-  <Group>
-    <Rect
-      x={0}
-      y={component.height / 2 - 10}
-      width={20}
-      height={20}
-      fill={component.props.checked ? '#1890ff' : '#fff'}
-      stroke="#d9d9d9"
-      strokeWidth={1}
-      cornerRadius={4}
-    />
-    {component.props.checked && (
+const RenderCheckbox = React.memo(({ component }: { component: ComponentConfig }) => {
+  const options = component.props.options
+  const values: string[] = component.props.values || (component.props.checked ? [component.props.label] : [])
+
+  // 多选项模式：水平排列多个复选框
+  if (Array.isArray(options) && options.length > 0) {
+    let cursorX = 0
+    const items = options.map((opt: any, i: number) => {
+      const optLabel = typeof opt === 'object' ? opt.label : opt
+      const optValue = typeof opt === 'object' ? opt.value : opt
+      const isChecked = values.includes(optValue)
+      const textWidth = optLabel.length * 14 + 8
+      const itemWidth = 28 + textWidth
+      const groupX = cursorX
+      cursorX += itemWidth
+      return (
+        <Group key={i} x={groupX}>
+          <Rect
+            x={0}
+            y={component.height / 2 - 10}
+            width={20}
+            height={20}
+            fill={isChecked ? '#1890ff' : '#fff'}
+            stroke="#d9d9d9"
+            strokeWidth={1}
+            cornerRadius={4}
+          />
+          {isChecked && (
+            <Text
+              x={4}
+              y={component.height / 2 - 5}
+              text="✓"
+              fontSize={14}
+              fill="#fff"
+            />
+          )}
+          <Text
+            x={28}
+            y={0}
+            width={textWidth}
+            height={component.height}
+            text={optLabel}
+            fontSize={14}
+            fill="#333"
+            verticalAlign="middle"
+          />
+        </Group>
+      )
+    })
+    return <Group>{items}</Group>
+  }
+
+  // 回退：单个复选框
+  const isChecked = component.props.checked
+  return (
+    <Group>
+      <Rect
+        x={0}
+        y={component.height / 2 - 10}
+        width={20}
+        height={20}
+        fill={isChecked ? '#1890ff' : '#fff'}
+        stroke="#d9d9d9"
+        strokeWidth={1}
+        cornerRadius={4}
+      />
+      {isChecked && (
+        <Text x={4} y={component.height / 2 - 5} text="✓" fontSize={14} fill="#fff" />
+      )}
       <Text
-        x={4}
-        y={component.height / 2 - 4}
-        text="✓"
+        x={28}
+        y={0}
+        width={component.width - 28}
+        height={component.height}
+        text={component.props.label}
         fontSize={14}
-        fill="#fff"
+        fill="#333"
         verticalAlign="middle"
       />
-    )}
-    <Text
-      x={28}
-      y={component.height / 2}
-      text={component.props.label}
-      fontSize={14}
-      fill="#333"
-      verticalAlign="middle"
-      offsetY={component.height / 2}
-    />
-  </Group>
-), (prev, next) => {
+    </Group>
+  )
+}, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.label === n.props.label &&
-         p.props.checked === n.props.checked
+  return p === n
 })
 
-const RenderRadio = React.memo(({ component }: { component: ComponentConfig }) => (
-  <Group>
-    <Circle
-      x={8}
-      y={component.height / 2}
-      radius={8}
-      fill={component.props.value ? '#1890ff' : '#fff'}
-      stroke="#d9d9d9"
-      strokeWidth={1}
-    />
-    {component.props.value && (
+const RenderRadio = React.memo(({ component }: { component: ComponentConfig }) => {
+  const options = component.props.options
+  const currentValue = component.props.value
+
+  // 多选项模式：水平排列多个单选项
+  if (Array.isArray(options) && options.length > 0) {
+    let cursorX = 0
+    const items = options.map((opt: any, i: number) => {
+      const optLabel = typeof opt === 'object' ? opt.label : opt
+      const optValue = typeof opt === 'object' ? opt.value : opt
+      const isSelected = currentValue === optValue
+      const textWidth = optLabel.length * 14 + 8
+      const itemWidth = 28 + textWidth
+      const groupX = cursorX
+      cursorX += itemWidth
+      return (
+        <Group key={i} x={groupX}>
+          <Circle
+            x={8}
+            y={component.height / 2}
+            radius={8}
+            fill={isSelected ? '#1890ff' : '#fff'}
+            stroke="#d9d9d9"
+            strokeWidth={1}
+          />
+          {isSelected && (
+            <Circle
+              x={8}
+              y={component.height / 2}
+              radius={4}
+              fill="#fff"
+            />
+          )}
+          <Text
+            x={22}
+            y={0}
+            width={textWidth}
+            height={component.height}
+            text={optLabel}
+            fontSize={14}
+            fill="#333"
+            verticalAlign="middle"
+          />
+        </Group>
+      )
+    })
+    return <Group>{items}</Group>
+  }
+
+  // 回退：单个单选项
+  const isSelected = !!component.props.value
+  return (
+    <Group>
       <Circle
         x={8}
         y={component.height / 2}
-        radius={4}
-        fill="#fff"
+        radius={8}
+        fill={isSelected ? '#1890ff' : '#fff'}
+        stroke="#d9d9d9"
+        strokeWidth={1}
       />
-    )}
-    <Text
-      x={24}
-      y={component.height / 2}
-      text={component.props.label}
-      fontSize={14}
-      fill="#333"
-      verticalAlign="middle"
-      offsetY={component.height / 2}
-    />
-  </Group>
-), (prev, next) => {
+      {isSelected && (
+        <Circle x={8} y={component.height / 2} radius={4} fill="#fff" />
+      )}
+      <Text
+        x={22}
+        y={0}
+        width={component.width - 22}
+        height={component.height}
+        text={component.props.label}
+        fontSize={14}
+        fill="#333"
+        verticalAlign="middle"
+      />
+    </Group>
+  )
+}, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.label === n.props.label &&
-         p.props.value === n.props.value
+  return p === n
 })
 
 const RenderModal = React.memo(({ component }: { component: ComponentConfig }) => (
@@ -920,10 +997,7 @@ const RenderTabs = React.memo(({ component }: { component: ComponentConfig }) =>
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         JSON.stringify(p.props.tabs) === JSON.stringify(n.props.tabs) &&
-         p.props.activeTab === n.props.activeTab
+  return p === n
 })
 
 const RenderDrawer = React.memo(({ component }: { component: ComponentConfig }) => (
@@ -1018,11 +1092,7 @@ const RenderAlert = React.memo(({ component }: { component: ComponentConfig }) =
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.type === n.props.type &&
-         p.props.message === n.props.message &&
-         p.props.showIcon === n.props.showIcon
+  return p === n
 })
 
 const RenderAvatar = React.memo(({ component }: { component: ComponentConfig }) => (
@@ -1087,10 +1157,7 @@ const RenderTag = React.memo(({ component }: { component: ComponentConfig }) => 
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.label === n.props.label &&
-         p.props.color === n.props.color
+  return p === n
 })
 
 const RenderBadge = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1145,10 +1212,7 @@ const RenderBadge = React.memo(({ component }: { component: ComponentConfig }) =
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.dot === n.props.dot &&
-         p.props.count === n.props.count
+  return p === n
 })
 
 const RenderDivider = React.memo(({ component }: { component: ComponentConfig }) => (
@@ -1230,11 +1294,7 @@ const RenderHeading = React.memo(({ component }: { component: ComponentConfig })
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.content === n.props.content &&
-         p.props.level === n.props.level &&
-         p.props.color === n.props.color
+  return p === n
 })
 
 const RenderPagination = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1287,9 +1347,7 @@ const RenderPagination = React.memo(({ component }: { component: ComponentConfig
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.total === n.props.total
+  return p === n
 })
 
 const RenderList = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1342,10 +1400,7 @@ const RenderList = React.memo(({ component }: { component: ComponentConfig }) =>
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.title === n.props.title &&
-         JSON.stringify(p.props.items) === JSON.stringify(n.props.items)
+  return p === n
 })
 
 const RenderSteps = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1415,10 +1470,7 @@ const RenderSteps = React.memo(({ component }: { component: ComponentConfig }) =
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         JSON.stringify(p.props.steps) === JSON.stringify(n.props.steps) &&
-         p.props.current === n.props.current
+  return p === n
 })
 
 const RenderTimeline = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1480,9 +1532,7 @@ const RenderTimeline = React.memo(({ component }: { component: ComponentConfig }
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         JSON.stringify(p.props.items) === JSON.stringify(n.props.items)
+  return p === n
 })
 
 const RenderCarousel = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1526,9 +1576,7 @@ const RenderCarousel = React.memo(({ component }: { component: ComponentConfig }
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.images?.length === n.props.images?.length
+  return p === n
 })
 
 const RenderSpace = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1573,8 +1621,7 @@ const RenderSpace = React.memo(({ component }: { component: ComponentConfig }) =
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height
+  return p === n
 })
 
 const RenderTooltip = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1604,8 +1651,7 @@ const RenderTooltip = React.memo(({ component }: { component: ComponentConfig })
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height
+  return p === n
 })
 
 const RenderPopover = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1635,8 +1681,7 @@ const RenderPopover = React.memo(({ component }: { component: ComponentConfig })
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height
+  return p === n
 })
 
 const RenderCascader = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1691,10 +1736,7 @@ const RenderCascader = React.memo(({ component }: { component: ComponentConfig }
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.label === n.props.label &&
-         p.props.placeholder === n.props.placeholder
+  return p === n
 })
 
 const RenderTransfer = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1762,8 +1804,7 @@ const RenderTransfer = React.memo(({ component }: { component: ComponentConfig }
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height
+  return p === n
 })
 
 const RenderForm = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1806,9 +1847,7 @@ const RenderForm = React.memo(({ component }: { component: ComponentConfig }) =>
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         p.props.title === n.props.title
+  return p === n
 })
 
 const RenderTree = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1867,9 +1906,7 @@ const RenderTree = React.memo(({ component }: { component: ComponentConfig }) =>
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p.width === n.width &&
-         p.height === n.height &&
-         JSON.stringify(p.props.treeData) === JSON.stringify(n.props.treeData)
+  return p === n
 })
 
 

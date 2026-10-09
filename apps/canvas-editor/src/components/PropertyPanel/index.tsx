@@ -335,7 +335,7 @@ export function PropertyPanel() {
         </button>
       </div>
 
-      {panelMode === 'page' || !selectedComponent ? <PageSettings /> : <ComponentSettings />}
+      {panelMode === 'page' || !selectedComponent ? PageSettings() : ComponentSettings()}
     </div>
   )
 }
