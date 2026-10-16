@@ -48,6 +48,10 @@ export class UpdateProcessDefinitionDto {
 
 export class ProcessNodeDto {
   @IsString()
+  @IsOptional()
+  id?: string
+
+  @IsString()
   @IsEnum(['start', 'approve', 'condition', 'fork', 'join', 'end', 'action'])
   type!: NodeType
 

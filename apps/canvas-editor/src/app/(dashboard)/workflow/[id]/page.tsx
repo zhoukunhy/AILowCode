@@ -13,6 +13,9 @@ export default function WorkflowEditorPage() {
   const { loadProcess, clearWorkflow, nodes, transitions, currentProcess } = useWorkflowStore()
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState('')
+  const [showSaveModal, setShowSaveModal] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ name: '', description: '', status: 'draft' })
 
   useEffect(() => {
     if (params.id === 'new') {
@@ -38,31 +41,60 @@ export default function WorkflowEditorPage() {
     fetchProcess()
   }, [params.id, loadProcess, clearWorkflow])
 
-  const handleSave = async () => {
+  // 点击保存按钮：打开弹窗并预填当前流程信息
+  const handleSave = () => {
     if (!currentProcess && nodes.length === 0) {
       setSaveStatus('请先添加节点')
       setTimeout(() => setSaveStatus(''), 3000)
       return
     }
 
+    setForm({
+      name: currentProcess?.name || '',
+      description: currentProcess?.description || '',
+      status: currentProcess?.status || 'draft',
+    })
+    setShowSaveModal(true)
+  }
+
+  // 弹窗确认：执行保存（processDefinitionId 由后端自动生成，前端不发送）
+  const handleConfirmSave = async () => {
+    if (!form.name.trim()) {
+      setSaveStatus('请输入流程名称')
+      setTimeout(() => setSaveStatus(''), 3000)
+      return
+    }
+
     try {
+      setSaving(true)
       setSaveStatus('保存中...')
-      
+
       const processData = {
         id: currentProcess?.id,
-        name: currentProcess?.name || '未命名流程',
-        description: currentProcess?.description,
-        status: currentProcess?.status || 'draft',
+        name: form.name.trim(),
+        description: form.description.trim() || undefined,
+        status: form.status,
         creatorId: '1',
-        nodes,
-        transitions,
+        nodes: nodes.map(({ processDefinitionId: _pid, ...rest }) => rest),
+        transitions: transitions.map((t) => {
+          // 后端返回的流转实体运行时可能带 processDefinitionId，统一剔除
+          const { processDefinitionId: _pid, ...rest } = t as typeof t & { processDefinitionId?: string }
+          return rest
+        }),
       }
 
-      await api.post('/workflow/processes/save', processData)
+      const res = await api.post('/workflow/processes/save', processData)
+      const response = res as unknown as { data?: any }
+      if (response?.data) {
+        loadProcess(response.data)
+      }
+
       setSaveStatus('保存成功')
+      setShowSaveModal(false)
     } catch {
       setSaveStatus('保存失败')
     } finally {
+      setSaving(false)
       setTimeout(() => setSaveStatus(''), 3000)
     }
   }
@@ -150,6 +182,75 @@ export default function WorkflowEditorPage() {
       </div>
       
       <ConfigPanel />
+
+      {showSaveModal && (
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowSaveModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl p-6 w-96 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">保存流程</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  流程名称 <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="请输入流程名称"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">流程描述</label>
+                <textarea
+                  value={form.description}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  placeholder="请输入流程描述（可选）"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">状态</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="draft">草稿</option>
+                  <option value="active">启用</option>
+                  <option value="inactive">禁用</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowSaveModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleConfirmSave}
+                disabled={saving || !form.name.trim()}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {saving ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

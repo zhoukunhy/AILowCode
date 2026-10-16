@@ -17,6 +17,10 @@ const nextConfig = {
   
   // 配置缓存策略
   headers() {
+    // 开发环境禁用强缓存，避免 chunk 更新后浏览器仍使用旧缓存导致模块加载错误
+    if (process.env.NODE_ENV !== 'production') {
+      return []
+    }
     return [
       {
         source: '/(.*)',

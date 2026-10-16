@@ -408,15 +408,172 @@ const SliderRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
   )
 }
 
+interface UploadedFile {
+  uid: string
+  name: string
+  url: string
+  isImage: boolean
+}
+
 const UploadRenderer: React.FC<RuntimeComponentProps> = ({ component }) => {
   const { props } = component
+  const [fileList, setFileList] = React.useState<UploadedFile[]>([])
+  const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+
+  const accept = props.accept || 'image/*'
+  const isImageMode = accept.startsWith('image') || accept === '*'
+  const multiple = props.multiple ?? false
+  const maxCount = props.maxCount ?? 8
+  const disabled = props.disabled ?? false
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const newFiles: UploadedFile[] = files.map((file) => {
+      const url = URL.createObjectURL(file)
+      return {
+        uid: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: file.name,
+        url,
+        isImage: file.type.startsWith('image'),
+      }
+    })
+
+    setFileList((prev) => {
+      if (!multiple) return newFiles
+      const combined = [...prev, ...newFiles]
+      return combined.slice(0, maxCount)
+    })
+    e.target.value = ''
+  }
+
+  const handleRemove = (uid: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setFileList((prev) => {
+      const file = prev.find((f) => f.uid === uid)
+      if (file) URL.revokeObjectURL(file.url)
+      return prev.filter((f) => f.uid !== uid)
+    })
+  }
+
+  const handlePreview = (file: UploadedFile) => {
+    if (file.isImage) {
+      setPreviewUrl(file.url)
+    } else {
+      window.open(file.url, '_blank')
+    }
+  }
+
   return (
     <div
-      className="border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer"
+      className="rounded-lg overflow-hidden flex flex-col"
       style={getComponentStyle(component)}
     >
-      <span className="text-2xl mb-2">📁</span>
-      <span className="text-sm text-gray-500">{props.placeholder || '点击上传'}</span>
+      {props.label && (
+        <div className="text-sm text-gray-700 mb-1 px-1">{props.label}</div>
+      )}
+      <div
+        className="flex-1 overflow-auto p-2"
+        onClick={() => !disabled && inputRef.current?.click()}
+      >
+        {fileList.length === 0 ? (
+          <div className="border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer h-full min-h-[60px]">
+            <span className="text-2xl mb-1">{isImageMode ? '🖼️' : '📁'}</span>
+            <span className="text-sm text-gray-500">
+              {props.placeholder || '点击上传'}
+            </span>
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {isImageMode
+              ? fileList.map((file) => (
+                  <div
+                    key={file.uid}
+                    className="relative group w-20 h-20 rounded-md overflow-hidden border border-gray-200"
+                  >
+                    {file.isImage ? (
+                      <img
+                        src={file.url}
+                        alt={file.name}
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handlePreview(file)
+                        }}
+                      />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center bg-gray-50 cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handlePreview(file)
+                        }}
+                      >
+                        <span className="text-2xl">📄</span>
+                      </div>
+                    )}
+                    <button
+                      className="absolute top-0 right-0 bg-black/50 text-white rounded-bl-md w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => handleRemove(file.uid, e)}
+                    >
+                      ✕
+                    </button>
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs px-1 py-0.5 truncate opacity-0 group-hover:opacity-100 transition-opacity">
+                      {file.name}
+                    </div>
+                  </div>
+                ))
+              : fileList.map((file) => (
+                  <div
+                    key={file.uid}
+                    className="flex items-center gap-2 bg-gray-50 rounded-md px-3 py-2 border border-gray-200"
+                  >
+                    <span className="text-xl">📄</span>
+                    <span className="text-sm text-gray-700 truncate max-w-[120px]">
+                      {file.name}
+                    </span>
+                    <button
+                      className="text-gray-400 hover:text-red-500 text-sm"
+                      onClick={(e) => handleRemove(file.uid, e)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+            {(!disabled && multiple && fileList.length < maxCount) && (
+              <div className="w-20 h-20 border-2 border-dashed border-gray-300 rounded-md flex items-center justify-center hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer">
+                <span className="text-2xl text-gray-400">+</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        multiple={multiple}
+        disabled={disabled}
+        className="hidden"
+        onChange={handleChange}
+      />
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/80 flex items-center justify-center"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <img
+            src={previewUrl}
+            alt="预览"
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+          />
+          <button className="absolute top-4 right-4 text-white text-3xl bg-black/50 rounded-full w-10 h-10 flex items-center justify-center hover:bg-black/70">
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   )
 }

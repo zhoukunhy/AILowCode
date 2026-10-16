@@ -15,6 +15,8 @@ interface OptimizedComponentRendererProps {
   onDragStart: () => void
   onDragEnd: () => void
   onTransform: (attrs: any) => void
+  pageWidth: number
+  zoom: number
 }
 
 const RenderButton = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -219,17 +221,27 @@ const RenderCard = React.memo(({ component }: { component: ComponentConfig }) =>
          p.props.content === n.props.content
 })
 
+// 表格底部分页栏高度
+const PAGINATION_HEIGHT = 32
+
 const RenderTable = React.memo(({ component }: { component: ComponentConfig }) => {
   const { data, isLoading, error } = useComponentDataBinding(component.id, {
     bindingMode: 'table',
     autoFetch: true,
   })
 
-  const { columns = 4, rows = 5 } = component.props
+  const { columns = 4, rows = 5, pageSize = 10 } = component.props
   const displayRows = data.length > 0 ? Math.min(data.length + 1, rows) : rows
   const displayColumns = data.length > 0 && data[0] ? Math.min(Object.keys(data[0]).length, columns) : columns
+
+  // 表格线区域高度 = 组件高度 - 底部分页栏
+  const gridHeight = component.height - PAGINATION_HEIGHT
   const cellWidth = component.width / displayColumns
-  const cellHeight = component.height / displayRows
+  const cellHeight = gridHeight / displayRows
+
+  // 分页总数依赖表格数据条数
+  const total = data.length
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
 
   const tableElements = useMemo(() => {
     const elements: JSX.Element[] = []
@@ -329,7 +341,7 @@ const RenderTable = React.memo(({ component }: { component: ComponentConfig }) =
         <Rect
           key="binding-indicator"
           x={component.width - 12}
-          y={component.height - 12}
+          y={gridHeight - 12}
           width={8}
           height={8}
           fill={isLoading ? '#1890ff' : error ? '#ff4d4f' : '#52c41a'}
@@ -338,14 +350,78 @@ const RenderTable = React.memo(({ component }: { component: ComponentConfig }) =
       )
     }
 
+    // 底部分页栏：总数 = 表格数据条数
+    elements.push(
+      <Rect
+        key="pagination-bg"
+        x={0}
+        y={gridHeight}
+        width={component.width}
+        height={PAGINATION_HEIGHT}
+        fill="#fafafa"
+      />,
+      <Line
+        key="pagination-line"
+        points={[0, gridHeight, component.width, gridHeight]}
+        stroke="#d9d9d9"
+        strokeWidth={1}
+      />,
+      <Text
+        key="pagination-total"
+        x={8}
+        y={gridHeight + PAGINATION_HEIGHT / 2}
+        text={`共 ${total} 条`}
+        fontSize={12}
+        fill="#666"
+        verticalAlign="middle"
+        offsetY={PAGINATION_HEIGHT / 2}
+      />
+    )
+
+    // 页码（最多显示 5 个，第 1 页高亮）
+    const pageCount = Math.min(totalPages, 5)
+    let pageX = component.width - pageCount * 32 - 8
+    for (let p = 1; p <= pageCount; p++) {
+      elements.push(
+        <Rect
+          key={`page-${p}`}
+          x={pageX}
+          y={gridHeight + PAGINATION_HEIGHT / 2 - 10}
+          width={28}
+          height={20}
+          fill={p === 1 ? '#1890ff' : '#fff'}
+          stroke="#d9d9d9"
+          strokeWidth={1}
+          cornerRadius={3}
+        />,
+        <Text
+          key={`page-text-${p}`}
+          x={pageX + 14}
+          y={gridHeight + PAGINATION_HEIGHT / 2}
+          text={String(p)}
+          fontSize={12}
+          fill={p === 1 ? '#fff' : '#666'}
+          align="center"
+          verticalAlign="middle"
+          offsetY={PAGINATION_HEIGHT / 2}
+        />
+      )
+      pageX += 32
+    }
+
     return elements
-  }, [component.width, component.height, displayRows, displayColumns, cellWidth, cellHeight, data, isLoading, error, component.props.dataSourceId])
+  }, [component.width, component.height, displayRows, displayColumns, cellWidth, cellHeight, gridHeight, total, totalPages, data, isLoading, error, component.props.dataSourceId])
 
   return <Group>{tableElements}</Group>
 }, (prev, next) => {
   const p = prev.component
   const n = next.component
-  return p === n
+  return p.width === n.width &&
+         p.height === n.height &&
+         p.props.columns === n.props.columns &&
+         p.props.rows === n.props.rows &&
+         p.props.pageSize === n.props.pageSize &&
+         p.props.dataSourceId === n.props.dataSourceId
 })
 
 const RenderTextarea = React.memo(({ component }: { component: ComponentConfig }) => {
@@ -1919,6 +1995,8 @@ export const OptimizedComponentRenderer = React.memo(({
   onDragStart,
   onDragEnd,
   onTransform: _onTransform,
+  pageWidth,
+  zoom,
 }: OptimizedComponentRendererProps) => {
   const [customDefinition, setCustomDefinition] = useState<any>(null)
   
@@ -1945,6 +2023,18 @@ export const OptimizedComponentRenderer = React.memo(({
     if (!e || !e.target) return
     onDragMove(e.target.x(), e.target.y())
   }, [onDragMove])
+
+  // 拖动边界限制：在 Konva 层面实时钳制，防止拖出画布
+  const dragBoundFunc = useCallback((pos: { x: number; y: number }) => {
+    // pos 是 Konva 绝对坐标（已含 Stage scale），逻辑坐标 = pos / zoom
+    const logicalX = pos.x / zoom
+    const logicalY = pos.y / zoom
+    const maxX = Math.max(0, pageWidth - component.width)
+    return {
+      x: Math.min(Math.max(0, logicalX), maxX) * zoom,
+      y: Math.max(0, logicalY) * zoom,
+    }
+  }, [pageWidth, zoom, component.width])
 
   const handleClick = useCallback((e: any) => {
     if (!e) return
@@ -1986,7 +2076,6 @@ export const OptimizedComponentRenderer = React.memo(({
       case 'badge': return <RenderBadge key="badge" component={component} />
       case 'divider': return <RenderDivider key="divider" component={component} />
       case 'image': return <RenderImage key="image" component={component} />
-      case 'pagination': return <RenderPagination key="pagination" component={component} />
       case 'tabs': return <RenderTabs key="tabs" component={component} />
       case 'steps': return <RenderSteps key="steps" component={component} />
       case 'timeline': return <RenderTimeline key="timeline" component={component} />
@@ -2009,6 +2098,7 @@ export const OptimizedComponentRenderer = React.memo(({
       onClick={handleClick}
       onTap={handleClick}
       draggable={!component.locked}
+      dragBoundFunc={dragBoundFunc}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragMove={handleDragMove}

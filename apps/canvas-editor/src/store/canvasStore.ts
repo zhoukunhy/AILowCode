@@ -577,12 +577,13 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
     name: '文件上传',
     icon: '📤',
     defaultWidth: 240,
-    defaultHeight: 100,
+    defaultHeight: 120,
     defaultProps: { 
       label: '上传标签', 
       placeholder: '点击或拖拽文件到此处上传',
-      accept: '*',
+      accept: 'image/*',
       multiple: false,
+      maxCount: 8,
       disabled: false,
     },
     schema: {
@@ -590,8 +591,9 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
       properties: {
         label: { type: 'string', title: '标签文本' },
         placeholder: { type: 'string', title: '提示文本' },
-        accept: { type: 'string', title: '接受文件类型' },
+        accept: { type: 'string', title: '接受文件类型（image/*为图片）' },
         multiple: { type: 'boolean', title: '多文件上传' },
+        maxCount: { type: 'number', title: '最大文件数' },
         disabled: { type: 'boolean', title: '禁用状态' },
       },
     },
@@ -758,30 +760,6 @@ const DEFAULT_COMPONENT_LIST: ComponentMeta[] = [
         title: { type: 'string', title: '列表标题' },
         items: { type: 'array', title: '列表项' },
         bordered: { type: 'boolean', title: '显示边框' },
-      },
-    },
-  },
-  {
-    type: 'pagination',
-    name: '分页',
-    icon: '📄',
-    defaultWidth: 600,
-    defaultHeight: 48,
-    defaultProps: { 
-      total: 100,
-      pageSize: 10,
-      current: 1,
-      showSizeChanger: true,
-      showQuickJumper: true,
-    },
-    schema: {
-      type: 'object',
-      properties: {
-        total: { type: 'number', title: '总条数' },
-        pageSize: { type: 'number', title: '每页条数' },
-        current: { type: 'number', title: '当前页' },
-        showSizeChanger: { type: 'boolean', title: '显示条数切换' },
-        showQuickJumper: { type: 'boolean', title: '显示快速跳转' },
       },
     },
   },
@@ -1441,6 +1419,50 @@ const DEFAULT_PROJECT_CONFIG: ProjectConfig = {
   isDirty: false,
 }
 
+// 矩形区域（用于组件重叠检测）
+interface Rect {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+// 判断两个矩形是否重叠（AABB 相交检测）
+function isRectOverlap(a: Rect, b: Rect): boolean {
+  return (
+    a.x < b.x + b.width &&
+    a.x + a.width > b.x &&
+    a.y < b.y + b.height &&
+    a.y + a.height > b.y
+  )
+}
+
+// 整组沿指定轴位移：从最小位移量开始按步长递增，返回第一个"整组不压组外组件"的位移量
+// 右移（axis='x'）额外要求组内组件不超出画布宽度（宽度固定，高度可自动扩展）；找不到返回 null
+function findGroupShiftDelta(
+  group: Rect[],
+  others: Rect[],
+  axis: 'x' | 'y',
+  minDelta: number,
+  step: number,
+  canvasWidth: number
+): number | null {
+  const align = (v: number) => (step > 1 ? Math.ceil(v / step) * step : v)
+  let delta = align(minDelta)
+
+  for (let i = 0; i < 500; i++) {
+    const overWidth = axis === 'x' && group.some(r => r.x + delta + r.width > canvasWidth)
+    if (overWidth) return null
+
+    const moved = group.map(r => (axis === 'x' ? { ...r, x: r.x + delta } : { ...r, y: r.y + delta }))
+    const clash = others.some(o => moved.some(m => isRectOverlap(m, o)))
+    if (!clash) return delta
+
+    delta += step
+  }
+  return null
+}
+
 // 创建Zustand store工厂函数
 export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
   project: DEFAULT_PROJECT_CONFIG,
@@ -1473,6 +1495,10 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
       finalY = Math.round(y / currentPage.gridSize) * currentPage.gridSize
     }
 
+    // 边界钳制：左/上/右不允许超出画布（切边放置）；下方允许超出（画布高度随内容自动扩展）
+    finalX = Math.min(Math.max(0, finalX), Math.max(0, currentPage.width - meta.defaultWidth))
+    finalY = Math.max(0, finalY)
+
     const newComponent: ComponentConfig = {
       id: generateId(),
       type: componentType,
@@ -1489,9 +1515,63 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
       locked: false,
     }
 
+    // 新组件覆盖已有组件时，整组移动被遮挡的物料（新组件位置不变），避免重合：
+    // 1. 优先整组向右移，保留一个栅格间隙；画布宽度固定，右移后无法完整展示则放弃
+    // 2. 整组向右放不下时整组向下移，同样保留一个栅格间隙（多个被遮挡组件同向同距离移动）
+    const newRect: Rect = { x: finalX, y: finalY, width: newComponent.width, height: newComponent.height }
+    const step = currentPage.snapToGrid ? currentPage.gridSize : 1
+    const gap = step > 1 ? step : 8
+
+    let adjustedComponents = components
+    const overlapped = components.filter(comp =>
+      isRectOverlap(newRect, { x: comp.x, y: comp.y, width: comp.width, height: comp.height })
+    )
+
+    if (overlapped.length > 0) {
+      const overlappedIds = new Set(overlapped.map(c => c.id))
+      const groupRects = overlapped.map(c => ({ x: c.x, y: c.y, width: c.width, height: c.height }))
+      const otherRects = components
+        .filter(c => !overlappedIds.has(c.id))
+        .map(c => ({ x: c.x, y: c.y, width: c.width, height: c.height }))
+
+      let shift: { axis: 'x' | 'y'; delta: number } | null = null
+
+      // 最小右移距离：让所有被遮挡组件的左边缘越过新组件右边缘并留出间隙
+      const minDx = Math.max(...groupRects.map(r => newRect.x + newRect.width + gap - r.x))
+      const dx = findGroupShiftDelta(groupRects, otherRects, 'x', minDx, step, currentPage.width)
+      if (dx !== null) {
+        shift = { axis: 'x', delta: dx }
+      } else {
+        // 向右展示不下，整组向下移动（画布高度随内容自动扩展，向下不受高度限制）
+        const minDy = Math.max(...groupRects.map(r => newRect.y + newRect.height + gap - r.y))
+        const dy = findGroupShiftDelta(groupRects, otherRects, 'y', minDy, step, currentPage.width)
+        if (dy !== null) shift = { axis: 'y', delta: dy }
+      }
+
+      if (shift) {
+        const { axis, delta } = shift
+        adjustedComponents = components.map(c => {
+          if (!overlappedIds.has(c.id)) return c
+          return axis === 'x' ? { ...c, x: c.x + delta } : { ...c, y: c.y + delta }
+        })
+      }
+    }
+
+    // 内容超出画布高度时自动扩展画布（对齐栅格并保留一个间隙余量）
+    const maxBottom = Math.max(
+      ...adjustedComponents.map(c => c.y + c.height),
+      finalY + newComponent.height
+    )
+    let pageHeight = currentPage.height
+    if (maxBottom > pageHeight) {
+      const needed = maxBottom + gap
+      pageHeight = step > 1 ? Math.ceil(needed / step) * step : Math.ceil(needed)
+    }
+
     set((state) => ({
-      components: [...state.components, newComponent],
+      components: [...adjustedComponents, newComponent],
       selectedId: newComponent.id,
+      currentPage: { ...state.currentPage, height: Math.max(state.currentPage.height, pageHeight) },
       project: { ...state.project, isDirty: true },
     }))
   },
@@ -2306,4 +2386,5 @@ export const createCanvasStore = () => createStore<CanvasState>((set, get) => ({
   },
 }))
 
-export { useCanvasStore } from '@/providers/canvas-store-provider'
+// useCanvasStore 定义在 canvas-store-context（避免 canvasStore ↔ provider 循环依赖导致运行时错误）
+export { useCanvasStore } from '@/providers/canvas-store-context'

@@ -222,6 +222,8 @@ export function VirtualCanvas() {
         onDragEnd={() => {}}
         onDragMove={callbacks.onDragMove}
         onTransform={callbacks.onTransform}
+        pageWidth={currentPage.width}
+        zoom={zoom}
       />
     )
 
@@ -243,11 +245,12 @@ export function VirtualCanvas() {
     if (!stage) return
 
     const rect = stage.getContainer().getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
+    // 屏幕坐标 → 画布内容坐标：Stage 设置了 scaleX/scaleY = zoom，需做逆变换
+    const x = (e.clientX - rect.left) / zoom
+    const y = (e.clientY - rect.top) / zoom
 
     addComponent(componentType, x, y)
-  }, [addComponent])
+  }, [addComponent, zoom])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()

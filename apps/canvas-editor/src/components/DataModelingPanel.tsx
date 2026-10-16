@@ -27,16 +27,110 @@ export function DataModelingPanel() {
   const deleteDataModel = useCanvasStore((state) => state.deleteDataModel)
   const addComponentsBatch = useCanvasStore((state) => state.addComponentsBatch)
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'entities' | 'relations'>('entities')
+  const [activeTab, setActiveTab] = useState<'entities' | 'relations' | 'crud'>('entities')
   const [showSqlModal, setShowSqlModal] = useState(false)
   const [sqlContent, setSqlContent] = useState('')
   const [loading, setLoading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [crudEndpoints, setCrudEndpoints] = useState<any[]>([])
+  const [syncMessage, setSyncMessage] = useState('')
 
   const selectedModel = dataModels.find(m => m.id === selectedModelId)
 
   const handleGenerateForm = (entity: any) => {
     const components = FormGenerator.generateFromEntity(entity)
     addComponentsBatch(components)
+  }
+
+  // 判断是否为有效UUID
+  const isUuid = (id: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+
+  // 同步表到数据库 + 自动生成CRUD接口
+  const handleSyncTables = async () => {
+    if (!selectedModel) return
+    if (selectedModel.entities.length === 0) {
+      alert('请先添加实体和字段')
+      return
+    }
+
+    setSyncing(true)
+    setSyncMessage('')
+    try {
+      let modelId = selectedModel.id
+
+      // 如果模型还未保存到后端，先创建
+      if (!isUuid(modelId)) {
+        const createRes = await fetch(`${API_BASE}/data-model`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            name: selectedModel.name,
+            description: selectedModel.description,
+            entities: selectedModel.entities,
+            relations: selectedModel.relations,
+            enums: selectedModel.enums,
+          }),
+        })
+        const created = await createRes.json()
+        if (!createRes.ok) throw new Error(created.message || '保存数据模型失败')
+        modelId = (created.data || created).id
+        // 用后端返回的真实ID替换本地ID
+        updateDataModel(selectedModel.id, { ...selectedModel, id: modelId })
+        setSelectedModelId(modelId)
+      } else {
+        // 已存在则更新
+        await fetch(`${API_BASE}/data-model/${modelId}`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            name: selectedModel.name,
+            description: selectedModel.description,
+            entities: selectedModel.entities,
+            relations: selectedModel.relations,
+            enums: selectedModel.enums,
+          }),
+        })
+      }
+
+      // 同步表 + 获取CRUD接口
+      const syncRes = await fetch(`${API_BASE}/data-model/${modelId}/sync-tables`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      })
+      const syncResult = await syncRes.json()
+      if (!syncRes.ok) throw new Error(syncResult.message || '同步失败')
+
+      // 后端全局拦截器将响应包成 { code, msg, data } 格式
+      const syncData = syncResult.data || syncResult
+      setCrudEndpoints(syncData.crudEndpoints || [])
+      setSyncMessage(syncData.message || '同步成功')
+      setActiveTab('crud')
+    } catch (error: any) {
+      setSyncMessage(`同步失败: ${error.message}`)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  // 从后端获取已有的CRUD接口列表
+  const handleFetchCrudEndpoints = async () => {
+    if (!selectedModel || !isUuid(selectedModel.id)) {
+      alert('请先同步表结构')
+      return
+    }
+    try {
+      const res = await fetch(`${API_BASE}/dynamic-crud/endpoints/${selectedModel.id}`, {
+        headers: getAuthHeaders(),
+      })
+      const result = await res.json()
+      // 后端全局拦截器将响应包成 { code, msg, data } 格式
+      const data = result.data || result
+      setCrudEndpoints(Array.isArray(data) ? data : [])
+      setActiveTab('crud')
+    } catch {
+      alert('获取CRUD接口列表失败')
+    }
   }
 
   const handleAddModel = () => {
@@ -199,6 +293,16 @@ CREATE TABLE orders (
             >
               关系定义
             </button>
+            <button
+              className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+                activeTab === 'crud'
+                  ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+              onClick={() => handleFetchCrudEndpoints()}
+            >
+              CRUD 接口
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">
@@ -208,11 +312,62 @@ CREATE TABLE orders (
                 onUpdate={(updatedModel) => updateDataModel(selectedModelId!, updatedModel)}
                 onGenerateForm={handleGenerateForm}
               />
-            ) : (
+            ) : activeTab === 'relations' ? (
               <RelationEditor
                 model={selectedModel}
                 onUpdate={(updatedModel) => updateDataModel(selectedModelId!, updatedModel)}
               />
+            ) : (
+              <div className="space-y-4">
+                {crudEndpoints.length === 0 ? (
+                  <div className="text-center py-8 text-gray-400">
+                    <div className="text-4xl mb-2">🔌</div>
+                    <p className="text-sm">暂无CRUD接口</p>
+                    <p className="text-xs mt-1">点击「同步表并自动生成CRUD接口」按钮</p>
+                  </div>
+                ) : (
+                  crudEndpoints.map((ep) => (
+                    <div key={ep.tableName} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-sm font-bold text-gray-800">{ep.entityName}</span>
+                        <span className="text-xs text-gray-400">表: {ep.tableName}</span>
+                      </div>
+                      <div className="space-y-1.5">
+                        {Object.entries(ep.endpoints).map(([method, url]) => {
+                          const color = String(url).startsWith('GET')
+                            ? 'text-green-600'
+                            : String(url).startsWith('POST')
+                            ? 'text-blue-600'
+                            : String(url).startsWith('PUT')
+                            ? 'text-orange-600'
+                            : 'text-red-600'
+                          return (
+                            <div key={method} className="flex items-center gap-2 text-xs">
+                              <code className={`font-mono font-bold ${color}`}>{String(url)}</code>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* 底部操作栏 */}
+          <div className="p-3 border-t border-gray-200 bg-gray-50">
+            <button
+              onClick={handleSyncTables}
+              disabled={syncing || selectedModel.entities.length === 0}
+              className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 text-sm font-medium"
+            >
+              {syncing ? '同步中...' : '同步表并生成CRUD接口'}
+            </button>
+            {syncMessage && (
+              <div className={`mt-2 text-xs ${syncMessage.includes('失败') ? 'text-red-500' : 'text-green-600'}`}>
+                {syncMessage}
+              </div>
             )}
           </div>
         </div>

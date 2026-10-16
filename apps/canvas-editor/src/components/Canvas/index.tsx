@@ -37,7 +37,9 @@ function batchUpdateReducer(state: BatchUpdateState, action: BatchUpdateAction):
 export function Canvas() {
   const stageRef = useRef<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const canvasAreaRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
+  const [canvasAreaSize, setCanvasAreaSize] = useState({ width: 0, height: 0 })
   const [visibleRect, setVisibleRect] = useState({ x: 0, y: 0, width: 0, height: 0 })
   const [isDragSelecting, setIsDragSelecting] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
@@ -80,6 +82,26 @@ export function Canvas() {
 
     const rect = container.getBoundingClientRect()
     setDimensions({ width: rect.width, height: rect.height })
+
+    return () => resizeObserver.disconnect()
+  }, [])
+
+  // 监听画布区域尺寸变化（用于让画布铺满中间区域）
+  useEffect(() => {
+    const area = canvasAreaRef.current
+    if (!area) return
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect
+        setCanvasAreaSize({ width, height })
+      }
+    })
+
+    resizeObserver.observe(area)
+
+    const rect = area.getBoundingClientRect()
+    setCanvasAreaSize({ width: rect.width, height: rect.height })
 
     return () => resizeObserver.disconnect()
   }, [])
@@ -137,6 +159,15 @@ export function Canvas() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedIds, components, removeComponent, selectComponents, selectComponent])
 
+  // 拖动边界钳制：左/上/右不允许超出画布（切边）；下方允许（画布高度随内容自动扩展）
+  const clampToCanvas = useCallback((x: number, y: number, compWidth: number) => {
+    const maxX = Math.max(0, currentPage.width - compWidth)
+    return {
+      x: Math.min(Math.max(0, x), maxX),
+      y: Math.max(0, y),
+    }
+  }, [currentPage.width])
+
   // 批量更新组件位置（使用 requestAnimationFrame 优化）
   useEffect(() => {
     if (batchState.updates.size === 0 || batchState.isProcessing) return
@@ -151,14 +182,16 @@ export function Canvas() {
           finalX = Math.round(pos.x / currentPage.gridSize) * currentPage.gridSize
           finalY = Math.round(pos.y / currentPage.gridSize) * currentPage.gridSize
         }
-        updateComponent(id, { x: finalX, y: finalY })
+        const comp = components.find(c => c.id === id)
+        const clamped = clampToCanvas(finalX, finalY, comp?.width ?? 0)
+        updateComponent(id, { x: clamped.x, y: clamped.y })
       })
       dispatchBatch({ type: 'CLEAR_UPDATES' })
       dispatchBatch({ type: 'SET_PROCESSING', processing: false })
     })
 
     return () => cancelAnimationFrame(animationFrameId)
-  }, [batchState.updates, batchState.isProcessing, currentPage, updateComponent])
+  }, [batchState.updates, batchState.isProcessing, currentPage, components, clampToCanvas, updateComponent])
 
   // 判断组件是否在可见区域内（带有边距）
   const isComponentVisible = useCallback((component: any, margin: number = 150) => {
@@ -201,6 +234,7 @@ export function Canvas() {
     if (!stage) return
 
     const rect = stage.getContainer().getBoundingClientRect()
+    // 屏幕坐标 → 画布内容坐标：Stage 设置了 scaleX/scaleY = zoom，需做逆变换
     const x = (e.clientX - rect.left) / zoom
     const y = (e.clientY - rect.top) / zoom
 
@@ -291,18 +325,25 @@ export function Canvas() {
             finalX = Math.round(finalX / currentPage.gridSize) * currentPage.gridSize
             finalY = Math.round(finalY / currentPage.gridSize) * currentPage.gridSize
           }
-          updateComponent(selectedId, { x: finalX, y: finalY })
+          const clamped = clampToCanvas(finalX, finalY, comp.width)
+          updateComponent(selectedId, { x: clamped.x, y: clamped.y })
         }
       })
     } else {
       // 单个组件移动使用批量更新
       dispatchBatch({ type: 'ADD_UPDATE', id, x: newX, y: newY })
     }
-  }, [currentPage, updateComponent, selectedIds, components])
+  }, [currentPage, updateComponent, selectedIds, components, clampToCanvas])
 
   // 缩放后的画布尺寸（固定逻辑画布 × zoom）
   const scaledWidth = pageWidth * zoom
   const scaledHeight = pageHeight * zoom
+
+  // 画布铺满整个中间区域：至少占满可视画布区，放大超出时保持原尺寸（可滚动）
+  const stageWidth = Math.max(Math.round(canvasAreaSize.width), scaledWidth)
+  const stageHeight = Math.max(Math.round(canvasAreaSize.height), scaledHeight)
+  // 画布宽于可视区域时左对齐（避免 flex 居中导致左侧溢出部分无法滚动到）
+  const isHorizontalOverflow = scaledWidth > canvasAreaSize.width
 
   // 框选矩形属性
   const selectionRect = useMemo(() => {
@@ -321,17 +362,20 @@ export function Canvas() {
       onDrop={handleDrop}
       onDragOver={handleDragOver}
     >
-      <div className="min-w-full min-h-full p-4">
+      <div className="min-w-full min-h-full p-4 flex flex-col">
         <ComponentToolbar />
-        <div className="flex min-w-full justify-center mt-2" style={{ minHeight: 'calc(100% - 60px)' }}>
+        <div
+          ref={canvasAreaRef}
+          className={`flex-1 flex min-w-full mt-2 ${isHorizontalOverflow ? 'justify-start' : 'justify-center'}`}
+        >
           <div
             className="canvas-wrapper bg-white shadow-lg rounded-lg overflow-hidden"
-            style={{ width: scaledWidth, height: scaledHeight, margin: '0 auto' }}
+            style={{ width: stageWidth, height: stageHeight }}
           >
             <Stage
               ref={stageRef}
-              width={scaledWidth}
-              height={scaledHeight}
+              width={stageWidth}
+              height={stageHeight}
               scaleX={zoom}
               scaleY={zoom}
               onClick={handleStageMouseUp}
@@ -342,8 +386,8 @@ export function Canvas() {
             >
               <Layer>
                 <CanvasGrid
-                  width={pageWidth}
-                  height={pageHeight}
+                  width={stageWidth / zoom}
+                  height={stageHeight / zoom}
                   gridSize={currentPage.gridSize}
                   visible={currentPage.showGrid}
                 />
@@ -381,6 +425,8 @@ export function Canvas() {
                       onDragEnd={() => setIsDraggingComponent(false)}
                       onDragMove={(newX: number, newY: number) => handleComponentDragMove(component.id, newX, newY)}
                       onTransform={(attrs: any) => updateComponent(component.id, attrs)}
+                      pageWidth={pageWidth}
+                      zoom={zoom}
                     />
                   )
                 })}
@@ -399,7 +445,7 @@ export function Canvas() {
                     />
                   )}
                   <Text
-                    x={pageWidth - 80}
+                    x={stageWidth / zoom - 80}
                     y={20}
                     fontSize={12}
                     fill="#666"

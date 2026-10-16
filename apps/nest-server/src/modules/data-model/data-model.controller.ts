@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { DataModelService } from './data-model.service'
+import { DynamicCrudService } from './services/dynamic-crud.service'
 import { TableGeneratorService } from './services/table-generator.service'
 import { CrudGeneratorService } from './services/crud-generator.service'
 import { SchemaImportService } from './services/schema-import.service'
@@ -23,6 +24,7 @@ import { CreateDataModelDto, UpdateDataModelDto } from './dto/data-model.dto'
 export class DataModelController {
   constructor(
     private readonly dataModelService: DataModelService,
+    private readonly dynamicCrudService: DynamicCrudService,
     private readonly tableGeneratorService: TableGeneratorService,
     private readonly crudGeneratorService: CrudGeneratorService,
     private readonly schemaImportService: SchemaImportService,
@@ -146,11 +148,16 @@ export class DataModelController {
   }
 
   @Post(':id/sync-tables')
-  @ApiOperation({ summary: '同步数据库表' })
+  @ApiOperation({ summary: '同步数据库表（建表 + 自动生成CRUD接口）' })
   @ApiResponse({ status: 200, description: '同步成功' })
   async syncTables(@Param('id', ParseUUIDPipe) id: string) {
     const model = await this.dataModelService.findOne(id)
-    return this.tableGeneratorService.syncTables(model)
+    const syncResult = await this.tableGeneratorService.syncTables(model)
+    const crudEndpoints = await this.dynamicCrudService.getCrudEndpoints(id)
+    return {
+      ...syncResult,
+      crudEndpoints,
+    }
   }
 
   @Delete(':id/drop-tables')

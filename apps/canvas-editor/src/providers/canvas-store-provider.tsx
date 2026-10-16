@@ -1,12 +1,11 @@
 'use client'
 
-import { type ReactNode, createContext, useRef, useContext, type MutableRefObject } from 'react'
-import { useStore } from 'zustand'
-import { createCanvasStore, type CanvasState } from '@/store/canvasStore'
+import { type ReactNode, useRef, type MutableRefObject } from 'react'
+import { createCanvasStore } from '@/store/canvasStore'
+import { CanvasStoreContext, useCanvasStore, type CanvasStoreApi } from './canvas-store-context'
 
-export type CanvasStoreApi = ReturnType<typeof createCanvasStore>
-
-export const CanvasStoreContext = createContext<CanvasStoreApi | undefined>(undefined)
+export { useCanvasStore }
+export type { CanvasStoreApi }
 
 export interface CanvasStoreProviderProps {
   children: ReactNode
@@ -23,14 +22,4 @@ export const CanvasStoreProvider = ({ children }: CanvasStoreProviderProps) => {
       {children}
     </CanvasStoreContext.Provider>
   )
-}
-
-export const useCanvasStore = <T,>(selector: (store: CanvasState) => T): T => {
-  const canvasStoreContext = useContext(CanvasStoreContext)
-
-  if (!canvasStoreContext) {
-    throw new Error(`useCanvasStore must be used within CanvasStoreProvider`)
-  }
-
-  return useStore(canvasStoreContext, selector)
 }

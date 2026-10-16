@@ -340,19 +340,6 @@ const COMPONENT_TEMPLATES: Record<string, (comp: ComponentConfig) => string> = {
     return `<nav className="flex items-center" aria-label="breadcrumb">${items}</nav>`
   },
 
-  pagination: (comp) => {
-    const current = comp.props.current || 1
-    const total = comp.props.total || 10
-    const pageSize = comp.props.pageSize || 10
-    const totalPages = Math.ceil(total / pageSize)
-    
-    return `<div className="flex items-center gap-2">
-  <button className="px-3 py-1 border rounded ${current === 1 ? 'opacity-50 cursor-not-allowed' : ''}" disabled={${current === 1}}>上一页</button>
-  <span className="text-sm">第 ${current} / ${totalPages} 页</span>
-  <button className="px-3 py-1 border rounded ${current === totalPages ? 'opacity-50 cursor-not-allowed' : ''}" disabled={${current === totalPages}}>下一页</button>
-</div>`
-  },
-
   avatar: (comp) => {
     const sizes: Record<string, string> = {
       small: 'w-6 h-6 text-xs',

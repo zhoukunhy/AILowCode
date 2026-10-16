@@ -22,7 +22,7 @@ export function Sidebar() {
   const groupedComponents = {
     layout: componentList.filter(c => 
       ['card', 'divider', 'space', 'tabs', 'modal', 'drawer', 'steps', 'timeline', 
-       'tree', 'carousel', 'pagination'].includes(c.type)
+       'tree', 'carousel'].includes(c.type)
     ),
     formData: componentList.filter(c => 
       ['input', 'textarea', 'select', 'checkbox', 'radio', 'switch', 'datepicker', 

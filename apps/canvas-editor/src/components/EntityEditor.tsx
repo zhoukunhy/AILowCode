@@ -91,7 +91,6 @@ export function EntityEditor({ model, onUpdate, onGenerateForm }: EntityEditorPr
       validationRules: [],
       dataPermissions: [],
     }
-
     onUpdate({
       ...model,
       entities: model.entities.map(e =>
@@ -575,17 +574,36 @@ export function EntityEditor({ model, onUpdate, onGenerateForm }: EntityEditorPr
                       }`}
                     >
                       {editingFieldId === field.id ? (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
+                          {/* 中文名称 + 英文字段名 */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">中文名称</label>
+                              <input
+                                type="text"
+                                value={field.label}
+                                onChange={(e) =>
+                                  handleUpdateField(field.id, { label: e.target.value })
+                                }
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
+                                placeholder="如：用户名"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">英文字段名</label>
+                              <input
+                                type="text"
+                                value={field.name}
+                                onChange={(e) =>
+                                  handleUpdateField(field.id, { name: e.target.value.replace(/[^a-zA-Z0-9_]/g, '_') })
+                                }
+                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                                placeholder="如：user_name"
+                              />
+                            </div>
+                          </div>
+                          {/* 字段类型 + 长度/精度 */}
                           <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={field.name}
-                              onChange={(e) =>
-                                handleUpdateField(field.id, { name: e.target.value })
-                              }
-                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                              placeholder="字段名"
-                            />
                             <select
                               value={field.type}
                               onChange={(e) =>
@@ -599,17 +617,6 @@ export function EntityEditor({ model, onUpdate, onGenerateForm }: EntityEditorPr
                                 </option>
                               ))}
                             </select>
-                          </div>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              value={field.label}
-                              onChange={(e) =>
-                                handleUpdateField(field.id, { label: e.target.value })
-                              }
-                              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                              placeholder="显示标签"
-                            />
                             {field.type === 'string' && (
                               <input
                                 type="number"
@@ -772,8 +779,8 @@ export function EntityEditor({ model, onUpdate, onGenerateForm }: EntityEditorPr
                       ) : (
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="font-medium text-sm">{field.label || field.name}</div>
-                            <div className="text-xs text-gray-500">
+                            <div className="font-medium text-sm">{field.label || '未命名'}</div>
+                            <div className="text-xs text-gray-500 font-mono">
                               {field.name} : {fieldTypes.find(t => t.value === field.type)?.label || field.type}
                               {field.required && ' *'}
                               {field.primaryKey && ' 🔑'}
